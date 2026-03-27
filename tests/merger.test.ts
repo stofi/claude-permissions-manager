@@ -1,0 +1,409 @@
+import { describe, it, expect } from "vitest";
+import { parseRule, mergeSettingsFiles } from "../src/core/merger.js";
+import type { SettingsFile } from "../src/core/types.js";
+
+// Helpers to build fake SettingsFile objects
+function makeFile(
+  scope: SettingsFile["scope"],
+  data: SettingsFile["data"],
+  path = "/fake/path"
+): SettingsFile {
+  return {
+    path,
+    scope,
+    exists: true,
+    readable: true,
+    parsed: true,
+    data,
+  };
+}
+
+// ────────────────────────────────────────────────────────────
+// parseRule
+// ────────────────────────────────────────────────────────────
+
+describe("parseRule", () => {
+  it("parses a bare tool name", () => {
+    const r = parseRule("Read");
+    expect(r.tool).toBe("Read");
+    expect(r.specifier).toBeUndefined();
+    expect(r.raw).toBe("Read");
+  });
+
+  it("parses tool with specifier", () => {
+    const r = parseRule("Bash(npm run *)");
+    expect(r.tool).toBe("Bash");
+    expect(r.specifier).toBe("npm run *");
+  });
+
+  it("parses MCP tool", () => {
+    const r = parseRule("mcp__github__create_issue");
+    expect(r.tool).toBe("mcp__github__create_issue");
+    expect(r.specifier).toBeUndefined();
+  });
+
+  it("parses file path specifier with slashes", () => {
+    const r = parseRule("Read(**/.env)");
+    expect(r.tool).toBe("Read");
+    expect(r.specifier).toBe("**/.env");
+  });
+
+  it("handles empty specifier parens — treats as opaque raw string (not a valid rule)", () => {
+    // Regex requires .+ inside parens, so "Bash()" falls through to fallback
+    const r = parseRule("Bash()");
+    expect(r.raw).toBe("Bash()");
+    // tool will be the full string since the regex didn't match a specifier group
+    expect(r.specifier).toBeUndefined();
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// mergeSettingsFiles — basic merging
+// ────────────────────────────────────────────────────────────
+
+describe("mergeSettingsFiles — basic merging", () => {
+  it("returns default mode when no files have data", () => {
+    const result = mergeSettingsFiles([]);
+    expect(result.defaultMode).toBe("default");
+  });
+
+  it("picks mode from first file (local > project priority)", () => {
+    const local = makeFile("local", {
+      permissions: { defaultMode: "acceptEdits" },
+    });
+    const project = makeFile("project", {
+      permissions: { defaultMode: "plan" },
+    });
+    const result = mergeSettingsFiles([local, project]);
+    expect(result.defaultMode).toBe("acceptEdits");
+  });
+
+  it("falls through to project mode if local has none", () => {
+    const local = makeFile("local", { permissions: {} });
+    const project = makeFile("project", {
+      permissions: { defaultMode: "plan" },
+    });
+    const result = mergeSettingsFiles([local, project]);
+    expect(result.defaultMode).toBe("plan");
+  });
+
+  it("concatenates allow rules across scopes", () => {
+    const local = makeFile("local", {
+      permissions: { allow: ["Bash(npx *)"] },
+    });
+    const project = makeFile("project", {
+      permissions: { allow: ["Bash(npm run *)", "Read"] },
+    });
+    const result = mergeSettingsFiles([local, project]);
+    expect(result.allow.map((r) => r.raw)).toEqual([
+      "Bash(npx *)",
+      "Bash(npm run *)",
+      "Read",
+    ]);
+  });
+
+  it("tags each rule with its source scope", () => {
+    const local = makeFile("local", {
+      permissions: { allow: ["Read"] },
+    });
+    const project = makeFile("project", {
+      permissions: { deny: ["Bash"] },
+    });
+    const result = mergeSettingsFiles([local, project]);
+    expect(result.allow[0].scope).toBe("local");
+    expect(result.deny[0].scope).toBe("project");
+  });
+
+  it("deduplicates identical rules from different scopes", () => {
+    const local = makeFile("local", {
+      permissions: { allow: ["Read"] },
+    });
+    const user = makeFile("user", {
+      permissions: { allow: ["Read", "Bash(git *)"] },
+    });
+    const result = mergeSettingsFiles([local, user]);
+    const raws = result.allow.map((r) => r.raw);
+    expect(raws.filter((r) => r === "Read").length).toBe(1);
+    expect(raws).toContain("Bash(git *)");
+  });
+
+  it("merges env var names from all scopes", () => {
+    const local = makeFile("local", { env: { MY_VAR: "x" } });
+    const user = makeFile("user", { env: { OTHER: "y" } });
+    const result = mergeSettingsFiles([local, user]);
+    expect(result.envVarNames).toContain("MY_VAR");
+    expect(result.envVarNames).toContain("OTHER");
+  });
+
+  it("sets isBypassDisabled when any file has disableBypassPermissionsMode=disable", () => {
+    const managed = makeFile("managed", {
+      permissions: { disableBypassPermissionsMode: "disable" },
+    });
+    const project = makeFile("project", {
+      permissions: { allow: ["Read"] },
+    });
+    const result = mergeSettingsFiles([managed, project]);
+    expect(result.isBypassDisabled).toBe(true);
+  });
+
+  it("skips files that don't exist", () => {
+    const missing: SettingsFile = {
+      path: "/missing",
+      scope: "local",
+      exists: false,
+      readable: false,
+      parsed: false,
+    };
+    const project = makeFile("project", {
+      permissions: { allow: ["Read"] },
+    });
+    const result = mergeSettingsFiles([missing, project]);
+    expect(result.allow.length).toBe(1);
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// mergeSettingsFiles — warning detection
+// ────────────────────────────────────────────────────────────
+
+describe("mergeSettingsFiles — warning detection", () => {
+  it("emits critical warning for bypassPermissions mode", () => {
+    const f = makeFile("local", {
+      permissions: { defaultMode: "bypassPermissions" },
+    });
+    const result = mergeSettingsFiles([f]);
+    const crit = result.warnings.find((w) => w.severity === "critical");
+    expect(crit).toBeDefined();
+    expect(crit!.message).toMatch(/bypassPermissions/);
+  });
+
+  it("emits high warning for wildcard * in allow", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["*"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const high = result.warnings.find(
+      (w) => w.severity === "high" && w.rule === "*"
+    );
+    expect(high).toBeDefined();
+    expect(high!.message).toMatch(/wildcard/i);
+  });
+
+  it("emits high warning for unqualified Bash allow", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["Bash"], deny: ["Read(**/.env)"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const high = result.warnings.find(
+      (w) => w.severity === "high" && w.rule === "Bash"
+    );
+    expect(high).toBeDefined();
+  });
+
+  it("emits high warning for unqualified Write allow", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["Write"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const high = result.warnings.find(
+      (w) => w.severity === "high" && w.rule === "Write"
+    );
+    expect(high).toBeDefined();
+  });
+
+  it("emits high warning for unqualified Edit allow", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["Edit"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const high = result.warnings.find(
+      (w) => w.severity === "high" && w.rule === "Edit"
+    );
+    expect(high).toBeDefined();
+    expect(high!.message).toMatch(/all file edits/i);
+  });
+
+  it("does NOT warn for Edit with specifier", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["Edit(/src/**)"], deny: ["Read(**/.env)"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const editWarn = result.warnings.find((w) => w.rule === "Edit(/src/**)");
+    expect(editWarn).toBeUndefined();
+  });
+
+  it("emits medium warning for sensitive path in allow", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["Read(**/.env)"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const med = result.warnings.find(
+      (w) => w.severity === "medium" && w.rule === "Read(**/.env)"
+    );
+    expect(med).toBeDefined();
+  });
+
+  it("emits low warning for missing deny when Bash is allowed", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["Bash(npm run *)"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const low = result.warnings.find(
+      (w) => w.severity === "low" && w.message.includes("deny rules")
+    );
+    expect(low).toBeDefined();
+  });
+
+  it("does NOT warn about missing deny rules when only read-only tools are allowed", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["Read", "Glob", "Grep"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const low = result.warnings.find(
+      (w) => w.message.includes("deny rules")
+    );
+    expect(low).toBeUndefined();
+  });
+
+  it("does NOT warn about bypass mode when no explicit rules configured", () => {
+    const f = makeFile("project", {
+      permissions: {},
+    });
+    const result = mergeSettingsFiles([f]);
+    const bypassWarn = result.warnings.find(
+      (w) => w.message.includes("disableBypassPermissionsMode")
+    );
+    expect(bypassWarn).toBeUndefined();
+  });
+
+  it("emits medium warning for pending MCP server", () => {
+    const f = makeFile("project", { permissions: {} });
+    const result = mergeSettingsFiles([f], [
+      {
+        name: "my-server",
+        scope: "project",
+        approvalState: "pending",
+      },
+    ]);
+    const med = result.warnings.find(
+      (w) => w.severity === "medium" && w.message.includes("my-server")
+    );
+    expect(med).toBeDefined();
+  });
+
+  it("does NOT emit disableBypassPermissionsMode warning when bypass already active", () => {
+    const f = makeFile("project", {
+      permissions: {
+        defaultMode: "bypassPermissions",
+        allow: ["Bash"],
+      },
+    });
+    const result = mergeSettingsFiles([f]);
+    // CRITICAL should fire for bypass mode being active
+    const crit = result.warnings.find((w) => w.severity === "critical");
+    expect(crit).toBeDefined();
+    // LOW disableBypassPermissionsMode warning should NOT fire — bypass is already the problem
+    const redundant = result.warnings.find((w) =>
+      w.message.includes("disableBypassPermissionsMode")
+    );
+    expect(redundant).toBeUndefined();
+  });
+
+  it("no warnings for clean project with deny rules", () => {
+    const f = makeFile("project", {
+      permissions: {
+        allow: ["Bash(npm run *)", "Read"],
+        deny: ["Read(**/.env)"],
+        disableBypassPermissionsMode: "disable",
+      },
+    });
+    const result = mergeSettingsFiles([f]);
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  it("emits low warning when same rule appears in both allow and deny", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["Read"], deny: ["Read"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const conflict = result.warnings.find(
+      (w) => w.severity === "low" && w.message.includes("both allow and deny")
+    );
+    expect(conflict).toBeDefined();
+    expect(conflict!.rule).toBe("Read");
+  });
+
+  it("emits conflict warning when allow/deny conflict across scopes", () => {
+    const local = makeFile("local", { permissions: { allow: ["Bash(npm run *)"] } });
+    const project = makeFile("project", { permissions: { deny: ["Bash(npm run *)"] } });
+    const result = mergeSettingsFiles([local, project]);
+    const conflict = result.warnings.find(
+      (w) => w.severity === "low" && w.rule === "Bash(npm run *)"
+    );
+    expect(conflict).toBeDefined();
+  });
+
+  it("emits low warning when bare tool deny overrides specific allow rule", () => {
+    const f = makeFile("project", {
+      permissions: {
+        allow: ["Bash(git status)", "Bash(git log *)"],
+        deny: ["Bash"],
+      },
+    });
+    const result = mergeSettingsFiles([f]);
+    const overriddenWarnings = result.warnings.filter(
+      (w) => w.severity === "low" && w.message.includes("overridden by bare deny")
+    );
+    expect(overriddenWarnings).toHaveLength(2);
+    expect(overriddenWarnings.map((w) => w.rule)).toContain("Bash(git status)");
+    expect(overriddenWarnings.map((w) => w.rule)).toContain("Bash(git log *)");
+  });
+
+  it("does NOT emit bare-tool-deny warning for bare allow + bare deny (exact match handled separately)", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["Bash"], deny: ["Bash"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    // Should get the exact-match conflict warning, not the bare-tool-override warning
+    const exactConflict = result.warnings.find(
+      (w) => w.message.includes("both allow and deny")
+    );
+    expect(exactConflict).toBeDefined();
+    const overrideWarning = result.warnings.find(
+      (w) => w.message.includes("overridden by bare deny")
+    );
+    expect(overrideWarning).toBeUndefined(); // no specifier, so this check doesn't apply
+  });
+
+  it("emits low warnings for allow rules overridden by wildcard deny *", () => {
+    const f = makeFile("project", {
+      permissions: {
+        allow: ["Bash(npm run *)", "Read"],
+        deny: ["*"],
+      },
+    });
+    const result = mergeSettingsFiles([f]);
+    const overrides = result.warnings.filter(
+      (w) => w.severity === "low" && w.message.includes("wildcard deny")
+    );
+    expect(overrides).toHaveLength(2);
+    expect(overrides.map((w) => w.rule)).toContain("Bash(npm run *)");
+    expect(overrides.map((w) => w.rule)).toContain("Read");
+  });
+
+  it("does NOT emit wildcard deny override for allow * + deny * (exact match handled separately)", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["*"], deny: ["*"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    // Exact conflict warning fires, wildcard override does not
+    const wildcardOverride = result.warnings.find(
+      (w) => w.message.includes("wildcard deny")
+    );
+    expect(wildcardOverride).toBeUndefined();
+    const exactConflict = result.warnings.find(
+      (w) => w.message.includes("both allow and deny")
+    );
+    expect(exactConflict).toBeDefined();
+  });
+});

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": ["Bash(npm run *)", "Read", "Edit(/src/**)"],
+    "deny": ["Read(**/.env)", "Bash(sudo *)"],
+    "ask": ["Bash(git push *)"],
+    "defaultMode": "acceptEdits"
+  },
+  "env": {
+    "NODE_ENV": "development"
+  }
+}

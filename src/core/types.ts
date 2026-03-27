@@ -1,0 +1,92 @@
+import type { PermissionMode, SettingsData, McpFileData } from "./schemas.js";
+
+export type { PermissionMode };
+
+export type SettingsScope = "managed" | "user" | "project" | "local";
+
+export interface PermissionRule {
+  tool: string;
+  specifier?: string;
+  raw: string;
+}
+
+export interface SettingsFile {
+  path: string;
+  scope: SettingsScope;
+  exists: boolean;
+  readable: boolean;
+  parsed: boolean;
+  parseError?: string;
+  data?: SettingsData;
+}
+
+export interface McpServer {
+  name: string;
+  type?: "stdio" | "http";
+  command?: string;
+  args?: string[];
+  url?: string;
+  envVarNames?: string[];   // Names only, not values
+  headerNames?: string[];
+  scope: SettingsScope;
+  approvalState?: "approved" | "denied" | "pending";
+}
+
+export interface McpFile {
+  path: string;
+  exists: boolean;
+  parsed: boolean;
+  parseError?: string;
+  servers: McpServer[];
+  rawData?: McpFileData;
+}
+
+export interface ClaudeMdFile {
+  path: string;
+  exists: boolean;
+  lineCount?: number;
+  scope: SettingsScope;
+}
+
+export type WarningSeverity = "critical" | "high" | "medium" | "low";
+
+export interface Warning {
+  severity: WarningSeverity;
+  message: string;
+  rule?: string;
+}
+
+export interface EffectivePermissions {
+  defaultMode: PermissionMode;
+  allow: Array<PermissionRule & { scope: SettingsScope }>;
+  deny: Array<PermissionRule & { scope: SettingsScope }>;
+  ask: Array<PermissionRule & { scope: SettingsScope }>;
+  isBypassDisabled: boolean;
+  mcpServers: McpServer[];
+  envVarNames: string[];
+  additionalDirs: string[];
+  warnings: Warning[];
+}
+
+export interface ClaudeProject {
+  rootPath: string;
+  claudeDir: string;
+  settingsFiles: SettingsFile[];
+  mcpFile?: McpFile;
+  claudeMdFiles: ClaudeMdFile[];
+  effectivePermissions: EffectivePermissions;
+}
+
+export interface GlobalSettings {
+  managed?: SettingsFile;
+  user?: SettingsFile;
+  userMcpServers: McpServer[];
+}
+
+export interface ScanResult {
+  global: GlobalSettings;
+  projects: ClaudeProject[];
+  scanRoot: string;
+  scannedAt: Date;
+  errors: Array<{ path: string; error: string }>;
+}

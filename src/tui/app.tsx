@@ -1,0 +1,110 @@
+import React, { useState, useEffect } from "react";
+import { Box, Text, useApp } from "ink";
+import { Spinner } from "./components/Spinner.js";
+import { ProjectList } from "./screens/ProjectList.js";
+import { ProjectDetail } from "./screens/ProjectDetail.js";
+import { Audit } from "./screens/Audit.js";
+import { Diff } from "./screens/Diff.js";
+import { scan } from "../core/discovery.js";
+import type { ScanResult, ClaudeProject } from "../core/types.js";
+import type { ScanOptions } from "../core/discovery.js";
+
+type Screen =
+  | { name: "loading" }
+  | { name: "list" }
+  | { name: "detail"; project: ClaudeProject }
+  | { name: "audit" }
+  | { name: "diff" };
+
+interface AppProps {
+  scanOptions?: ScanOptions;
+}
+
+export function App({ scanOptions }: AppProps) {
+  const { exit } = useApp();
+  const [screen, setScreen] = useState<Screen>({ name: "loading" });
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    scan(scanOptions)
+      .then((result) => {
+        setScanResult(result);
+        setScreen({ name: "list" });
+      })
+      .catch((err: unknown) => {
+        setError(String(err));
+      });
+  }, []);
+
+  if (error) {
+    return (
+      <Box flexDirection="column">
+        <Text color="red" bold>
+          Error scanning filesystem:
+        </Text>
+        <Text color="red">{error}</Text>
+      </Box>
+    );
+  }
+
+  if (screen.name === "loading" || !scanResult) {
+    return (
+      <Box>
+        <Spinner label="Scanning for Claude projects..." />
+      </Box>
+    );
+  }
+
+  if (screen.name === "list") {
+    return (
+      <ProjectList
+        scanResult={scanResult}
+        onSelectProject={(p) => setScreen({ name: "detail", project: p })}
+        onAudit={() => setScreen({ name: "audit" })}
+        onDiff={() => setScreen({ name: "diff" })}
+        onQuit={() => exit()}
+      />
+    );
+  }
+
+  if (screen.name === "detail") {
+    const refresh = async () => {
+      const updated = await scan({ ...scanOptions, root: scanResult.scanRoot });
+      const refreshed = updated.projects.find(
+        (p) => p.rootPath === screen.project.rootPath
+      );
+      setScanResult(updated);
+      if (refreshed) {
+        setScreen({ name: "detail", project: refreshed });
+      }
+    };
+    return (
+      <ProjectDetail
+        project={screen.project}
+        onBack={() => setScreen({ name: "list" })}
+        onRefresh={refresh}
+      />
+    );
+  }
+
+  if (screen.name === "audit") {
+    return (
+      <Audit
+        scanResult={scanResult}
+        onBack={() => setScreen({ name: "list" })}
+      />
+    );
+  }
+
+  if (screen.name === "diff") {
+    return (
+      <Diff
+        scanResult={scanResult}
+        onBack={() => setScreen({ name: "list" })}
+      />
+    );
+  }
+
+  return null;
+}

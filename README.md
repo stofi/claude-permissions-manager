@@ -1,0 +1,125 @@
+# claude-permissions-manager (`cpm`)
+
+Discover, analyze, and manage [Claude Code](https://claude.ai/code) permissions across all your projects.
+
+## Install
+
+```bash
+npm install -g claude-permissions-manager
+# or run without installing:
+npx claude-permissions-manager
+```
+
+## Usage
+
+```bash
+cpm                         # Launch interactive TUI (when stdout is a TTY)
+cpm list                    # List all projects with their permission modes
+cpm show                    # Show permissions for current project (cwd)
+cpm show ~/my-project       # Show detailed permissions for a specific project
+cpm audit                   # Report risky permissions across all projects
+cpm diff <path1> <path2>    # Compare two projects side by side
+cpm export                  # Dump all permissions as JSON (stdout)
+cpm export --format csv     # Dump as CSV
+cpm export --output out.json  # Write to file
+```
+
+### Initialize a project
+
+```bash
+# Create a starter settings.json from a preset
+cpm init --project ~/my-project --preset node    # Node.js project
+cpm init --project ~/my-project --preset safe    # Read-only + safe git (default)
+cpm init --project ~/my-project --preset strict  # Highly restrictive
+
+# Use --scope local to create a personal settings.local.json instead
+cpm init --project ~/my-project --preset node --scope local
+```
+
+### Managing permissions
+
+```bash
+# Add rules
+cpm allow "Bash(npm run *)" --project ~/my-project --scope project
+cpm deny  "Read(**/.env)"   --project ~/my-project --scope project
+cpm ask   "Bash(git push *)" --project ~/my-project --scope project
+cpm allow "Read"            --scope user   # applies to all projects
+
+# Remove a rule
+cpm reset "Bash(npm run *)" --project ~/my-project --scope project
+
+# Clear all rules (with confirmation)
+cpm reset --all --yes --project ~/my-project --scope project
+
+# Set permission mode
+cpm mode acceptEdits --project ~/my-project --scope project
+```
+
+### Scope options
+
+| Scope | File | Applies to |
+|---|---|---|
+| `local` | `.claude/settings.local.json` | You, this project (default) |
+| `project` | `.claude/settings.json` | All collaborators (commit to git) |
+| `user` | `~/.claude/settings.json` | You, all projects |
+
+### Flags
+
+```
+--root <dir>   Override scan root (default: ~)
+--depth <n>    Max directory depth for scanning (default: 8)
+--json         Output as JSON (list, show, audit, diff, export)
+--no-global    Skip user/managed global settings (list, audit, export)
+```
+
+## Shell completion
+
+```bash
+# Bash — add to ~/.bashrc
+eval "$(cpm completion bash)"
+
+# Zsh — add to ~/.zshrc
+eval "$(cpm completion zsh)"
+```
+
+Tab-completes: commands, `--scope` values, `--format`, `--preset`, mode names, and directory paths.
+
+## Interactive TUI
+
+Run `cpm` (or `cpm ui`) for the interactive terminal UI:
+
+- `↑↓` / `j`/`k` — navigate projects
+- `Enter` — view project details
+- `a` — audit view (security issues)
+- `d` — diff two projects
+- `q` — quit
+
+In project detail (permissions tab):
+- `1` / `2` / `3` — switch tabs (permissions / MCP / warnings)
+- `j`/`k` — move cursor through rules
+- `a` — add allow rule, `d` — add deny rule, `s` — add ask rule
+- `x` — delete selected rule
+- `←` / `Esc` / `q` — back to list
+
+## What it reads
+
+- `~/.claude/settings.json` — your personal global settings
+- `.claude/settings.json` — project-level shared settings
+- `.claude/settings.local.json` — project-level personal settings
+- `/etc/claude-code/managed-settings.json` — enterprise managed settings
+- `.mcp.json` — MCP server configurations
+- `~/.claude.json` — Claude Code state (MCP approvals, per-project servers)
+
+Values from all scopes are merged. Deny rules at any scope win absolutely.
+
+## Security
+
+- Never displays environment variable values (only names)
+- Never displays MCP header values (only names)
+- Warns prominently for `bypassPermissions` mode
+- Atomic file writes (write to temp file, then rename)
+- No network access — fully local
+
+## Requirements
+
+Node.js ≥ 18

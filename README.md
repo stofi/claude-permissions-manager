@@ -1,5 +1,9 @@
 # claude-permissions-manager (`cpm`)
 
+[![CI](https://github.com/stofi/claude-permissions-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/stofi/claude-permissions-manager/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/claude-permissions-manager)](https://www.npmjs.com/package/claude-permissions-manager)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Discover, analyze, and manage [Claude Code](https://claude.ai/code) permissions across all your projects.
 
 ## Install

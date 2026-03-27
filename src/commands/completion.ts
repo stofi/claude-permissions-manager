@@ -58,6 +58,10 @@ _cpm_completions() {
       COMPREPLY=( \$(compgen -W "${presetList}" -- "\${cur}") )
       return 0
       ;;
+    --mode)
+      COMPREPLY=( \$(compgen -W "${modeList}" -- "\${cur}") )
+      return 0
+      ;;
     --root|--project|--output)
       COMPREPLY=( \$(compgen -d -- "\${cur}") )
       return 0
@@ -103,7 +107,7 @@ _cpm_completions() {
       return 0
       ;;
     ui)
-      COMPREPLY=( \$(compgen -W "--root --depth --json" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--root --depth" -- "\${cur}") )
       return 0
       ;;
     audit)
@@ -232,8 +236,7 @@ ${commandDefs}
         ui)
           _arguments \\
             '--root[Root directory]:root:_directories' \\
-            '--depth[Max scan depth]:depth:' \\
-            '--json[Output as JSON]'
+            '--depth[Max scan depth]:depth:'
           ;;
         audit)
           _arguments \\

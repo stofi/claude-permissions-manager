@@ -1,0 +1,3 @@
+# Re-include settings.local.json for test fixtures
+# (overrides global gitignore which excludes **/.claude/settings.local.json)
+!settings.local.json

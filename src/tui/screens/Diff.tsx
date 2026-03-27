@@ -210,8 +210,9 @@ function DiffView({
         );
       })()}
 
-      {allAllow.size === 0 && allDeny.size === 0 && allAsk.size === 0 && (
-        <Text color="gray">Both projects have no permission rules.</Text>
+      {allAllow.size === 0 && allDeny.size === 0 && allAsk.size === 0 &&
+        pa.mcpServers.length === 0 && pb.mcpServers.length === 0 && (
+        <Text color="green">✓ Projects have identical effective permissions.</Text>
       )}
     </Box>
   );

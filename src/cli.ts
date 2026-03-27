@@ -5,6 +5,11 @@ import { showCommand } from "./commands/show.js";
 import { auditCommand } from "./commands/audit.js";
 import { homeDir } from "./utils/paths.js";
 
+function parseDepth(raw: string, fallback = 8): number {
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
 const program = new Command();
 
 program
@@ -37,7 +42,7 @@ program
     const { uiCommand } = await import("./commands/ui.js");
     await uiCommand({
       root: opts.root,
-      maxDepth: parseInt(opts.depth, 10),
+      maxDepth: parseDepth(opts.depth),
     });
   });
 
@@ -51,7 +56,7 @@ program
   .action(async (opts) => {
     await listCommand({
       root: opts.root,
-      maxDepth: parseInt(opts.depth, 10),
+      maxDepth: parseDepth(opts.depth),
       json: opts.json,
       includeGlobal: opts.global !== false,
     });
@@ -75,7 +80,7 @@ program
   .action(async (opts) => {
     await auditCommand({
       root: opts.root,
-      maxDepth: parseInt(opts.depth, 10),
+      maxDepth: parseDepth(opts.depth),
       json: opts.json,
       includeGlobal: opts.global !== false,
     });
@@ -161,7 +166,7 @@ program
     const { exportCommand } = await import("./commands/export.js");
     await exportCommand({
       root: opts.root,
-      maxDepth: parseInt(opts.depth, 10),
+      maxDepth: parseDepth(opts.depth),
       format: opts.format,
       output: opts.output,
       includeGlobal: opts.global !== false,

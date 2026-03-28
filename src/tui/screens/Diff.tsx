@@ -13,7 +13,7 @@ interface DiffProps {
 type DiffState =
   | { phase: "selectA"; cursorA: number }
   | { phase: "selectB"; projectA: ClaudeProject; cursorA: number; cursorB: number }
-  | { phase: "view"; projectA: ClaudeProject; projectB: ClaudeProject };
+  | { phase: "view"; projectA: ClaudeProject; projectB: ClaudeProject; cursorA: number };
 
 function ProjectPicker({
   projects,
@@ -139,6 +139,13 @@ function DiffView({
 
   return (
     <Box flexDirection="column">
+      {/* Same-project note */}
+      {projectA.rootPath === projectB.rootPath && (
+        <Box marginBottom={1}>
+          <Text color="yellow">Note: comparing a project with itself</Text>
+        </Box>
+      )}
+
       {/* Header row */}
       <Box marginBottom={1}>
         <Text color="cyan" bold>
@@ -298,7 +305,7 @@ export function Diff({ scanResult, onBack }: DiffProps) {
   useInput((input, key) => {
     if (state.phase === "view") {
       if (key.escape || input === "q" || key.leftArrow) {
-        setState({ phase: "selectA", cursorA: 0 });
+        setState({ phase: "selectA", cursorA: state.cursorA });
         setScrollOffset(0);
       }
       return;
@@ -338,6 +345,7 @@ export function Diff({ scanResult, onBack }: DiffProps) {
           phase: "view",
           projectA: state.projectA,
           projectB: projects[cursor],
+          cursorA: state.cursorA,
         });
       }
     }
@@ -378,6 +386,7 @@ export function Diff({ scanResult, onBack }: DiffProps) {
                 phase: "view",
                 projectA: state.projectA,
                 projectB: p,
+                cursorA: state.cursorA,
               });
             }}
             onBack={() => {

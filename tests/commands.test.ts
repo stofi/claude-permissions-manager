@@ -314,6 +314,22 @@ describe("askCommand", () => {
     const data = await readSettings();
     expect(data.permissions.ask).toContain("Bash(git push *)");
   });
+
+  it("warns when rule also exists in deny list", async () => {
+    await denyCommand("Bash(git push *)", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await askCommand("Bash(git push *)", { project: tmpDir, scope: "project" });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /deny takes precedence/i.test(m))).toBe(true);
+  });
+
+  it("warns when rule also exists in allow list", async () => {
+    await allowCommand("Bash(git push *)", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await askCommand("Bash(git push *)", { project: tmpDir, scope: "project" });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /also in allow/i.test(m))).toBe(true);
+  });
 });
 
 describe("resetRuleCommand", () => {

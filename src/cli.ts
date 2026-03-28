@@ -16,7 +16,7 @@ const program = new Command();
 program
   .name("cpm")
   .description("Claude Permissions Manager — discover and manage Claude Code permissions")
-  .version("0.8.0");
+  .version("0.9.0");
 
 // Default action: TUI when TTY, list otherwise
 program.action(async () => {

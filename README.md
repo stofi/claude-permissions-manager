@@ -70,12 +70,14 @@ cpm mode acceptEdits --project ~/my-project --scope project
 ### Flags
 
 ```
---root <dir>   Override scan root (default: ~)
---depth <n>    Max directory depth for scanning (default: 8)
---json         Output as JSON (list, show, audit, diff, export)
---no-global    Skip user/managed global settings (list, audit, export, ui)
---exit-code    Exit 1 if issues found, 2 if critical issues (audit only — useful in CI)
---dry-run      Preview what would be written without modifying files (allow, deny, ask, mode, reset --all)
+--root <dir>       Override scan root (default: ~)
+--depth <n>        Max directory depth for scanning (default: 8)
+--json             Output as JSON (list, show, audit, diff, export)
+--no-global        Skip user/managed global settings (list, audit, export, ui)
+--exit-code        Exit 1 if issues found, 2 if critical issues (audit only — useful in CI)
+--dry-run          Preview what would be written without modifying files (allow, deny, ask, mode, reset --all)
+--format <fmt>     Output format: json|csv (export only, default: json)
+--output <file>    Write output to file instead of stdout (export only)
 ```
 
 #### Exit codes

@@ -179,7 +179,7 @@ export async function initCommand(opts: InitOptions): Promise<void> {
         ? "Tip: commit this file to share permissions with your team."
         : scope === "local"
         ? "Tip: add .claude/settings.local.json to .gitignore."
-        : ""
+        : "Tip: this applies to all Claude Code projects on this machine."
     )
   );
   if (mode === "bypassPermissions") {

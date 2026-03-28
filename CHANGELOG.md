@@ -7,16 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.0] - 2026-03-28
 
+### Added
+- `cpm reset --all --dry-run` — preview what would be cleared (shows allow/deny/ask rule counts) without modifying files; consistent with `--dry-run` on `allow`/`deny`/`ask`/`mode`.
+- **merger**: `ask` rules that conflict with `deny` now emit LOW warnings (exact match, bare-tool-deny override, wildcard `*` override) — parallels the existing allow/deny conflict detection.
+- `parseClaudeJson` now emits a `stderr` warning when `~/.claude.json` exists but cannot be read (EACCES) or contains invalid JSON, instead of silently returning empty.
+
 ### Fixed
 - **diff**: `envVarNames` and `additionalDirs` were not compared — projects differing only in these fields incorrectly reported as identical. Both JSON and text output now include ENV VARS and ADDITIONAL DIRS diff sections.
 - **diff `--json`**: `identical` flag now correctly accounts for `envVarNames` and `additionalDirs` differences.
-- **TUI Diff**: `isIdentical` check was missing `envVarNames` and `additionalDirs`; ENV VARS and ADDITIONAL DIRS diff sections added to match CLI text output.
+- **TUI Diff**: `isIdentical` check was missing `envVarNames` and `additionalDirs`; ENV VARS (magenta) and ADDITIONAL DIRS (cyan) diff sections added to match CLI text output.
 - **list `--json`**: `mcpServers` entries now include `type`, `envVarNames`, and `headerNames` — consistent with `show --json` and `export --json` (previously only `name`, `scope`, `approvalState`).
+- **show `--json`**: `mcpServers` entries were missing `?? "stdio"` / `?? "pending"` defaults for `type` and `approvalState` — in edge cases these fields could be omitted from the JSON output. Now consistent with `export --json` and `list --json`.
+- **init**: no tip was printed when using `--scope user`; now says "this applies to all Claude Code projects on this machine."
 
 ### Internal
 - `mode` command description in CLI now derived from `PermissionModeSchema.options` instead of being hardcoded.
 - Writer temp file names include a monotonic counter (`pid.counter`) to prevent collision when multiple writes occur concurrently within one process.
-- Test coverage expanded to 174 tests; additional tests for `showCommand --json` rule format, `diffCommand --json` identical flag, unknown preset error path, and `showCommand` no-.claude-dir error path.
+- Completion scripts (`bash`/`zsh`) updated to suggest `--dry-run` for `reset` command.
+- Test coverage expanded to 180 tests.
 
 ## [0.7.0] - 2026-03-28
 

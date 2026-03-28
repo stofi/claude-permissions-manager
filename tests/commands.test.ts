@@ -539,6 +539,22 @@ describe("showCommand — JSON", () => {
       expect(f).toHaveProperty("scope");
     }
   });
+
+  it("mcpServers have type and approvalState defaults (never undefined/null)", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+    await showCommand(join(FIXTURES, "project-a"), { json: true });
+
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(Array.isArray(json.mcpServers)).toBe(true);
+    for (const s of json.mcpServers as Record<string, unknown>[]) {
+      expect(s.type).toBeDefined();
+      expect(typeof s.type).toBe("string");
+      expect(s.approvalState).toBeDefined();
+      expect(typeof s.approvalState).toBe("string");
+    }
+  });
 });
 
 // ────────────────────────────────────────────────────────────

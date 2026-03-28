@@ -87,10 +87,16 @@ function DiffView({
   const askB = new Set(pb.ask.map((r) => r.raw));
   const mcpSetA = new Set(pa.mcpServers.map((s) => s.name));
   const mcpSetB = new Set(pb.mcpServers.map((s) => s.name));
+  const envSetA = new Set(pa.envVarNames);
+  const envSetB = new Set(pb.envVarNames);
+  const dirSetA = new Set(pa.additionalDirs);
+  const dirSetB = new Set(pb.additionalDirs);
 
   const allAllow = new Set([...allowA, ...allowB]);
   const allDeny = new Set([...denyA, ...denyB]);
   const allAsk = new Set([...askA, ...askB]);
+  const allEnv = new Set([...envSetA, ...envSetB]);
+  const allDirs = new Set([...dirSetA, ...dirSetB]);
 
   function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
     if (a.size !== b.size) return false;
@@ -104,7 +110,9 @@ function DiffView({
     setsEqual(allowA, allowB) &&
     setsEqual(denyA, denyB) &&
     setsEqual(askA, askB) &&
-    setsEqual(mcpSetA, mcpSetB);
+    setsEqual(mcpSetA, mcpSetB) &&
+    setsEqual(envSetA, envSetB) &&
+    setsEqual(dirSetA, dirSetB);
 
   function DiffRow({
     rule,
@@ -235,6 +243,38 @@ function DiffView({
           </Box>
         );
       })()}
+
+      {/* Env vars */}
+      {allEnv.size > 0 && (
+        <Box flexDirection="column" marginBottom={1}>
+          <Text bold color="magenta">ENV VARS</Text>
+          {[...allEnv].map((v) => (
+            <DiffRow
+              key={v}
+              rule={v}
+              inA={envSetA.has(v)}
+              inB={envSetB.has(v)}
+              color="magenta"
+            />
+          ))}
+        </Box>
+      )}
+
+      {/* Additional dirs */}
+      {allDirs.size > 0 && (
+        <Box flexDirection="column" marginBottom={1}>
+          <Text bold color="cyan">ADDITIONAL DIRS</Text>
+          {[...allDirs].map((d) => (
+            <DiffRow
+              key={d}
+              rule={d}
+              inA={dirSetA.has(d)}
+              inB={dirSetB.has(d)}
+              color="cyan"
+            />
+          ))}
+        </Box>
+      )}
 
       {isIdentical && (
         <Text color="green">✓ Projects have identical effective permissions.</Text>

@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **TUI ProjectList**: critical warnings (🚨) now show total count, consistent with non-critical warnings (`⚠ N`).
 - **TUI Audit**: scan errors (`scanResult.errors`) are now displayed at the bottom of the audit screen; previously silently ignored.
 - **TUI Audit**: pressing Enter on a warning navigates to the project detail screen; pressing ←/Esc/q from detail returns to the audit screen (previously Enter did nothing).
+- **TUI ProjectDetail**: after adding/removing a rule (triggering a background refresh), pressing back now correctly returns to the audit screen when the user navigated from there — previously the `from` origin was lost on refresh, causing back to always go to the project list.
 
 ### Internal
 - `mode` command description in CLI now derived from `PermissionModeSchema.options` instead of being hardcoded.

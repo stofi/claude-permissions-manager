@@ -150,7 +150,9 @@ export function ProjectDetail({ project, onBack, onRefresh }: ProjectDetailProps
       const path = resolveSettingsPath(selectedRule.scope, project.rootPath);
       const result = await removeRule(selectedRule.raw, path);
       if (result.removed) {
-        setCursor(Math.max(0, cursor - 1));
+        // If deleted item was last in list, move cursor up; otherwise stay in place
+        const newLength = allRules.length - 1;
+        setCursor(Math.min(cursor, Math.max(0, newLength - 1)));
         await onRefresh();
         showStatus(`Removed "${selectedRule.raw}" from ${selectedRule.scope}`);
       } else {

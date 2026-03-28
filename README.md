@@ -99,6 +99,23 @@ cpm show ~/my-project   # ✓ works
 cpm show ~              # ✗ won't expand to home directory
 ```
 
+### JSON output format
+
+When using `--json`, allow/deny/ask rules are emitted as objects with `rule` and `scope` fields (consistent across `list`, `show`, `diff`, and `export`):
+
+```json
+{
+  "allow": [
+    { "rule": "Bash(npm run *)", "scope": "project" },
+    { "rule": "Read", "scope": "user" }
+  ]
+}
+```
+
+`scope` is one of `"managed"`, `"user"`, `"project"`, or `"local"`.
+
+`cpm diff --json` additionally wraps rule arrays into `onlyInA`, `onlyInB`, and `inBoth` sub-keys. `inBoth` entries are plain strings (the scope is the same in both projects by definition).
+
 ## Shell completion
 
 ```bash

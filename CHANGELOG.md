@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-03-28
+
+### Added
+- **TUI Audit**: pressing Enter on a warning now navigates to the project detail screen; pressing ←/Esc/q from detail returns to the audit screen (previously Enter did nothing).
+
+### Fixed
+- **TUI Diff**: cursor position through the `view` phase — pressing Esc after viewing a diff now restores the project-A cursor position instead of resetting to 0. Previously the fix only covered the selectB→selectA back-navigation; the view→selectA path was also missing preservation.
+- **TUI Diff**: pressing ←/Esc/q from the diff view was incorrectly stored as `cursorA: 0`; now correctly uses `state.cursorA` in all `view → selectA` transitions.
+- **TUI Diff**: added "Note: comparing a project with itself" warning in the diff view when both selected projects have the same path — matches the existing CLI behaviour.
+- **TUI ProjectDetail**: after adding/removing a rule (triggering a background refresh), pressing back now correctly returns to the audit screen when the user navigated from there — the `from` origin was previously lost on refresh.
+- **README**: `--format` and `--output` flags (export-only) added to the Flags reference section; previously only documented in usage examples.
+
+### Internal
+- Test coverage expanded to 189 tests.
+  - `auditCommand` suite: JSON shape, issue detection, `--exit-code` exits 0/1/2 (all three branches now covered).
+  - `askCommand` conflict warnings: deny-takes-precedence and allow-list conflict paths.
+  - `askCommand --dry-run` coverage added (was the only manage command missing it).
+  - `diffCommand --json` envVarNames/additionalDirs fields verified.
+
 ## [0.8.0] - 2026-03-28
 
 ### Added

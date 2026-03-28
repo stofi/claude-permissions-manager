@@ -744,6 +744,29 @@ describe("auditCommand", () => {
     exitSpy.mockRestore();
   });
 
+  it("--exit-code exits 1 when non-critical warnings found", async () => {
+    // Create a project with a MEDIUM warning (bare WebFetch) but no CRITICAL
+    const warnDir = mkdtempSync(join(tmpdir(), "cpm-audit-warn-"));
+    const claudeDir = join(warnDir, "proj", ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    await import("fs/promises").then((fs) =>
+      fs.writeFile(join(claudeDir, "settings.json"), JSON.stringify({
+        permissions: { allow: ["WebFetch"] },
+      }))
+    );
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit:1"); });
+    try {
+      await expect(
+        auditCommand({ root: warnDir, maxDepth: 2, exitCode: true, includeGlobal: false })
+      ).rejects.toThrow("exit:1");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    } finally {
+      exitSpy.mockRestore();
+      rmSync(warnDir, { recursive: true, force: true });
+    }
+  });
+
   it("--exit-code exits 0 when no issues found", async () => {
     // Use an empty temp dir — no projects, no issues
     const emptyDir = mkdtempSync(join(tmpdir(), "cpm-audit-empty-"));

@@ -79,7 +79,7 @@ export function App({ scanOptions }: AppProps) {
       );
       setScanResult(updated);
       if (refreshed) {
-        setScreen({ name: "detail", project: refreshed });
+        setScreen({ name: "detail", project: refreshed, from: screen.from });
       } else {
         // Project was removed — fall back to list
         setScreen({ name: "list" });

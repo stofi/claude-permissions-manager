@@ -140,7 +140,7 @@ export function ProjectList({
               </Text>
               {"  "}
               {hasCritical ? (
-                <Text color="red" bold>🚨</Text>
+                <Text color="red" bold>🚨 {perms.warnings.length}</Text>
               ) : hasWarnings ? (
                 <Text color="yellow">⚠ {perms.warnings.length}</Text>
               ) : (

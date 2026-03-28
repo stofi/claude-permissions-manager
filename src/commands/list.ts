@@ -23,7 +23,7 @@ export async function listCommand(options: ScanOptions & { json?: boolean }): Pr
         ask: p.effectivePermissions.ask.map((r) => ({ rule: r.raw, scope: r.scope })),
         mcpServers: p.effectivePermissions.mcpServers.map((s) => ({
           name: s.name,
-          type: s.type,
+          type: s.type ?? "stdio",
           scope: s.scope,
           approvalState: s.approvalState ?? "pending",
           envVarNames: s.envVarNames,

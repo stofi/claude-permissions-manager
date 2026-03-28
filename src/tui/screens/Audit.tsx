@@ -117,6 +117,15 @@ export function Audit({ scanResult, onBack }: AuditProps) {
         </Box>
       )}
 
+      {scanResult.errors.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text color="red" bold>{scanResult.errors.length} project(s) could not be scanned:</Text>
+          {scanResult.errors.map((e) => (
+            <Text key={e.path} color="red">  {collapseHome(e.path)}: {e.error}</Text>
+          ))}
+        </Box>
+      )}
+
       <Box marginTop={1}>
         <Text color="gray">↑↓/jk scroll  ←/Esc/q: back</Text>
       </Box>

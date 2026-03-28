@@ -1,3 +1,4 @@
+import { PermissionModeSchema } from "./schemas.js";
 import type {
   SettingsFile,
   SettingsScope,
@@ -231,7 +232,11 @@ export function mergeSettingsFiles(
 
     const perms = file.data.permissions;
     if (perms) {
-      if (perms.defaultMode) modes.push(perms.defaultMode);
+      if (perms.defaultMode) {
+        const validMode = PermissionModeSchema.safeParse(perms.defaultMode);
+        if (validMode.success) modes.push(validMode.data);
+        // else: invalid mode value — schema warning in parseError already captures it
+      }
       if (perms.disableBypassPermissionsMode === "disable") {
         isBypassDisabled = true;
       }

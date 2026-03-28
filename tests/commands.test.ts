@@ -337,6 +337,13 @@ describe("modeCommand", () => {
     await expect(modeCommand("invalidMode", { project: tmpDir, scope: "project" })).rejects.toThrow();
     exitSpy.mockRestore();
   });
+
+  it("warns about all-project impact when setting bypassPermissions at user scope", async () => {
+    const logSpy = vi.spyOn(console, "log");
+    await modeCommand("bypassPermissions", { project: tmpDir, scope: "user" });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /user scope/i.test(m) && /ALL/i.test(m))).toBe(true);
+  });
 });
 
 describe("resetAllCommand", () => {

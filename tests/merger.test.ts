@@ -479,3 +479,50 @@ describe("mergeSettingsFiles — warning detection", () => {
     expect(warn).toBeUndefined();
   });
 });
+
+// ────────────────────────────────────────────────────────────
+// Invalid defaultMode handling
+// ────────────────────────────────────────────────────────────
+
+describe("mergeSettingsFiles — invalid defaultMode", () => {
+  it("ignores an invalid defaultMode value — falls back to 'default'", () => {
+    const file = makeFile("local", {
+      // Simulate a file that failed schema validation and was stored raw
+      permissions: { defaultMode: "invalid-mode" as "default" },
+    });
+    const result = mergeSettingsFiles([file]);
+    expect(result.defaultMode).toBe("default");
+  });
+
+  it("valid mode from higher-priority scope wins even when lower scope has invalid mode", () => {
+    const local = makeFile("local", {
+      permissions: { defaultMode: "typo-mode" as "default" },
+    });
+    const project = makeFile("project", {
+      permissions: { defaultMode: "acceptEdits" },
+    });
+    // local has invalid mode → skipped; project has valid → used
+    const result = mergeSettingsFiles([local, project]);
+    expect(result.defaultMode).toBe("acceptEdits");
+  });
+
+  it("valid mode from higher-priority scope still wins over invalid lower scope", () => {
+    const local = makeFile("local", {
+      permissions: { defaultMode: "auto" },
+    });
+    const project = makeFile("project", {
+      permissions: { defaultMode: "bogus" as "default" },
+    });
+    const result = mergeSettingsFiles([local, project]);
+    expect(result.defaultMode).toBe("auto");
+  });
+
+  it("all valid modes are accepted", () => {
+    const modes = ["default", "acceptEdits", "plan", "auto", "dontAsk", "bypassPermissions"] as const;
+    for (const m of modes) {
+      const file = makeFile("local", { permissions: { defaultMode: m } });
+      const result = mergeSettingsFiles([file]);
+      expect(result.defaultMode).toBe(m);
+    }
+  });
+});

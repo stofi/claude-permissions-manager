@@ -26,6 +26,23 @@ export function Audit({ scanResult, onBack, onSelectProject }: AuditProps) {
   const [cursor, setCursor] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
 
+  // Collect all warnings grouped by severity
+  const byseverity: Record<WarningSeverity, AuditItem[]> = {
+    critical: [],
+    high: [],
+    medium: [],
+    low: [],
+  };
+
+  for (const project of scanResult.projects) {
+    for (const w of project.effectivePermissions.warnings) {
+      byseverity[w.severity].push({ project, warning: w });
+    }
+  }
+
+  // Flatten in severity order
+  const items: AuditItem[] = SEVERITY_ORDER.flatMap((s) => byseverity[s]);
+
   useInput((input, key) => {
     if (key.escape || input === "q" || key.leftArrow) {
       onBack();
@@ -45,23 +62,6 @@ export function Audit({ scanResult, onBack, onSelectProject }: AuditProps) {
       }
     }
   });
-
-  // Collect all warnings grouped by severity
-  const byseverity: Record<WarningSeverity, AuditItem[]> = {
-    critical: [],
-    high: [],
-    medium: [],
-    low: [],
-  };
-
-  for (const project of scanResult.projects) {
-    for (const w of project.effectivePermissions.warnings) {
-      byseverity[w.severity].push({ project, warning: w });
-    }
-  }
-
-  // Flatten in severity order
-  const items: AuditItem[] = SEVERITY_ORDER.flatMap((s) => byseverity[s]);
 
   const visibleItems = items.slice(scrollOffset, scrollOffset + visibleRows);
 

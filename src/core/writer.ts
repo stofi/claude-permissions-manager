@@ -90,6 +90,7 @@ export async function addRule(
   list: RuleList,
   settingsPath: string
 ): Promise<{ added: boolean; alreadyPresent: boolean; conflictsWith?: RuleList }> {
+  raw = raw.trim();
   const validation = validateRule(raw);
   if (!validation.valid) {
     throw new Error(`Invalid rule "${raw}": ${validation.error}`);
@@ -126,6 +127,7 @@ export async function removeRule(
   settingsPath: string,
   listFilter?: RuleList
 ): Promise<{ removed: boolean; removedFrom: RuleList[] }> {
+  raw = raw.trim();
   const data = await readSettingsOrEmpty(settingsPath);
   const perms = data.permissions ?? {};
 

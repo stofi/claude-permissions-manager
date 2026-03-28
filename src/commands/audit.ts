@@ -3,7 +3,7 @@ import { scan } from "../core/discovery.js";
 import { collapseHome } from "../utils/paths.js";
 import type { ScanOptions } from "../core/discovery.js";
 
-export async function auditCommand(options: ScanOptions & { json?: boolean }): Promise<void> {
+export async function auditCommand(options: ScanOptions & { json?: boolean; exitCode?: boolean }): Promise<void> {
   process.stderr.write(chalk.gray("Scanning for Claude projects...\n"));
   const result = await scan(options);
 
@@ -26,13 +26,30 @@ export async function auditCommand(options: ScanOptions & { json?: boolean }): P
   }
 
   if (options.json) {
-    console.log(JSON.stringify({ issues: allIssues, errors: result.errors }, null, 2));
+    console.log(JSON.stringify({
+      generatedAt: result.scannedAt.toISOString(),
+      scanRoot: result.scanRoot,
+      projectCount: result.projects.length,
+      issueCount: allIssues.length,
+      issues: allIssues,
+      errors: result.errors,
+    }, null, 2));
+    if (options.exitCode && allIssues.length > 0) {
+      const hasCritical = allIssues.some((i) => i.severity === "critical");
+      process.exit(hasCritical ? 2 : 1);
+    }
     return;
   }
 
   if (allIssues.length === 0) {
     console.log(chalk.green(`\n✓ No issues found across ${result.projects.length} project(s).`));
-    return;
+    if (result.errors.length > 0) {
+      console.log(chalk.red(`\n${result.errors.length} scan error(s) — some projects could not be checked:`));
+      for (const e of result.errors) {
+        console.log(chalk.red(`  ${collapseHome(e.path)}: ${e.error}`));
+      }
+    }
+    return; // exit 0
   }
 
   const bySeverity = {
@@ -53,5 +70,17 @@ export async function auditCommand(options: ScanOptions & { json?: boolean }): P
       if (issue.rule) console.log(`    Rule: ${chalk.italic(issue.rule)}`);
     }
     console.log("");
+  }
+
+  if (result.errors.length > 0) {
+    console.log(chalk.red(`${result.errors.length} scan error(s) — some projects could not be checked:`));
+    for (const e of result.errors) {
+      console.log(chalk.red(`  ${collapseHome(e.path)}: ${e.error}`));
+    }
+  }
+
+  if (options.exitCode && allIssues.length > 0) {
+    const hasCritical = allIssues.some((i) => i.severity === "critical");
+    process.exit(hasCritical ? 2 : 1);
   }
 }

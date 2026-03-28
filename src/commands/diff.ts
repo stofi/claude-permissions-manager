@@ -11,6 +11,10 @@ export async function diffCommand(
   const root1 = resolve(expandHome(path1));
   const root2 = resolve(expandHome(path2));
 
+  if (root1 === root2) {
+    console.log(chalk.yellow("Note: comparing a project with itself — paths resolve to the same directory."));
+  }
+
   const [result1, result2] = await Promise.all([
     scan({ root: root1, maxDepth: 1 }),
     scan({ root: root2, maxDepth: 1 }),

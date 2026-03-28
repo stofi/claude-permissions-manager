@@ -43,30 +43,6 @@ export function managedSettingsPath(): string {
   return "/etc/claude-code/managed-settings.json";
 }
 
-/** Platform-specific path to managed CLAUDE.md */
-export function managedClaudeMdPath(): string {
-  const os = platform();
-  if (os === "darwin") {
-    return "/Library/Application Support/ClaudeCode/CLAUDE.md";
-  }
-  if (os === "win32") {
-    return "C:\\Program Files\\ClaudeCode\\CLAUDE.md";
-  }
-  return "/etc/claude-code/CLAUDE.md";
-}
-
-/** Path to managed-mcp.json */
-export function managedMcpPath(): string {
-  const os = platform();
-  if (os === "darwin") {
-    return "/Library/Application Support/ClaudeCode/managed-mcp.json";
-  }
-  if (os === "win32") {
-    return "C:\\Program Files\\ClaudeCode\\managed-mcp.json";
-  }
-  return "/etc/claude-code/managed-mcp.json";
-}
-
 /** System directories to skip during scanning */
 export const SKIP_DIRS = new Set([
   "/proc",
@@ -84,8 +60,14 @@ export const SKIP_DIR_NAMES = new Set([
   ".git",
   ".pnpm",
   ".npm",
+  ".yarn",
   "__pycache__",
   ".cache",
+  "vendor",
+  ".venv",
+  "venv",
+  ".svn",
+  ".hg",
   "Library",       // macOS Library within home
   "Applications",
 ]);

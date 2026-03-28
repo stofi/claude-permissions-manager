@@ -27,9 +27,9 @@ program.action(async () => {
   }
   if (process.stdout.isTTY) {
     const { uiCommand } = await import("./commands/ui.js");
-    await uiCommand({ root: homeDir() });
+    await uiCommand({ root: homeDir(), maxDepth: 8, includeGlobal: true });
   } else {
-    await listCommand({ root: homeDir() });
+    await listCommand({ root: homeDir(), maxDepth: 8, includeGlobal: true });
   }
 });
 
@@ -38,11 +38,13 @@ program
   .description("Launch interactive TUI")
   .option("--root <dir>", "Root directory to scan from", homeDir())
   .option("--depth <n>", "Max scan depth", "8")
+  .option("--no-global", "Skip user and managed global settings")
   .action(async (opts) => {
     const { uiCommand } = await import("./commands/ui.js");
     await uiCommand({
       root: opts.root,
       maxDepth: parseDepth(opts.depth),
+      includeGlobal: opts.global !== false,
     });
   });
 
@@ -77,12 +79,14 @@ program
   .option("--depth <n>", "Max scan depth", "8")
   .option("--json", "Output as JSON")
   .option("--no-global", "Skip user and managed global settings")
+  .option("--exit-code", "Exit with code 1 (issues found) or 2 (critical issues) for CI use")
   .action(async (opts) => {
     await auditCommand({
       root: opts.root,
       maxDepth: parseDepth(opts.depth),
       json: opts.json,
       includeGlobal: opts.global !== false,
+      exitCode: opts.exitCode,
     });
   });
 

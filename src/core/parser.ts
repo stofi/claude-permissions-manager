@@ -155,7 +155,6 @@ export async function parseMcpFile(
     parsed: result.success,
     parseError: result.success ? undefined : result.error.message,
     servers,
-    rawData: rawData as ReturnType<typeof McpFileSchema.parse>,
   };
 }
 
@@ -213,6 +212,7 @@ export async function parseClaudeJson(claudeJsonPath: string): Promise<{
         args: c.args as string[] | undefined,
         url: c.url as string | undefined,
         envVarNames: c.env ? Object.keys(c.env as object) : undefined,
+        headerNames: c.headers ? Object.keys(c.headers as object) : undefined,
         scope: "user",
         approvalState: "approved",
       });
@@ -238,8 +238,10 @@ export async function parseClaudeJson(claudeJsonPath: string): Promise<{
             name,
             type: (c.type as "stdio" | "http" | undefined) ?? "stdio",
             command: c.command as string | undefined,
+            args: c.args as string[] | undefined,
             url: c.url as string | undefined,
             envVarNames: c.env ? Object.keys(c.env as object) : undefined,
+            headerNames: c.headers ? Object.keys(c.headers as object) : undefined,
             scope: "local",
             approvalState,
           });

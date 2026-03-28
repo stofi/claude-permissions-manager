@@ -1,4 +1,4 @@
-import type { PermissionMode, SettingsData, McpFileData } from "./schemas.js";
+import type { PermissionMode, SettingsData } from "./schemas.js";
 
 export type { PermissionMode };
 
@@ -38,7 +38,6 @@ export interface McpFile {
   parsed: boolean;
   parseError?: string;
   servers: McpServer[];
-  rawData?: McpFileData;
 }
 
 export interface ClaudeMdFile {

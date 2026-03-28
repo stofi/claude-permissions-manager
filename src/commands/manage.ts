@@ -21,16 +21,29 @@ const VALID_MODES: PermissionMode[] = [
   "bypassPermissions",
 ];
 
+const VALID_SCOPES: SettingsScope[] = ["local", "project", "user"];
+
 function resolveProject(projectOpt?: string): string {
   if (!projectOpt) return process.cwd();
   return resolve(expandHome(projectOpt));
+}
+
+function resolveScope(scopeOpt?: string): SettingsScope {
+  const scope = scopeOpt ?? "local";
+  if (!VALID_SCOPES.includes(scope as SettingsScope)) {
+    console.error(
+      chalk.red(`Invalid scope "${scope}". Valid scopes: ${VALID_SCOPES.join(", ")}`)
+    );
+    process.exit(1);
+  }
+  return scope as SettingsScope;
 }
 
 export async function allowCommand(
   rule: string,
   opts: { project?: string; scope?: string }
 ): Promise<void> {
-  const scope = (opts.scope ?? "local") as SettingsScope;
+  const scope = resolveScope(opts.scope);
   const projectPath = resolveProject(opts.project);
 
   const validation = validateRule(rule);
@@ -61,7 +74,7 @@ export async function denyCommand(
   rule: string,
   opts: { project?: string; scope?: string }
 ): Promise<void> {
-  const scope = (opts.scope ?? "local") as SettingsScope;
+  const scope = resolveScope(opts.scope);
   const projectPath = resolveProject(opts.project);
 
   const validation = validateRule(rule);
@@ -89,7 +102,7 @@ export async function askCommand(
   rule: string,
   opts: { project?: string; scope?: string }
 ): Promise<void> {
-  const scope = (opts.scope ?? "local") as SettingsScope;
+  const scope = resolveScope(opts.scope);
   const projectPath = resolveProject(opts.project);
 
   const validation = validateRule(rule);
@@ -120,7 +133,7 @@ export async function resetRuleCommand(
   rule: string,
   opts: { project?: string; scope?: string }
 ): Promise<void> {
-  const scope = (opts.scope ?? "local") as SettingsScope;
+  const scope = resolveScope(opts.scope);
   const projectPath = resolveProject(opts.project);
   const settingsPath = resolveSettingsPath(scope, projectPath);
 
@@ -148,7 +161,7 @@ export async function modeCommand(
     process.exit(1);
   }
 
-  const scope = (opts.scope ?? "local") as SettingsScope;
+  const scope = resolveScope(opts.scope);
   const projectPath = resolveProject(opts.project);
   const settingsPath = resolveSettingsPath(scope, projectPath);
 
@@ -176,7 +189,7 @@ export async function modeCommand(
 export async function resetAllCommand(
   opts: { project?: string; scope?: string; yes?: boolean }
 ): Promise<void> {
-  const scope = (opts.scope ?? "local") as SettingsScope;
+  const scope = resolveScope(opts.scope);
   const projectPath = resolveProject(opts.project);
   const settingsPath = resolveSettingsPath(scope, projectPath);
 

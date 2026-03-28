@@ -79,7 +79,7 @@ export function ProjectList({
         <Text color="gray" bold>
           {"  "}
           {"Project".padEnd(38)}
-          {"Mode".padEnd(14)}
+          {"Mode".padEnd(23)}
           {"Allow".padEnd(7)}
           {"Deny".padEnd(6)}
           {"Ask".padEnd(5)}
@@ -120,7 +120,7 @@ export function ProjectList({
               backgroundColor={isSelected ? "cyan" : undefined}
               bold={!isSelected && perms.defaultMode === "bypassPermissions"}
             >
-              {"[" + perms.defaultMode + "]"}
+              {("[" + perms.defaultMode + "]").padEnd(19)}
             </Text>
             <Text
               color={isSelected ? "black" : undefined}

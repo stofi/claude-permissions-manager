@@ -201,7 +201,11 @@ export function ProjectDetail({ project, onBack, onRefresh }: ProjectDetailProps
 
       // Delete rule
       if (input === "x" && selectedRule) {
-        setMode("confirming-delete");
+        if (selectedRule.scope === "managed" || selectedRule.scope === "user") {
+          showStatus(`Cannot delete ${selectedRule.scope} scope rules`, "red");
+        } else {
+          setMode("confirming-delete");
+        }
       }
     },
     { isActive: mode === "view" }
@@ -377,6 +381,11 @@ export function ProjectDetail({ project, onBack, onRefresh }: ProjectDetailProps
                   {s.envVarNames && s.envVarNames.length > 0 && (
                     <Text color="gray">
                       {"    "}env: {s.envVarNames.join(", ")}
+                    </Text>
+                  )}
+                  {s.headerNames && s.headerNames.length > 0 && (
+                    <Text color="gray">
+                      {"    "}headers: {s.headerNames.join(", ")}
                     </Text>
                   )}
                 </Box>

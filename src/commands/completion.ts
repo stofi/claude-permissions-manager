@@ -89,14 +89,26 @@ _cpm_completions() {
     mode)
       if [[ "\${cur}" != -* ]]; then
         COMPREPLY=( \$(compgen -W "${modeList}" -- "\${cur}") )
-        return 0
+      else
+        COMPREPLY=( \$(compgen -W "--scope --project" -- "\${cur}") )
       fi
+      return 0
       ;;
-    show|diff)
+    show)
       if [[ "\${cur}" != -* ]]; then
         COMPREPLY=( \$(compgen -d -- "\${cur}") )
-        return 0
+      else
+        COMPREPLY=( \$(compgen -W "--json" -- "\${cur}") )
       fi
+      return 0
+      ;;
+    diff)
+      if [[ "\${cur}" != -* ]]; then
+        COMPREPLY=( \$(compgen -d -- "\${cur}") )
+      else
+        COMPREPLY=( \$(compgen -W "--json" -- "\${cur}") )
+      fi
+      return 0
       ;;
     completion)
       COMPREPLY=( \$(compgen -W "bash zsh" -- "\${cur}") )
@@ -107,11 +119,11 @@ _cpm_completions() {
       return 0
       ;;
     ui)
-      COMPREPLY=( \$(compgen -W "--root --depth" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--root --depth --no-global" -- "\${cur}") )
       return 0
       ;;
     audit)
-      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --exit-code" -- "\${cur}") )
       return 0
       ;;
     export)
@@ -196,7 +208,9 @@ ${commandDefs}
             '1:mode:(${modeList})'
           ;;
         show)
-          _arguments '1:project:_directories'
+          _arguments \\
+            '1:project:_directories' \\
+            '--json[Output as JSON]'
           ;;
         diff)
           _arguments \\
@@ -236,14 +250,16 @@ ${commandDefs}
         ui)
           _arguments \\
             '--root[Root directory]:root:_directories' \\
-            '--depth[Max scan depth]:depth:'
+            '--depth[Max scan depth]:depth:' \\
+            '--no-global[Skip user and managed global settings]'
           ;;
         audit)
           _arguments \\
             '--root[Root directory]:root:_directories' \\
             '--depth[Max scan depth]:depth:' \\
             '--json[Output as JSON]' \\
-            '--no-global[Skip user and managed global settings]'
+            '--no-global[Skip user and managed global settings]' \\
+            '--exit-code[Exit 1 if issues, 2 if critical (for CI)]'
           ;;
         export)
           _arguments \\

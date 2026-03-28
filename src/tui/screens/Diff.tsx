@@ -22,7 +22,6 @@ function ProjectPicker({
   onSelect,
   onBack,
   scrollOffset,
-  onScroll,
   visibleRows,
 }: {
   projects: ClaudeProject[];
@@ -31,7 +30,6 @@ function ProjectPicker({
   onSelect: (p: ClaudeProject) => void;
   onBack: () => void;
   scrollOffset: number;
-  onScroll: (offset: number) => void;
   visibleRows: number;
 }) {
   useInput((input, key) => {
@@ -87,10 +85,26 @@ function DiffView({
   const denyB = new Set(pb.deny.map((r) => r.raw));
   const askA = new Set(pa.ask.map((r) => r.raw));
   const askB = new Set(pb.ask.map((r) => r.raw));
+  const mcpSetA = new Set(pa.mcpServers.map((s) => s.name));
+  const mcpSetB = new Set(pb.mcpServers.map((s) => s.name));
 
   const allAllow = new Set([...allowA, ...allowB]);
   const allDeny = new Set([...denyA, ...denyB]);
   const allAsk = new Set([...askA, ...askB]);
+
+  function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
+    if (a.size !== b.size) return false;
+    for (const v of a) if (!b.has(v)) return false;
+    return true;
+  }
+
+  const isIdentical =
+    pa.defaultMode === pb.defaultMode &&
+    pa.isBypassDisabled === pb.isBypassDisabled &&
+    setsEqual(allowA, allowB) &&
+    setsEqual(denyA, denyB) &&
+    setsEqual(askA, askB) &&
+    setsEqual(mcpSetA, mcpSetB);
 
   function DiffRow({
     rule,
@@ -133,6 +147,20 @@ function DiffView({
         <Text color="gray">{"  →  "}</Text>
         <ModeBadge mode={pb.defaultMode} />
       </Box>
+
+      {/* Bypass lock diff (only when they differ) */}
+      {pa.isBypassDisabled !== pb.isBypassDisabled && (
+        <Box marginBottom={1}>
+          <Text>Bypass lock: </Text>
+          <Text color={pa.isBypassDisabled ? "green" : "gray"}>
+            {pa.isBypassDisabled ? "locked" : "not locked"}
+          </Text>
+          <Text color="gray">{"  →  "}</Text>
+          <Text color={pb.isBypassDisabled ? "green" : "gray"}>
+            {pb.isBypassDisabled ? "locked" : "not locked"}
+          </Text>
+        </Box>
+      )}
 
       {/* Allow */}
       {allAllow.size > 0 && (
@@ -190,9 +218,7 @@ function DiffView({
 
       {/* MCP Servers */}
       {(() => {
-        const mcpA = new Set(pa.mcpServers.map((s) => s.name));
-        const mcpB = new Set(pb.mcpServers.map((s) => s.name));
-        const allMcp = new Set([...mcpA, ...mcpB]);
+        const allMcp = new Set([...mcpSetA, ...mcpSetB]);
         if (allMcp.size === 0) return null;
         return (
           <Box flexDirection="column" marginBottom={1}>
@@ -201,8 +227,8 @@ function DiffView({
               <DiffRow
                 key={name}
                 rule={name}
-                inA={mcpA.has(name)}
-                inB={mcpB.has(name)}
+                inA={mcpSetA.has(name)}
+                inB={mcpSetB.has(name)}
                 color="blue"
               />
             ))}
@@ -210,8 +236,7 @@ function DiffView({
         );
       })()}
 
-      {allAllow.size === 0 && allDeny.size === 0 && allAsk.size === 0 &&
-        pa.mcpServers.length === 0 && pb.mcpServers.length === 0 && (
+      {isIdentical && (
         <Text color="green">✓ Projects have identical effective permissions.</Text>
       )}
     </Box>
@@ -293,7 +318,6 @@ export function Diff({ scanResult, onBack }: DiffProps) {
           }}
           onBack={onBack}
           scrollOffset={scrollOffset}
-          onScroll={setScrollOffset}
           visibleRows={visibleRows}
         />
       )}
@@ -321,7 +345,6 @@ export function Diff({ scanResult, onBack }: DiffProps) {
               setScrollOffset(0);
             }}
             scrollOffset={scrollOffset}
-            onScroll={setScrollOffset}
             visibleRows={visibleRows}
           />
         </Box>

@@ -90,6 +90,13 @@ function detectWarnings(
         rule: rule.raw,
       });
     }
+    if (rule.tool === "WebFetch" && !rule.specifier) {
+      warnings.push({
+        severity: "medium",
+        message: "WebFetch is allowed without any URL specifier — arbitrary URLs can be fetched",
+        rule: rule.raw,
+      });
+    }
     // Check for sensitive paths in allow
     if (
       rule.specifier &&
@@ -108,8 +115,9 @@ function detectWarnings(
   }
 
   // Only warn if there are non-trivial allow rules (not just read-only tools)
+  const READ_ONLY_TOOLS = ["Read", "Glob", "Grep", "WebFetch", "WebSearch"];
   const nonReadAllows = permissions.allow.filter(
-    (r) => !["Read", "Glob", "Grep"].includes(r.tool)
+    (r) => !READ_ONLY_TOOLS.includes(r.tool)
   );
   if (nonReadAllows.length > 0 && permissions.deny.length === 0) {
     warnings.push({
@@ -160,6 +168,33 @@ function detectWarnings(
         severity: "low",
         message: `Allow rule "${rule.raw}" is overridden by wildcard deny "*" — allow has no effect`,
         rule: rule.raw,
+      });
+    }
+  }
+
+  // Warn about managed-settings-only restriction flags
+  // These flags are only respected when set in managed settings (enterprise deployment)
+  for (const file of settingsFiles) {
+    if (!file.exists || !file.data || file.scope !== "managed") continue;
+    if (file.data.allowManagedPermissionRulesOnly) {
+      warnings.push({
+        severity: "high",
+        message:
+          "allowManagedPermissionRulesOnly is set in managed settings — project-level permission rules are overridden",
+      });
+    }
+    if (file.data.allowManagedHooksOnly) {
+      warnings.push({
+        severity: "medium",
+        message:
+          "allowManagedHooksOnly is set in managed settings — project-level hooks are overridden",
+      });
+    }
+    if (file.data.allowManagedMcpServersOnly) {
+      warnings.push({
+        severity: "medium",
+        message:
+          "allowManagedMcpServersOnly is set in managed settings — project-level MCP servers are overridden",
       });
     }
   }

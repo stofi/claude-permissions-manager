@@ -61,6 +61,7 @@ export async function showCommand(
         scope: s.scope,
         approvalState: s.approvalState,
         envVarNames: s.envVarNames,
+        headerNames: s.headerNames,
       })),
       claudeMdFiles: project.claudeMdFiles,
       warnings: perms.warnings,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Box, Text, useApp } from "ink";
 import { Spinner } from "./components/Spinner.js";
 import { ProjectList } from "./screens/ProjectList.js";
@@ -25,6 +25,7 @@ export function App({ scanOptions }: AppProps) {
   const [screen, setScreen] = useState<Screen>({ name: "loading" });
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const refreshCancelRef = useRef(0);
 
   useEffect(() => {
     scan(scanOptions)
@@ -70,19 +71,24 @@ export function App({ scanOptions }: AppProps) {
 
   if (screen.name === "detail") {
     const refresh = async () => {
+      const id = ++refreshCancelRef.current;
       const updated = await scan({ ...scanOptions, root: scanResult.scanRoot });
+      if (id !== refreshCancelRef.current) return; // navigation happened while scanning
       const refreshed = updated.projects.find(
         (p) => p.rootPath === screen.project.rootPath
       );
       setScanResult(updated);
       if (refreshed) {
         setScreen({ name: "detail", project: refreshed });
+      } else {
+        // Project was removed — fall back to list
+        setScreen({ name: "list" });
       }
     };
     return (
       <ProjectDetail
         project={screen.project}
-        onBack={() => setScreen({ name: "list" })}
+        onBack={() => { refreshCancelRef.current++; setScreen({ name: "list" }); }}
         onRefresh={refresh}
       />
     );

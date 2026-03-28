@@ -75,7 +75,7 @@ cpm mode acceptEdits --project ~/my-project --scope project
 --json         Output as JSON (list, show, audit, diff, export)
 --no-global    Skip user/managed global settings (list, audit, export, ui)
 --exit-code    Exit 1 if issues found, 2 if critical issues (audit only — useful in CI)
---dry-run      Preview what would be written without modifying files (allow, deny, ask, mode)
+--dry-run      Preview what would be written without modifying files (allow, deny, ask, mode, reset --all)
 ```
 
 #### Exit codes
@@ -138,12 +138,17 @@ Run `cpm` (or `cpm ui`) for the interactive terminal UI:
 - `d` — diff two projects
 - `q` — quit
 
+In the audit screen:
+- `↑↓` / `j`/`k` — navigate warnings
+- `Enter` — jump to that project's detail screen (back returns to audit)
+- `←` / `Esc` / `q` — back to list
+
 In project detail (permissions tab):
 - `1` / `2` / `3` — switch tabs (permissions / MCP / warnings)
 - `j`/`k` — move cursor through rules
 - `a` — add allow rule, `d` — add deny rule, `s` — add ask rule
 - `x` — delete selected rule
-- `←` / `Esc` / `q` — back to list
+- `←` / `Esc` / `q` — back
 
 ## What it reads
 

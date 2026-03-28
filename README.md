@@ -73,7 +73,29 @@ cpm mode acceptEdits --project ~/my-project --scope project
 --root <dir>   Override scan root (default: ~)
 --depth <n>    Max directory depth for scanning (default: 8)
 --json         Output as JSON (list, show, audit, diff, export)
---no-global    Skip user/managed global settings (list, audit, export)
+--no-global    Skip user/managed global settings (list, audit, export, ui)
+--exit-code    Exit 1 if issues found, 2 if critical issues (audit only — useful in CI)
+```
+
+#### Exit codes
+
+All commands exit `0` on success and `1` on error (missing `.claude` directory, invalid arguments, file I/O failure).
+
+`cpm audit --exit-code` uses additional codes:
+
+| Code | Meaning |
+|------|---------|
+| `0`  | No issues found |
+| `1`  | Warnings found (high, medium, or low severity) |
+| `2`  | Critical issues found |
+
+#### Path arguments
+
+`cpm` does **not** expand a bare `~` — use `~/` (with trailing slash) or a full path:
+
+```bash
+cpm show ~/my-project   # ✓ works
+cpm show ~              # ✗ won't expand to home directory
 ```
 
 ## Shell completion
@@ -126,4 +148,4 @@ Values from all scopes are merged. Deny rules at any scope win absolutely.
 
 ## Requirements
 
-Node.js ≥ 18
+Node.js ≥ 20

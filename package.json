@@ -33,6 +33,7 @@
   },
   "scripts": {
     "build": "tsc && chmod +x dist/cli.js",
+    "prepublishOnly": "npm run build && npm test && npm run typecheck",
     "dev": "tsx src/cli.ts",
     "start": "node dist/cli.js",
     "test": "vitest run",

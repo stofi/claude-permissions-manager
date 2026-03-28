@@ -105,6 +105,18 @@ describe("initCommand", () => {
     expect(data.permissions.allow).not.toContain("Bash(git status)");
     expect(data.permissions.deny).toContain("Bash");
   });
+
+  it("exits 1 on invalid scope", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    await expect(initCommand({ project: tmpDir, scope: "bogus" })).rejects.toThrow("exit:1");
+    exitSpy.mockRestore();
+  });
+
+  it("exits 1 on invalid mode", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    await expect(initCommand({ project: tmpDir, mode: "invalid-mode" })).rejects.toThrow("exit:1");
+    exitSpy.mockRestore();
+  });
 });
 
 // ────────────────────────────────────────────────────────────

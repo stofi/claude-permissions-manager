@@ -4,16 +4,12 @@ import { stat } from "fs/promises";
 import { expandHome, collapseHome } from "../utils/paths.js";
 import { resolveSettingsPath } from "../core/writer.js";
 import { addRule, setMode, clearAllRules } from "../core/writer.js";
-import type { PermissionMode } from "../core/types.js";
+import { PermissionModeSchema } from "../core/schemas.js";
+import type { PermissionMode, SettingsScope } from "../core/types.js";
 
-const VALID_MODES: PermissionMode[] = [
-  "default",
-  "acceptEdits",
-  "plan",
-  "auto",
-  "dontAsk",
-  "bypassPermissions",
-];
+// Derived from schema — single source of truth
+const VALID_MODES: PermissionMode[] = PermissionModeSchema.options;
+const VALID_SCOPES: SettingsScope[] = ["local", "project", "user"];
 
 interface InitOptions {
   project?: string;
@@ -98,7 +94,14 @@ const PRESETS: Record<string, {
 };
 
 export async function initCommand(opts: InitOptions): Promise<void> {
-  const scope = (opts.scope ?? "project") as "local" | "project" | "user";
+  const rawScope = opts.scope ?? "project";
+  if (!VALID_SCOPES.includes(rawScope as SettingsScope)) {
+    console.error(
+      chalk.red(`Invalid scope "${rawScope}". Valid scopes: ${VALID_SCOPES.join(", ")}`)
+    );
+    process.exit(1);
+  }
+  const scope = rawScope as SettingsScope;
   const projectPath = opts.project
     ? resolve(expandHome(opts.project))
     : process.cwd();

@@ -88,7 +88,8 @@ export function validateRule(raw: string): { valid: boolean; error?: string } {
 export async function addRule(
   raw: string,
   list: RuleList,
-  settingsPath: string
+  settingsPath: string,
+  options?: { dryRun?: boolean }
 ): Promise<{ added: boolean; alreadyPresent: boolean; conflictsWith?: RuleList }> {
   raw = raw.trim();
   const validation = validateRule(raw);
@@ -108,6 +109,10 @@ export async function addRule(
   // Check if rule exists in opposing list (deny wins over allow/ask)
   const opposingLists: RuleList[] = (["allow", "deny", "ask"] as RuleList[]).filter((l) => l !== list);
   const conflictsWith = opposingLists.find((l) => (Array.isArray(perms[l]) ? perms[l] : []).includes(raw));
+
+  if (options?.dryRun) {
+    return { added: true, alreadyPresent: false, conflictsWith };
+  }
 
   const updated: SettingsData = {
     ...data,

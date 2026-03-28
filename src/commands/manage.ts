@@ -7,20 +7,15 @@ import {
   clearAllRules,
   resolveSettingsPath,
   validateRule,
-  readSettingsOrEmpty,
+  readSettingsOrEmpty, // used by modeCommand dry-run
 } from "../core/writer.js";
 import { expandHome, collapseHome } from "../utils/paths.js";
+import { PermissionModeSchema } from "../core/schemas.js";
 import type { RuleList } from "../core/writer.js";
 import type { PermissionMode, SettingsScope } from "../core/types.js";
 
-const VALID_MODES: PermissionMode[] = [
-  "default",
-  "acceptEdits",
-  "plan",
-  "auto",
-  "dontAsk",
-  "bypassPermissions",
-];
+// Derived from schema — single source of truth for valid modes
+const VALID_MODES: PermissionMode[] = PermissionModeSchema.options;
 
 const VALID_SCOPES: SettingsScope[] = ["local", "project", "user"];
 
@@ -46,20 +41,14 @@ async function previewRuleAdd(
   settingsPath: string,
   scope: SettingsScope
 ): Promise<void> {
-  const data = await readSettingsOrEmpty(settingsPath);
-  const perms = data.permissions ?? {};
-  const existing = Array.isArray(perms[list]) ? perms[list] : [];
-  const alreadyPresent = existing.includes(rule);
-  const opposingLists = (["allow", "deny", "ask"] as RuleList[]).filter((l) => l !== list);
-  const conflictsWith = opposingLists.find((l) => (Array.isArray(perms[l]) ? perms[l] : []).includes(rule));
-
+  const result = await addRule(rule, list, settingsPath, { dryRun: true });
   console.log(chalk.cyan(`[dry-run] No files will be modified`));
-  if (alreadyPresent) {
+  if (result.alreadyPresent) {
     console.log(chalk.yellow(`  Rule "${rule}" is already in ${list} list — no change`));
   } else {
     console.log(`  Would add "${chalk.bold(rule)}" to ${list} list`);
-    if (conflictsWith) {
-      const msg = conflictsWith === "deny" ? "deny takes precedence" : `also in ${conflictsWith}`;
+    if (result.conflictsWith) {
+      const msg = result.conflictsWith === "deny" ? "deny takes precedence" : `also in ${result.conflictsWith}`;
       console.log(chalk.yellow(`  ⚠ ${msg}`));
     }
   }

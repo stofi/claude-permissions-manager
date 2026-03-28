@@ -25,6 +25,13 @@ export async function auditCommand(options: ScanOptions & { json?: boolean; exit
     }
   }
 
+  const exitWithCode = () => {
+    if (options.exitCode && allIssues.length > 0) {
+      const hasCritical = allIssues.some((i) => i.severity === "critical");
+      process.exit(hasCritical ? 2 : 1);
+    }
+  };
+
   if (options.json) {
     console.log(JSON.stringify({
       generatedAt: result.scannedAt.toISOString(),
@@ -34,10 +41,7 @@ export async function auditCommand(options: ScanOptions & { json?: boolean; exit
       issues: allIssues,
       errors: result.errors,
     }, null, 2));
-    if (options.exitCode && allIssues.length > 0) {
-      const hasCritical = allIssues.some((i) => i.severity === "critical");
-      process.exit(hasCritical ? 2 : 1);
-    }
+    exitWithCode();
     return;
   }
 
@@ -79,8 +83,5 @@ export async function auditCommand(options: ScanOptions & { json?: boolean; exit
     }
   }
 
-  if (options.exitCode && allIssues.length > 0) {
-    const hasCritical = allIssues.some((i) => i.severity === "critical");
-    process.exit(hasCritical ? 2 : 1);
-  }
+  exitWithCode();
 }

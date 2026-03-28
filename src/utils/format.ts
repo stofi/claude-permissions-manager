@@ -85,7 +85,8 @@ export function formatEffectivePermissions(
   const lines: string[] = [];
 
   lines.push(chalk.bold(`\n${collapseHome(project.rootPath)}`));
-  lines.push(`Mode: ${formatMode(perms.defaultMode)}`);
+  const bypassLock = perms.isBypassDisabled ? chalk.green("  [bypass locked]") : "";
+  lines.push(`Mode: ${formatMode(perms.defaultMode)}${bypassLock}`);
   lines.push("");
 
   // Settings files — show all scopes in precedence order (local, project, user, managed)

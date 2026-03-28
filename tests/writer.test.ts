@@ -247,6 +247,22 @@ describe("addRule", () => {
     expect(result.added).toBe(true);
     expect(result.conflictsWith).toBe("allow");
   });
+
+  it("reports conflictsWith=deny when ask rule is in deny list", async () => {
+    const path = settingsPath();
+    await addRule("Bash(git push *)", "deny", path);
+    const result = await addRule("Bash(git push *)", "ask", path);
+    expect(result.added).toBe(true);
+    expect(result.conflictsWith).toBe("deny");
+  });
+
+  it("reports conflictsWith=allow when ask rule is in allow list", async () => {
+    const path = settingsPath();
+    await addRule("Bash(git push *)", "allow", path);
+    const result = await addRule("Bash(git push *)", "ask", path);
+    expect(result.added).toBe(true);
+    expect(result.conflictsWith).toBe("allow");
+  });
 });
 
 // ────────────────────────────────────────────────────────────

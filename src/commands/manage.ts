@@ -7,6 +7,7 @@ import {
   clearAllRules,
   resolveSettingsPath,
   validateRule,
+  readSettingsOrEmpty,
 } from "../core/writer.js";
 import { expandHome, collapseHome } from "../utils/paths.js";
 import type { RuleList } from "../core/writer.js";
@@ -39,9 +40,35 @@ function resolveScope(scopeOpt?: string): SettingsScope {
   return scope as SettingsScope;
 }
 
+async function previewRuleAdd(
+  rule: string,
+  list: RuleList,
+  settingsPath: string,
+  scope: SettingsScope
+): Promise<void> {
+  const data = await readSettingsOrEmpty(settingsPath);
+  const perms = data.permissions ?? {};
+  const existing = Array.isArray(perms[list]) ? perms[list] : [];
+  const alreadyPresent = existing.includes(rule);
+  const opposingLists = (["allow", "deny", "ask"] as RuleList[]).filter((l) => l !== list);
+  const conflictsWith = opposingLists.find((l) => (Array.isArray(perms[l]) ? perms[l] : []).includes(rule));
+
+  console.log(chalk.cyan(`[dry-run] No files will be modified`));
+  if (alreadyPresent) {
+    console.log(chalk.yellow(`  Rule "${rule}" is already in ${list} list — no change`));
+  } else {
+    console.log(`  Would add "${chalk.bold(rule)}" to ${list} list`);
+    if (conflictsWith) {
+      const msg = conflictsWith === "deny" ? "deny takes precedence" : `also in ${conflictsWith}`;
+      console.log(chalk.yellow(`  ⚠ ${msg}`));
+    }
+  }
+  console.log(chalk.gray(`  target: ${collapseHome(settingsPath)} [${scope}]`));
+}
+
 export async function allowCommand(
   rule: string,
-  opts: { project?: string; scope?: string }
+  opts: { project?: string; scope?: string; dryRun?: boolean }
 ): Promise<void> {
   const scope = resolveScope(opts.scope);
   const projectPath = resolveProject(opts.project);
@@ -53,6 +80,12 @@ export async function allowCommand(
   }
 
   const settingsPath = resolveSettingsPath(scope, projectPath);
+
+  if (opts.dryRun) {
+    await previewRuleAdd(rule, "allow", settingsPath, scope);
+    return;
+  }
+
   const result = await addRule(rule, "allow", settingsPath);
 
   if (result.alreadyPresent) {
@@ -72,7 +105,7 @@ export async function allowCommand(
 
 export async function denyCommand(
   rule: string,
-  opts: { project?: string; scope?: string }
+  opts: { project?: string; scope?: string; dryRun?: boolean }
 ): Promise<void> {
   const scope = resolveScope(opts.scope);
   const projectPath = resolveProject(opts.project);
@@ -84,6 +117,12 @@ export async function denyCommand(
   }
 
   const settingsPath = resolveSettingsPath(scope, projectPath);
+
+  if (opts.dryRun) {
+    await previewRuleAdd(rule, "deny", settingsPath, scope);
+    return;
+  }
+
   const result = await addRule(rule, "deny", settingsPath);
 
   if (result.alreadyPresent) {
@@ -100,7 +139,7 @@ export async function denyCommand(
 
 export async function askCommand(
   rule: string,
-  opts: { project?: string; scope?: string }
+  opts: { project?: string; scope?: string; dryRun?: boolean }
 ): Promise<void> {
   const scope = resolveScope(opts.scope);
   const projectPath = resolveProject(opts.project);
@@ -112,6 +151,12 @@ export async function askCommand(
   }
 
   const settingsPath = resolveSettingsPath(scope, projectPath);
+
+  if (opts.dryRun) {
+    await previewRuleAdd(rule, "ask", settingsPath, scope);
+    return;
+  }
+
   const result = await addRule(rule, "ask", settingsPath);
 
   if (result.alreadyPresent) {
@@ -152,7 +197,7 @@ export async function resetRuleCommand(
 
 export async function modeCommand(
   mode: string,
-  opts: { project?: string; scope?: string }
+  opts: { project?: string; scope?: string; dryRun?: boolean }
 ): Promise<void> {
   if (!VALID_MODES.includes(mode as PermissionMode)) {
     console.error(
@@ -164,6 +209,15 @@ export async function modeCommand(
   const scope = resolveScope(opts.scope);
   const projectPath = resolveProject(opts.project);
   const settingsPath = resolveSettingsPath(scope, projectPath);
+
+  if (opts.dryRun) {
+    const data = await readSettingsOrEmpty(settingsPath);
+    const current = data.permissions?.defaultMode ?? "default";
+    console.log(chalk.cyan(`[dry-run] No files will be modified`));
+    console.log(`  Would set defaultMode: ${chalk.gray(current)} → ${chalk.bold(mode)}`);
+    console.log(chalk.gray(`  target: ${collapseHome(settingsPath)} [${scope}]`));
+    return;
+  }
 
   await setMode(mode as PermissionMode, settingsPath);
 

@@ -346,6 +346,54 @@ describe("modeCommand", () => {
   });
 });
 
+describe("--dry-run flag", () => {
+  it("allowCommand --dry-run does not write to file", async () => {
+    const logSpy = vi.spyOn(console, "log");
+    await allowCommand("Read", { project: tmpDir, scope: "project", dryRun: true });
+    // File should not be created
+    await expect(readFile(settingsPath(), "utf-8")).rejects.toThrow();
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /dry.run/i.test(m))).toBe(true);
+  });
+
+  it("allowCommand --dry-run shows 'already present' when rule exists", async () => {
+    await allowCommand("Read", { project: tmpDir, scope: "project" }); // write it first
+    const logSpy = vi.spyOn(console, "log");
+    await allowCommand("Read", { project: tmpDir, scope: "project", dryRun: true });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /already/i.test(m))).toBe(true);
+    // File should still have exactly one rule
+    const data = await readSettings();
+    expect(data.permissions.allow).toHaveLength(1);
+  });
+
+  it("denyCommand --dry-run does not write to file", async () => {
+    await denyCommand("Bash(sudo *)", { project: tmpDir, scope: "project", dryRun: true });
+    await expect(readFile(settingsPath(), "utf-8")).rejects.toThrow();
+  });
+
+  it("modeCommand --dry-run shows transition and does not write", async () => {
+    const logSpy = vi.spyOn(console, "log");
+    await modeCommand("acceptEdits", { project: tmpDir, scope: "project", dryRun: true });
+    await expect(readFile(settingsPath(), "utf-8")).rejects.toThrow();
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /dry.run/i.test(m))).toBe(true);
+    expect(calls.some((m) => /acceptEdits/.test(m))).toBe(true);
+  });
+
+  it("modeCommand --dry-run shows current → new mode transition", async () => {
+    // Set a mode first
+    await modeCommand("plan", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await modeCommand("auto", { project: tmpDir, scope: "project", dryRun: true });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /plan/.test(m) && /auto/.test(m))).toBe(true);
+    // File should still have "plan"
+    const data = await readSettings();
+    expect(data.permissions.defaultMode).toBe("plan");
+  });
+});
+
 describe("resetAllCommand", () => {
   it("requires --yes flag and exits 1 without it", async () => {
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });

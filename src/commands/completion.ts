@@ -90,7 +90,7 @@ _cpm_completions() {
       if [[ "\${cur}" != -* ]]; then
         COMPREPLY=( \$(compgen -W "${modeList}" -- "\${cur}") )
       else
-        COMPREPLY=( \$(compgen -W "--scope --project" -- "\${cur}") )
+        COMPREPLY=( \$(compgen -W "--scope --project --dry-run" -- "\${cur}") )
       fi
       return 0
       ;;
@@ -131,7 +131,7 @@ _cpm_completions() {
       return 0
       ;;
     allow|deny|ask)
-      COMPREPLY=( \$(compgen -W "--scope --project" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--scope --project --dry-run" -- "\${cur}") )
       return 0
       ;;
     reset)
@@ -205,6 +205,7 @@ ${commandDefs}
           _arguments \\
             '--scope[Settings scope]:scope:(${scopeList})' \\
             '--project[Project path]:project:_directories' \\
+            '--dry-run[Preview without writing]' \\
             '1:mode:(${modeList})'
           ;;
         show)
@@ -222,6 +223,7 @@ ${commandDefs}
           _arguments \\
             '--scope[Settings scope]:scope:(${scopeList})' \\
             '--project[Project path]:project:_directories' \\
+            '--dry-run[Preview without writing]' \\
             '1:rule:'
           ;;
         reset)

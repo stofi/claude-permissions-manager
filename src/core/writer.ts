@@ -28,7 +28,7 @@ export function resolveSettingsPath(
 }
 
 /** Read a settings file, returning empty object if it doesn't exist */
-async function readSettingsOrEmpty(path: string): Promise<SettingsData> {
+export async function readSettingsOrEmpty(path: string): Promise<SettingsData> {
   try {
     const content = await readFile(path, "utf-8");
     const json = JSON.parse(content);

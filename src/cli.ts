@@ -104,9 +104,10 @@ program
   .description('Add a rule to the allow list (e.g. cpm allow "Bash(npm run *)")')
   .option("--scope <scope>", "Settings scope: local|project|user (default: local)", "local")
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
+  .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (rule, opts) => {
     const { allowCommand } = await import("./commands/manage.js");
-    await allowCommand(rule, opts);
+    await allowCommand(rule, { ...opts, dryRun: opts.dryRun });
   });
 
 program
@@ -114,9 +115,10 @@ program
   .description('Add a rule to the deny list (e.g. cpm deny "Read(**/.env)")')
   .option("--scope <scope>", "Settings scope: local|project|user (default: local)", "local")
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
+  .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (rule, opts) => {
     const { denyCommand } = await import("./commands/manage.js");
-    await denyCommand(rule, opts);
+    await denyCommand(rule, { ...opts, dryRun: opts.dryRun });
   });
 
 program
@@ -124,9 +126,10 @@ program
   .description('Add a rule to the ask list (always prompt for confirmation)')
   .option("--scope <scope>", "Settings scope: local|project|user (default: local)", "local")
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
+  .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (rule, opts) => {
     const { askCommand } = await import("./commands/manage.js");
-    await askCommand(rule, opts);
+    await askCommand(rule, { ...opts, dryRun: opts.dryRun });
   });
 
 program
@@ -153,9 +156,10 @@ program
   .description("Set defaultMode: default|acceptEdits|plan|auto|dontAsk|bypassPermissions")
   .option("--scope <scope>", "Settings scope: local|project|user (default: local)", "local")
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
+  .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (mode, opts) => {
     const { modeCommand } = await import("./commands/manage.js");
-    await modeCommand(mode, opts);
+    await modeCommand(mode, { ...opts, dryRun: opts.dryRun });
   });
 
 program

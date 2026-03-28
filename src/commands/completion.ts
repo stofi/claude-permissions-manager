@@ -5,6 +5,7 @@
  *   eval "$(cpm completion bash)"   # add to ~/.bashrc
  *   eval "$(cpm completion zsh)"    # add to ~/.zshrc
  */
+import { PermissionModeSchema } from "../core/schemas.js";
 
 const COMMANDS = [
   "ui",
@@ -23,7 +24,7 @@ const COMMANDS = [
 ];
 
 const SCOPES = ["local", "project", "user"];
-const MODES = ["default", "acceptEdits", "plan", "auto", "dontAsk", "bypassPermissions"];
+const MODES = PermissionModeSchema.options;
 const PRESETS = ["safe", "node", "strict"];
 const FORMATS = ["json", "csv"];
 

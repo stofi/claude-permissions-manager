@@ -568,3 +568,62 @@ describe("diffCommand — JSON", () => {
     expect(json.identical).toBe(false);
   });
 });
+
+// ────────────────────────────────────────────────────────────
+// Additional edge case tests
+// ────────────────────────────────────────────────────────────
+
+describe("initCommand — error cases", () => {
+  it("exits 1 on unknown preset", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    await expect(initCommand({ project: tmpDir, preset: "unknown-preset" })).rejects.toThrow("exit:1");
+    exitSpy.mockRestore();
+  });
+});
+
+describe("showCommand — error cases", () => {
+  it("exits 1 when no .claude directory found", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
+    await expect(showCommand(tmpDir, {})).rejects.toThrow();
+    exitSpy.mockRestore();
+  });
+});
+
+describe("diffCommand — identical projects", () => {
+  it("reports identical:true when comparing same project to itself", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+    await diffCommand(
+      join(FIXTURES, "project-a"),
+      join(FIXTURES, "project-a"),
+      { json: true }
+    );
+
+    // diff.ts emits a "Note: comparing..." warning before the JSON — find the JSON call
+    const jsonStr = calls.map((a) => a.join("")).find((s) => s.trim().startsWith("{"));
+    const json = JSON.parse(jsonStr ?? "{}");
+    expect(json.identical).toBe(true);
+    expect(json.allow.onlyInA).toHaveLength(0);
+    expect(json.allow.onlyInB).toHaveLength(0);
+    expect(json.mode.a).toBe(json.mode.b);
+  });
+
+  it("includes envVarNames and additionalDirs in JSON output", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+    await diffCommand(
+      join(FIXTURES, "project-a"),
+      join(FIXTURES, "project-b"),
+      { json: true }
+    );
+
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(json).toHaveProperty("envVarNames");
+    expect(json).toHaveProperty("additionalDirs");
+    expect(json.envVarNames).toHaveProperty("onlyInA");
+    expect(json.envVarNames).toHaveProperty("onlyInB");
+    expect(json.envVarNames).toHaveProperty("inBoth");
+  });
+});

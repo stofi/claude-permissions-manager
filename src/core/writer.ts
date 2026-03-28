@@ -42,13 +42,16 @@ export async function readSettingsOrEmpty(path: string): Promise<SettingsData> {
   }
 }
 
+/** Monotonic counter for unique temp file names within this process */
+let _tmpCounter = 0;
+
 /** Atomically write a settings file (write to temp, then rename) */
 async function writeSettingsAtomic(path: string, data: SettingsData): Promise<void> {
   const dir = dirname(path);
   // Ensure the .claude directory exists
   mkdirSync(dir, { recursive: true });
 
-  const tmp = path + ".tmp." + process.pid;
+  const tmp = path + `.tmp.${process.pid}.${++_tmpCounter}`;
   try {
     await writeFile(tmp, JSON.stringify(data, null, 2) + "\n", "utf-8");
     await rename(tmp, path);

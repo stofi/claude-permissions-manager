@@ -12,7 +12,7 @@ interface DiffProps {
 
 type DiffState =
   | { phase: "selectA"; cursorA: number }
-  | { phase: "selectB"; projectA: ClaudeProject; cursorB: number }
+  | { phase: "selectB"; projectA: ClaudeProject; cursorA: number; cursorB: number }
   | { phase: "view"; projectA: ClaudeProject; projectB: ClaudeProject };
 
 function ProjectPicker({
@@ -312,7 +312,7 @@ export function Diff({ scanResult, onBack }: DiffProps) {
       return;
     }
     if (key.escape && state.phase === "selectB") {
-      setState({ phase: "selectA", cursorA: 0 });
+      setState({ phase: "selectA", cursorA: state.cursorA });
       setScrollOffset(0);
       return;
     }
@@ -331,7 +331,7 @@ export function Diff({ scanResult, onBack }: DiffProps) {
       if (prev < scrollOffset) setScrollOffset(prev);
     } else if (key.return) {
       if (state.phase === "selectA" && projects[cursor]) {
-        setState({ phase: "selectB", projectA: projects[cursor], cursorB: 0 });
+        setState({ phase: "selectB", projectA: projects[cursor], cursorA: cursor, cursorB: 0 });
         setScrollOffset(0);
       } else if (state.phase === "selectB" && projects[cursor]) {
         setState({
@@ -353,7 +353,7 @@ export function Diff({ scanResult, onBack }: DiffProps) {
           cursor={state.cursorA}
           label="Select first project:"
           onSelect={(p) => {
-            setState({ phase: "selectB", projectA: p, cursorB: 0 });
+            setState({ phase: "selectB", projectA: p, cursorA: state.cursorA, cursorB: 0 });
             setScrollOffset(0);
           }}
           onBack={onBack}
@@ -381,7 +381,7 @@ export function Diff({ scanResult, onBack }: DiffProps) {
               });
             }}
             onBack={() => {
-              setState({ phase: "selectA", cursorA: 0 });
+              setState({ phase: "selectA", cursorA: state.cursorA });
               setScrollOffset(0);
             }}
             scrollOffset={scrollOffset}

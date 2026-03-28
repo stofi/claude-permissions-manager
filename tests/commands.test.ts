@@ -11,6 +11,7 @@ import { exportCommand } from "../src/commands/export.js";
 import { listCommand } from "../src/commands/list.js";
 import { showCommand } from "../src/commands/show.js";
 import { diffCommand } from "../src/commands/diff.js";
+import { auditCommand } from "../src/commands/audit.js";
 import {
   allowCommand,
   denyCommand,
@@ -387,6 +388,14 @@ describe("--dry-run flag", () => {
     await expect(readFile(settingsPath(), "utf-8")).rejects.toThrow();
   });
 
+  it("askCommand --dry-run does not write to file", async () => {
+    const logSpy = vi.spyOn(console, "log");
+    await askCommand("Bash(git push *)", { project: tmpDir, scope: "project", dryRun: true });
+    await expect(readFile(settingsPath(), "utf-8")).rejects.toThrow();
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /dry.run/i.test(m))).toBe(true);
+  });
+
   it("modeCommand --dry-run shows transition and does not write", async () => {
     const logSpy = vi.spyOn(console, "log");
     await modeCommand("acceptEdits", { project: tmpDir, scope: "project", dryRun: true });
@@ -675,5 +684,59 @@ describe("diffCommand — identical projects", () => {
     expect(json.envVarNames).toHaveProperty("onlyInA");
     expect(json.envVarNames).toHaveProperty("onlyInB");
     expect(json.envVarNames).toHaveProperty("inBoth");
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// auditCommand
+// ────────────────────────────────────────────────────────────
+
+describe("auditCommand", () => {
+  it("outputs JSON with expected shape", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await auditCommand({ root: FIXTURES, maxDepth: 3, json: true });
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(json).toHaveProperty("generatedAt");
+    expect(json).toHaveProperty("scanRoot");
+    expect(typeof json.issueCount).toBe("number");
+    expect(Array.isArray(json.issues)).toBe(true);
+    for (const issue of json.issues) {
+      expect(issue).toHaveProperty("project");
+      expect(issue).toHaveProperty("severity");
+      expect(issue).toHaveProperty("message");
+    }
+  });
+
+  it("reports at least one issue from fixture projects", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await auditCommand({ root: FIXTURES, maxDepth: 3, json: true });
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    // project-bypass has bypassPermissions mode — should produce at least one warning
+    expect(json.issueCount).toBeGreaterThan(0);
+  });
+
+  it("--exit-code exits 2 when critical issues found", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit:2"); });
+    // project-bypass fixture has bypassPermissions mode → CRITICAL warning
+    await expect(
+      auditCommand({ root: join(FIXTURES, "project-bypass"), maxDepth: 1, exitCode: true })
+    ).rejects.toThrow("exit:2");
+    expect(exitSpy).toHaveBeenCalledWith(2);
+    exitSpy.mockRestore();
+  });
+
+  it("--exit-code exits 0 when no issues found", async () => {
+    // Use an empty temp dir — no projects, no issues
+    const emptyDir = mkdtempSync(join(tmpdir(), "cpm-audit-empty-"));
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await auditCommand({ root: emptyDir, maxDepth: 1, exitCode: true });
+      // Should complete without calling process.exit
+    } finally {
+      rmSync(emptyDir, { recursive: true, force: true });
+    }
   });
 });

@@ -16,15 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **diff**: `envVarNames` and `additionalDirs` were not compared — projects differing only in these fields incorrectly reported as identical. Both JSON and text output now include ENV VARS and ADDITIONAL DIRS diff sections.
 - **diff `--json`**: `identical` flag now correctly accounts for `envVarNames` and `additionalDirs` differences.
 - **TUI Diff**: `isIdentical` check was missing `envVarNames` and `additionalDirs`; ENV VARS (magenta) and ADDITIONAL DIRS (cyan) diff sections added to match CLI text output.
-- **list `--json`**: `mcpServers` entries now include `type`, `envVarNames`, and `headerNames` — consistent with `show --json` and `export --json` (previously only `name`, `scope`, `approvalState`).
-- **show `--json`**: `mcpServers` entries were missing `?? "stdio"` / `?? "pending"` defaults for `type` and `approvalState` — in edge cases these fields could be omitted from the JSON output. Now consistent with `export --json` and `list --json`.
+- **list `--json`**: `mcpServers` entries now include `type` (with `?? "stdio"` default), `envVarNames`, and `headerNames` — consistent with `show --json` and `export --json` (previously only `name`, `scope`, `approvalState`).
+- **show `--json`**: `mcpServers` entries were missing `?? "stdio"` / `?? "pending"` defaults for `type` and `approvalState` — in edge cases these fields could be omitted from JSON output. Now consistent with `export --json` and `list --json`.
 - **init**: no tip was printed when using `--scope user`; now says "this applies to all Claude Code projects on this machine."
+- **TUI Header**: hardcoded default version `"0.1.0"` was displayed on all TUI screens; removed so no stale version appears.
+- **TUI ProjectList**: critical warnings (🚨) now show total count, consistent with non-critical warnings (`⚠ N`).
+- **TUI Audit**: scan errors (`scanResult.errors`) are now displayed at the bottom of the audit screen; previously silently ignored.
 
 ### Internal
 - `mode` command description in CLI now derived from `PermissionModeSchema.options` instead of being hardcoded.
 - Writer temp file names include a monotonic counter (`pid.counter`) to prevent collision when multiple writes occur concurrently within one process.
 - Completion scripts (`bash`/`zsh`) updated to suggest `--dry-run` for `reset` command.
-- Test coverage expanded to 180 tests.
+- Test coverage expanded to 181 tests.
 
 ## [0.7.0] - 2026-03-28
 

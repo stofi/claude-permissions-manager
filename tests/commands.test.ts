@@ -447,6 +447,14 @@ describe("resetAllCommand", () => {
     await resetAllCommand({ project: tmpDir, scope: "project", dryRun: true });
     expect(calls.join("\n")).toMatch(/no permission rules/i);
   });
+
+  it("clears rules on a non-existent file (creates file with empty permissions)", async () => {
+    // No settings file exists yet — should not crash
+    await resetAllCommand({ project: tmpDir, scope: "project", yes: true });
+    const data = await readSettings();
+    expect(data.permissions?.allow ?? []).toHaveLength(0);
+    expect(data.permissions?.deny ?? []).toHaveLength(0);
+  });
 });
 
 // ────────────────────────────────────────────────────────────
@@ -481,13 +489,16 @@ describe("listCommand — JSON", () => {
     }
   });
 
-  it("mcpServers have scope and approvalState", async () => {
+  it("mcpServers have scope, approvalState, and type (never undefined)", async () => {
     const json = await captureListJson();
     for (const project of json.projects) {
-      for (const s of project.mcpServers) {
+      for (const s of project.mcpServers as Record<string, unknown>[]) {
         expect(s).toHaveProperty("name");
         expect(s).toHaveProperty("scope");
-        expect(s).toHaveProperty("approvalState");
+        expect(s.approvalState).toBeDefined();
+        expect(typeof s.approvalState).toBe("string");
+        expect(s.type).toBeDefined();
+        expect(typeof s.type).toBe("string");
       }
     }
   });

@@ -4,6 +4,9 @@ export type { PermissionMode };
 
 export type SettingsScope = "managed" | "user" | "project" | "local";
 
+/** Scopes that can be written to (excludes "managed" which is system-controlled) */
+export const WRITABLE_SCOPES: SettingsScope[] = ["local", "project", "user"];
+
 export interface PermissionRule {
   tool: string;
   specifier?: string;

@@ -39,12 +39,21 @@ export async function diffCommand(
   const mcpNamesB = new Set(p2.mcpServers.map((s) => s.name));
 
   if (opts.json) {
-    const allowOnlyA = p1.allow.filter((r) => !p2.allow.some((x) => x.raw === r.raw)).map((r) => ({ rule: r.raw, scope: r.scope }));
-    const allowOnlyB = p2.allow.filter((r) => !p1.allow.some((x) => x.raw === r.raw)).map((r) => ({ rule: r.raw, scope: r.scope }));
-    const denyOnlyA = p1.deny.filter((r) => !p2.deny.some((x) => x.raw === r.raw)).map((r) => ({ rule: r.raw, scope: r.scope }));
-    const denyOnlyB = p2.deny.filter((r) => !p1.deny.some((x) => x.raw === r.raw)).map((r) => ({ rule: r.raw, scope: r.scope }));
-    const askOnlyA = p1.ask.filter((r) => !p2.ask.some((x) => x.raw === r.raw)).map((r) => ({ rule: r.raw, scope: r.scope }));
-    const askOnlyB = p2.ask.filter((r) => !p1.ask.some((x) => x.raw === r.raw)).map((r) => ({ rule: r.raw, scope: r.scope }));
+    // Pre-compute Sets for O(1) lookup instead of O(n) per-item scan
+    const p1AllowRaws = new Set(p1.allow.map((r) => r.raw));
+    const p2AllowRaws = new Set(p2.allow.map((r) => r.raw));
+    const p1DenyRaws = new Set(p1.deny.map((r) => r.raw));
+    const p2DenyRaws = new Set(p2.deny.map((r) => r.raw));
+    const p1AskRaws = new Set(p1.ask.map((r) => r.raw));
+    const p2AskRaws = new Set(p2.ask.map((r) => r.raw));
+
+    const toRuleObj = (r: { raw: string; scope: import("../core/types.js").SettingsScope }) => ({ rule: r.raw, scope: r.scope });
+    const allowOnlyA = p1.allow.filter((r) => !p2AllowRaws.has(r.raw)).map(toRuleObj);
+    const allowOnlyB = p2.allow.filter((r) => !p1AllowRaws.has(r.raw)).map(toRuleObj);
+    const denyOnlyA = p1.deny.filter((r) => !p2DenyRaws.has(r.raw)).map(toRuleObj);
+    const denyOnlyB = p2.deny.filter((r) => !p1DenyRaws.has(r.raw)).map(toRuleObj);
+    const askOnlyA = p1.ask.filter((r) => !p2AskRaws.has(r.raw)).map(toRuleObj);
+    const askOnlyB = p2.ask.filter((r) => !p1AskRaws.has(r.raw)).map(toRuleObj);
     const mcpOnlyA = [...mcpNamesA].filter((n) => !mcpNamesB.has(n));
     const mcpOnlyB = [...mcpNamesB].filter((n) => !mcpNamesA.has(n));
     const identical =
@@ -64,17 +73,17 @@ export async function diffCommand(
       allow: {
         onlyInA: allowOnlyA,
         onlyInB: allowOnlyB,
-        inBoth: p1.allow.filter((r) => p2.allow.some((x) => x.raw === r.raw)).map((r) => r.raw),
+        inBoth: p1.allow.filter((r) => p2AllowRaws.has(r.raw)).map((r) => r.raw),
       },
       deny: {
         onlyInA: denyOnlyA,
         onlyInB: denyOnlyB,
-        inBoth: p1.deny.filter((r) => p2.deny.some((x) => x.raw === r.raw)).map((r) => r.raw),
+        inBoth: p1.deny.filter((r) => p2DenyRaws.has(r.raw)).map((r) => r.raw),
       },
       ask: {
         onlyInA: askOnlyA,
         onlyInB: askOnlyB,
-        inBoth: p1.ask.filter((r) => p2.ask.some((x) => x.raw === r.raw)).map((r) => r.raw),
+        inBoth: p1.ask.filter((r) => p2AskRaws.has(r.raw)).map((r) => r.raw),
       },
       mcpServers: {
         onlyInA: mcpOnlyA,

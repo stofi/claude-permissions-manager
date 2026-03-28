@@ -13,11 +13,10 @@ import { expandHome, collapseHome } from "../utils/paths.js";
 import { PermissionModeSchema } from "../core/schemas.js";
 import type { RuleList } from "../core/writer.js";
 import type { PermissionMode, SettingsScope } from "../core/types.js";
+import { WRITABLE_SCOPES } from "../core/types.js";
 
 // Derived from schema — single source of truth for valid modes
 const VALID_MODES: PermissionMode[] = PermissionModeSchema.options;
-
-const VALID_SCOPES: SettingsScope[] = ["local", "project", "user"];
 
 function resolveProject(projectOpt?: string): string {
   if (!projectOpt) return process.cwd();
@@ -26,9 +25,9 @@ function resolveProject(projectOpt?: string): string {
 
 function resolveScope(scopeOpt?: string): SettingsScope {
   const scope = scopeOpt ?? "local";
-  if (!VALID_SCOPES.includes(scope as SettingsScope)) {
+  if (!WRITABLE_SCOPES.includes(scope as SettingsScope)) {
     console.error(
-      chalk.red(`Invalid scope "${scope}". Valid scopes: ${VALID_SCOPES.join(", ")}`)
+      chalk.red(`Invalid scope "${scope}". Valid scopes: ${WRITABLE_SCOPES.join(", ")}`)
     );
     process.exit(1);
   }

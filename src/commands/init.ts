@@ -6,10 +6,10 @@ import { resolveSettingsPath } from "../core/writer.js";
 import { addRule, setMode, clearAllRules } from "../core/writer.js";
 import { PermissionModeSchema } from "../core/schemas.js";
 import type { PermissionMode, SettingsScope } from "../core/types.js";
+import { WRITABLE_SCOPES } from "../core/types.js";
 
 // Derived from schema — single source of truth
 const VALID_MODES: PermissionMode[] = PermissionModeSchema.options;
-const VALID_SCOPES: SettingsScope[] = ["local", "project", "user"];
 
 interface InitOptions {
   project?: string;
@@ -95,9 +95,9 @@ const PRESETS: Record<string, {
 
 export async function initCommand(opts: InitOptions): Promise<void> {
   const rawScope = opts.scope ?? "project";
-  if (!VALID_SCOPES.includes(rawScope as SettingsScope)) {
+  if (!WRITABLE_SCOPES.includes(rawScope as SettingsScope)) {
     console.error(
-      chalk.red(`Invalid scope "${rawScope}". Valid scopes: ${VALID_SCOPES.join(", ")}`)
+      chalk.red(`Invalid scope "${rawScope}". Valid scopes: ${WRITABLE_SCOPES.join(", ")}`)
     );
     process.exit(1);
   }

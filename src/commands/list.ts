@@ -18,9 +18,9 @@ export async function listCommand(options: ScanOptions & { json?: boolean }): Pr
         path: p.rootPath,
         mode: p.effectivePermissions.defaultMode,
         isBypassDisabled: p.effectivePermissions.isBypassDisabled,
-        allow: p.effectivePermissions.allow.map((r) => r.raw),
-        deny: p.effectivePermissions.deny.map((r) => r.raw),
-        ask: p.effectivePermissions.ask.map((r) => r.raw),
+        allow: p.effectivePermissions.allow.map((r) => ({ rule: r.raw, scope: r.scope })),
+        deny: p.effectivePermissions.deny.map((r) => ({ rule: r.raw, scope: r.scope })),
+        ask: p.effectivePermissions.ask.map((r) => ({ rule: r.raw, scope: r.scope })),
         mcpServers: p.effectivePermissions.mcpServers.map((s) => ({
           name: s.name,
           scope: s.scope,

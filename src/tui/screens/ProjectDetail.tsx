@@ -150,7 +150,9 @@ export function ProjectDetail({ project, onBack, onRefresh }: ProjectDetailProps
       const path = resolveSettingsPath(selectedRule.scope, project.rootPath);
       const result = await removeRule(selectedRule.raw, path);
       if (result.removed) {
-        setCursor(Math.max(0, cursor - 1));
+        // If deleted item was last in list, move cursor up; otherwise stay in place
+        const newLength = allRules.length - 1;
+        setCursor(Math.min(cursor, Math.max(0, newLength - 1)));
         await onRefresh();
         showStatus(`Removed "${selectedRule.raw}" from ${selectedRule.scope}`);
       } else {
@@ -201,7 +203,11 @@ export function ProjectDetail({ project, onBack, onRefresh }: ProjectDetailProps
 
       // Delete rule
       if (input === "x" && selectedRule) {
-        setMode("confirming-delete");
+        if (selectedRule.scope === "managed" || selectedRule.scope === "user") {
+          showStatus(`Cannot delete ${selectedRule.scope} scope rules`, "red");
+        } else {
+          setMode("confirming-delete");
+        }
       }
     },
     { isActive: mode === "view" }
@@ -377,6 +383,11 @@ export function ProjectDetail({ project, onBack, onRefresh }: ProjectDetailProps
                   {s.envVarNames && s.envVarNames.length > 0 && (
                     <Text color="gray">
                       {"    "}env: {s.envVarNames.join(", ")}
+                    </Text>
+                  )}
+                  {s.headerNames && s.headerNames.length > 0 && (
+                    <Text color="gray">
+                      {"    "}headers: {s.headerNames.join(", ")}
                     </Text>
                   )}
                 </Box>

@@ -139,6 +139,12 @@ export function formatEffectivePermissions(
         ? chalk.red("denied")
         : chalk.yellow("pending");
       lines.push(`  ${s.name.padEnd(20)} [${s.scope}]  ${s.type ?? "stdio"}  ${approval}`);
+      if (s.envVarNames && s.envVarNames.length > 0) {
+        lines.push(`    ${chalk.gray(`env: ${s.envVarNames.join(", ")}`)}`);
+      }
+      if (s.headerNames && s.headerNames.length > 0) {
+        lines.push(`    ${chalk.gray(`headers: ${s.headerNames.join(", ")}`)}`);
+      }
     }
     lines.push("");
   }

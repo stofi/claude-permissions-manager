@@ -1,10 +1,17 @@
 import chalk from "chalk";
+import { dirname } from "path";
+import { stat } from "fs/promises";
 import { scan } from "../core/discovery.js";
 import { collapseHome } from "../utils/paths.js";
 import type { ScanOptions } from "../core/discovery.js";
 import type { ClaudeProject } from "../core/types.js";
 
 type ExportFormat = "json" | "csv";
+
+/** Safely coerce a possibly-corrupt settings field to a string array */
+function toStringArray(val: unknown): string[] {
+  return Array.isArray(val) ? (val as string[]) : [];
+}
 
 function projectToJsonRecord(project: ClaudeProject) {
   const perms = project.effectivePermissions;
@@ -21,6 +28,7 @@ function projectToJsonRecord(project: ClaudeProject) {
       scope: s.scope,
       approvalState: s.approvalState ?? "pending",
       envVarNames: s.envVarNames ?? [],
+      headerNames: s.headerNames ?? [],
     })),
     envVarNames: perms.envVarNames,
     additionalDirs: perms.additionalDirs,
@@ -92,9 +100,9 @@ export async function exportCommand(
               path: result.global.user.path,
               exists: result.global.user.exists,
               parsed: result.global.user.parsed,
-              allow: result.global.user.data?.permissions?.allow ?? [],
-              deny: result.global.user.data?.permissions?.deny ?? [],
-              ask: result.global.user.data?.permissions?.ask ?? [],
+              allow: toStringArray(result.global.user.data?.permissions?.allow),
+              deny: toStringArray(result.global.user.data?.permissions?.deny),
+              ask: toStringArray(result.global.user.data?.permissions?.ask),
               mode: result.global.user.data?.permissions?.defaultMode,
             }
           : null,
@@ -103,9 +111,9 @@ export async function exportCommand(
               path: result.global.managed.path,
               exists: result.global.managed.exists,
               parsed: result.global.managed.parsed,
-              allow: result.global.managed.data?.permissions?.allow ?? [],
-              deny: result.global.managed.data?.permissions?.deny ?? [],
-              ask: result.global.managed.data?.permissions?.ask ?? [],
+              allow: toStringArray(result.global.managed.data?.permissions?.allow),
+              deny: toStringArray(result.global.managed.data?.permissions?.deny),
+              ask: toStringArray(result.global.managed.data?.permissions?.ask),
               mode: result.global.managed.data?.permissions?.defaultMode,
             }
           : null,
@@ -113,6 +121,7 @@ export async function exportCommand(
           name: s.name,
           type: s.type ?? "stdio",
           envVarNames: s.envVarNames ?? [],
+          headerNames: s.headerNames ?? [],
         })),
       },
       projects: result.projects.map(projectToJsonRecord),
@@ -124,6 +133,12 @@ export async function exportCommand(
   }
 
   if (options.output) {
+    const dir = dirname(options.output);
+    try {
+      await stat(dir);
+    } catch {
+      throw new Error(`Output directory does not exist: ${dir}`);
+    }
     const { writeFile } = await import("fs/promises");
     await writeFile(options.output, output, "utf-8");
     process.stderr.write(

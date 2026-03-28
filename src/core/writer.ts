@@ -28,7 +28,7 @@ export function resolveSettingsPath(
 }
 
 /** Read a settings file, returning empty object if it doesn't exist */
-async function readSettingsOrEmpty(path: string): Promise<SettingsData> {
+export async function readSettingsOrEmpty(path: string): Promise<SettingsData> {
   try {
     const content = await readFile(path, "utf-8");
     const json = JSON.parse(content);
@@ -42,13 +42,16 @@ async function readSettingsOrEmpty(path: string): Promise<SettingsData> {
   }
 }
 
+/** Monotonic counter for unique temp file names within this process */
+let _tmpCounter = 0;
+
 /** Atomically write a settings file (write to temp, then rename) */
 async function writeSettingsAtomic(path: string, data: SettingsData): Promise<void> {
   const dir = dirname(path);
   // Ensure the .claude directory exists
   mkdirSync(dir, { recursive: true });
 
-  const tmp = path + ".tmp." + process.pid;
+  const tmp = path + `.tmp.${process.pid}.${++_tmpCounter}`;
   try {
     await writeFile(tmp, JSON.stringify(data, null, 2) + "\n", "utf-8");
     await rename(tmp, path);
@@ -88,8 +91,10 @@ export function validateRule(raw: string): { valid: boolean; error?: string } {
 export async function addRule(
   raw: string,
   list: RuleList,
-  settingsPath: string
+  settingsPath: string,
+  options?: { dryRun?: boolean }
 ): Promise<{ added: boolean; alreadyPresent: boolean; conflictsWith?: RuleList }> {
+  raw = raw.trim();
   const validation = validateRule(raw);
   if (!validation.valid) {
     throw new Error(`Invalid rule "${raw}": ${validation.error}`);
@@ -107,6 +112,10 @@ export async function addRule(
   // Check if rule exists in opposing list (deny wins over allow/ask)
   const opposingLists: RuleList[] = (["allow", "deny", "ask"] as RuleList[]).filter((l) => l !== list);
   const conflictsWith = opposingLists.find((l) => (Array.isArray(perms[l]) ? perms[l] : []).includes(raw));
+
+  if (options?.dryRun) {
+    return { added: true, alreadyPresent: false, conflictsWith };
+  }
 
   const updated: SettingsData = {
     ...data,
@@ -126,6 +135,7 @@ export async function removeRule(
   settingsPath: string,
   listFilter?: RuleList
 ): Promise<{ removed: boolean; removedFrom: RuleList[] }> {
+  raw = raw.trim();
   const data = await readSettingsOrEmpty(settingsPath);
   const perms = data.permissions ?? {};
 

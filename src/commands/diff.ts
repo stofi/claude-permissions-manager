@@ -2,6 +2,7 @@ import chalk from "chalk";
 import { resolve } from "path";
 import { scan } from "../core/discovery.js";
 import { expandHome, collapseHome } from "../utils/paths.js";
+import type { SettingsScope } from "../core/types.js";
 
 export async function diffCommand(
   path1: string,
@@ -10,6 +11,10 @@ export async function diffCommand(
 ): Promise<void> {
   const root1 = resolve(expandHome(path1));
   const root2 = resolve(expandHome(path2));
+
+  if (root1 === root2) {
+    console.log(chalk.yellow("Note: comparing a project with itself — paths resolve to the same directory."));
+  }
 
   const [result1, result2] = await Promise.all([
     scan({ root: root1, maxDepth: 1 }),
@@ -35,21 +40,40 @@ export async function diffCommand(
   const mcpNamesB = new Set(p2.mcpServers.map((s) => s.name));
 
   if (opts.json) {
-    const allowOnlyA = p1.allow.filter((r) => !p2.allow.some((x) => x.raw === r.raw)).map((r) => r.raw);
-    const allowOnlyB = p2.allow.filter((r) => !p1.allow.some((x) => x.raw === r.raw)).map((r) => r.raw);
-    const denyOnlyA = p1.deny.filter((r) => !p2.deny.some((x) => x.raw === r.raw)).map((r) => r.raw);
-    const denyOnlyB = p2.deny.filter((r) => !p1.deny.some((x) => x.raw === r.raw)).map((r) => r.raw);
-    const askOnlyA = p1.ask.filter((r) => !p2.ask.some((x) => x.raw === r.raw)).map((r) => r.raw);
-    const askOnlyB = p2.ask.filter((r) => !p1.ask.some((x) => x.raw === r.raw)).map((r) => r.raw);
+    // Pre-compute Sets for O(1) lookup instead of O(n) per-item scan
+    const p1AllowRaws = new Set(p1.allow.map((r) => r.raw));
+    const p2AllowRaws = new Set(p2.allow.map((r) => r.raw));
+    const p1DenyRaws = new Set(p1.deny.map((r) => r.raw));
+    const p2DenyRaws = new Set(p2.deny.map((r) => r.raw));
+    const p1AskRaws = new Set(p1.ask.map((r) => r.raw));
+    const p2AskRaws = new Set(p2.ask.map((r) => r.raw));
+
+    const toRuleObj = (r: { raw: string; scope: SettingsScope }) => ({ rule: r.raw, scope: r.scope });
+    const allowOnlyA = p1.allow.filter((r) => !p2AllowRaws.has(r.raw)).map(toRuleObj);
+    const allowOnlyB = p2.allow.filter((r) => !p1AllowRaws.has(r.raw)).map(toRuleObj);
+    const denyOnlyA = p1.deny.filter((r) => !p2DenyRaws.has(r.raw)).map(toRuleObj);
+    const denyOnlyB = p2.deny.filter((r) => !p1DenyRaws.has(r.raw)).map(toRuleObj);
+    const askOnlyA = p1.ask.filter((r) => !p2AskRaws.has(r.raw)).map(toRuleObj);
+    const askOnlyB = p2.ask.filter((r) => !p1AskRaws.has(r.raw)).map(toRuleObj);
     const mcpOnlyA = [...mcpNamesA].filter((n) => !mcpNamesB.has(n));
     const mcpOnlyB = [...mcpNamesB].filter((n) => !mcpNamesA.has(n));
+    const envNamesA = new Set(p1.envVarNames);
+    const envNamesB = new Set(p2.envVarNames);
+    const envOnlyA = p1.envVarNames.filter((v) => !envNamesB.has(v));
+    const envOnlyB = p2.envVarNames.filter((v) => !envNamesA.has(v));
+    const dirNamesA = new Set(p1.additionalDirs);
+    const dirNamesB = new Set(p2.additionalDirs);
+    const dirsOnlyA = p1.additionalDirs.filter((d) => !dirNamesB.has(d));
+    const dirsOnlyB = p2.additionalDirs.filter((d) => !dirNamesA.has(d));
     const identical =
       p1.defaultMode === p2.defaultMode &&
       p1.isBypassDisabled === p2.isBypassDisabled &&
       allowOnlyA.length === 0 && allowOnlyB.length === 0 &&
       denyOnlyA.length === 0 && denyOnlyB.length === 0 &&
       askOnlyA.length === 0 && askOnlyB.length === 0 &&
-      mcpOnlyA.length === 0 && mcpOnlyB.length === 0;
+      mcpOnlyA.length === 0 && mcpOnlyB.length === 0 &&
+      envOnlyA.length === 0 && envOnlyB.length === 0 &&
+      dirsOnlyA.length === 0 && dirsOnlyB.length === 0;
 
     const output = {
       projectA: root1,
@@ -60,22 +84,32 @@ export async function diffCommand(
       allow: {
         onlyInA: allowOnlyA,
         onlyInB: allowOnlyB,
-        inBoth: p1.allow.filter((r) => p2.allow.some((x) => x.raw === r.raw)).map((r) => r.raw),
+        inBoth: p1.allow.filter((r) => p2AllowRaws.has(r.raw)).map((r) => r.raw),
       },
       deny: {
         onlyInA: denyOnlyA,
         onlyInB: denyOnlyB,
-        inBoth: p1.deny.filter((r) => p2.deny.some((x) => x.raw === r.raw)).map((r) => r.raw),
+        inBoth: p1.deny.filter((r) => p2DenyRaws.has(r.raw)).map((r) => r.raw),
       },
       ask: {
         onlyInA: askOnlyA,
         onlyInB: askOnlyB,
-        inBoth: p1.ask.filter((r) => p2.ask.some((x) => x.raw === r.raw)).map((r) => r.raw),
+        inBoth: p1.ask.filter((r) => p2AskRaws.has(r.raw)).map((r) => r.raw),
       },
       mcpServers: {
         onlyInA: mcpOnlyA,
         onlyInB: mcpOnlyB,
         inBoth: [...mcpNamesA].filter((n) => mcpNamesB.has(n)),
+      },
+      envVarNames: {
+        onlyInA: envOnlyA,
+        onlyInB: envOnlyB,
+        inBoth: p1.envVarNames.filter((v) => envNamesB.has(v)),
+      },
+      additionalDirs: {
+        onlyInA: dirsOnlyA,
+        onlyInB: dirsOnlyB,
+        inBoth: p1.additionalDirs.filter((d) => dirNamesB.has(d)),
       },
     };
     console.log(JSON.stringify(output, null, 2));
@@ -136,6 +170,28 @@ export async function diffCommand(
   printDiff("DENY", p1.deny, p2.deny, "red");
   printDiff("ASK", p1.ask, p2.ask, "yellow");
 
+  // Helper for plain string set diffs (env vars, dirs)
+  function printStringsDiff(label: string, a: string[], b: string[]) {
+    const setA = new Set(a);
+    const setB = new Set(b);
+    const all = new Set([...setA, ...setB]);
+    if (all.size === 0) return;
+    console.log(chalk.bold(label));
+    for (const v of all) {
+      if (setA.has(v) && setB.has(v)) {
+        console.log(chalk.gray(`  = ${v}`));
+      } else if (setA.has(v)) {
+        console.log(chalk.red(`  - ${v}  (only in A)`));
+      } else {
+        console.log(chalk.green(`  + ${v}  (only in B)`));
+      }
+    }
+    console.log("");
+  }
+
+  printStringsDiff("ENV VARS", p1.envVarNames, p2.envVarNames);
+  printStringsDiff("ADDITIONAL DIRS", p1.additionalDirs, p2.additionalDirs);
+
   // MCP servers diff
   const allMcp = new Set([...mcpNamesA, ...mcpNamesB]);
   if (allMcp.size > 0) {
@@ -174,7 +230,9 @@ export async function diffCommand(
     !setsEqual(p1.allow, p2.allow) ||
     !setsEqual(p1.deny, p2.deny) ||
     !setsEqual(p1.ask, p2.ask) ||
-    !setsOfStringsEqual(mcpNamesA, mcpNamesB);
+    !setsOfStringsEqual(mcpNamesA, mcpNamesB) ||
+    !setsOfStringsEqual(new Set(p1.envVarNames), new Set(p2.envVarNames)) ||
+    !setsOfStringsEqual(new Set(p1.additionalDirs), new Set(p2.additionalDirs));
 
   if (!hasChanges) {
     console.log(chalk.green("✓ Projects have identical effective permissions."));

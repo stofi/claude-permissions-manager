@@ -265,6 +265,39 @@ describe("mergeSettingsFiles — warning detection", () => {
     expect(low).toBeUndefined();
   });
 
+  it("does NOT warn about missing deny rules when only WebFetch/WebSearch are allowed", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["WebFetch", "WebSearch"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const low = result.warnings.find(
+      (w) => w.message.includes("deny rules")
+    );
+    expect(low).toBeUndefined();
+  });
+
+  it("emits medium warning for bare WebFetch allow (no URL specifier)", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["WebFetch"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const med = result.warnings.find(
+      (w) => w.severity === "medium" && w.rule === "WebFetch" && w.message.includes("URL specifier")
+    );
+    expect(med).toBeDefined();
+  });
+
+  it("does NOT emit WebFetch warning when a URL specifier is provided", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["WebFetch(https://api.example.com/*)"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const webFetchWarn = result.warnings.find(
+      (w) => w.rule === "WebFetch(https://api.example.com/*)"
+    );
+    expect(webFetchWarn).toBeUndefined();
+  });
+
   it("does NOT warn about bypass mode when no explicit rules configured", () => {
     const f = makeFile("project", {
       permissions: {},
@@ -405,5 +438,133 @@ describe("mergeSettingsFiles — warning detection", () => {
       (w) => w.message.includes("both allow and deny")
     );
     expect(exactConflict).toBeDefined();
+  });
+
+  it("emits low warning when same rule appears in both ask and deny", () => {
+    const f = makeFile("project", {
+      permissions: { ask: ["Bash(git *)"], deny: ["Bash(git *)"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const conflict = result.warnings.find(
+      (w) => w.severity === "low" && w.message.includes("both ask and deny")
+    );
+    expect(conflict).toBeDefined();
+    expect(conflict!.rule).toBe("Bash(git *)");
+  });
+
+  it("emits low warning when bare tool deny overrides specific ask rule", () => {
+    const f = makeFile("project", {
+      permissions: {
+        ask: ["Bash(git status)", "Bash(git log *)"],
+        deny: ["Bash"],
+      },
+    });
+    const result = mergeSettingsFiles([f]);
+    const overriddenWarnings = result.warnings.filter(
+      (w) => w.severity === "low" && w.message.includes("overridden by bare deny") && w.message.includes("Ask rule")
+    );
+    expect(overriddenWarnings).toHaveLength(2);
+    expect(overriddenWarnings.map((w) => w.rule)).toContain("Bash(git status)");
+  });
+
+  it("emits low warnings for ask rules overridden by wildcard deny *", () => {
+    const f = makeFile("project", {
+      permissions: {
+        ask: ["Bash(npm run *)", "Read"],
+        deny: ["*"],
+      },
+    });
+    const result = mergeSettingsFiles([f]);
+    const overrides = result.warnings.filter(
+      (w) => w.severity === "low" && w.message.includes("wildcard deny") && w.message.includes("Ask rule")
+    );
+    expect(overrides).toHaveLength(2);
+    expect(overrides.map((w) => w.rule)).toContain("Bash(npm run *)");
+  });
+
+  it("emits high warning for allowManagedPermissionRulesOnly in managed settings", () => {
+    const managed = makeFile("managed", {
+      allowManagedPermissionRulesOnly: true,
+    });
+    const result = mergeSettingsFiles([managed]);
+    const warn = result.warnings.find(
+      (w) => w.severity === "high" && w.message.includes("allowManagedPermissionRulesOnly")
+    );
+    expect(warn).toBeDefined();
+  });
+
+  it("emits medium warnings for allowManagedHooksOnly and allowManagedMcpServersOnly in managed settings", () => {
+    const managed = makeFile("managed", {
+      allowManagedHooksOnly: true,
+      allowManagedMcpServersOnly: true,
+    });
+    const result = mergeSettingsFiles([managed]);
+    const hooksWarn = result.warnings.find(
+      (w) => w.severity === "medium" && w.message.includes("allowManagedHooksOnly")
+    );
+    const mcpWarn = result.warnings.find(
+      (w) => w.severity === "medium" && w.message.includes("allowManagedMcpServersOnly")
+    );
+    expect(hooksWarn).toBeDefined();
+    expect(mcpWarn).toBeDefined();
+  });
+
+  it("does NOT warn about allowManaged* flags in non-managed scopes", () => {
+    const project = makeFile("project", {
+      allowManagedPermissionRulesOnly: true,
+      allowManagedHooksOnly: true,
+    });
+    const result = mergeSettingsFiles([project]);
+    const warn = result.warnings.find(
+      (w) => w.message.includes("allowManaged")
+    );
+    expect(warn).toBeUndefined();
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// Invalid defaultMode handling
+// ────────────────────────────────────────────────────────────
+
+describe("mergeSettingsFiles — invalid defaultMode", () => {
+  it("ignores an invalid defaultMode value — falls back to 'default'", () => {
+    const file = makeFile("local", {
+      // Simulate a file that failed schema validation and was stored raw
+      permissions: { defaultMode: "invalid-mode" as "default" },
+    });
+    const result = mergeSettingsFiles([file]);
+    expect(result.defaultMode).toBe("default");
+  });
+
+  it("valid mode from higher-priority scope wins even when lower scope has invalid mode", () => {
+    const local = makeFile("local", {
+      permissions: { defaultMode: "typo-mode" as "default" },
+    });
+    const project = makeFile("project", {
+      permissions: { defaultMode: "acceptEdits" },
+    });
+    // local has invalid mode → skipped; project has valid → used
+    const result = mergeSettingsFiles([local, project]);
+    expect(result.defaultMode).toBe("acceptEdits");
+  });
+
+  it("valid mode from higher-priority scope still wins over invalid lower scope", () => {
+    const local = makeFile("local", {
+      permissions: { defaultMode: "auto" },
+    });
+    const project = makeFile("project", {
+      permissions: { defaultMode: "bogus" as "default" },
+    });
+    const result = mergeSettingsFiles([local, project]);
+    expect(result.defaultMode).toBe("auto");
+  });
+
+  it("all valid modes are accepted", () => {
+    const modes = ["default", "acceptEdits", "plan", "auto", "dontAsk", "bypassPermissions"] as const;
+    for (const m of modes) {
+      const file = makeFile("local", { permissions: { defaultMode: m } });
+      const result = mergeSettingsFiles([file]);
+      expect(result.defaultMode).toBe(m);
+    }
   });
 });

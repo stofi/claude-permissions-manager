@@ -72,8 +72,6 @@ export const McpFileSchema = z.object({
   mcpServers: z.record(McpServerConfigSchema).optional(),
 });
 
-export type McpFileData = z.infer<typeof McpFileSchema>;
-
 // ~/.claude.json structure (partially documented)
 export const ClaudeJsonProjectSchema = z
   .object({

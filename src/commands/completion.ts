@@ -5,6 +5,8 @@
  *   eval "$(cpm completion bash)"   # add to ~/.bashrc
  *   eval "$(cpm completion zsh)"    # add to ~/.zshrc
  */
+import { PermissionModeSchema } from "../core/schemas.js";
+import { WRITABLE_SCOPES } from "../core/types.js";
 
 const COMMANDS = [
   "ui",
@@ -22,8 +24,8 @@ const COMMANDS = [
   "completion",
 ];
 
-const SCOPES = ["local", "project", "user"];
-const MODES = ["default", "acceptEdits", "plan", "auto", "dontAsk", "bypassPermissions"];
+const SCOPES = WRITABLE_SCOPES;
+const MODES = PermissionModeSchema.options;
 const PRESETS = ["safe", "node", "strict"];
 const FORMATS = ["json", "csv"];
 
@@ -89,14 +91,26 @@ _cpm_completions() {
     mode)
       if [[ "\${cur}" != -* ]]; then
         COMPREPLY=( \$(compgen -W "${modeList}" -- "\${cur}") )
-        return 0
+      else
+        COMPREPLY=( \$(compgen -W "--scope --project --dry-run" -- "\${cur}") )
       fi
+      return 0
       ;;
-    show|diff)
+    show)
       if [[ "\${cur}" != -* ]]; then
         COMPREPLY=( \$(compgen -d -- "\${cur}") )
-        return 0
+      else
+        COMPREPLY=( \$(compgen -W "--json" -- "\${cur}") )
       fi
+      return 0
+      ;;
+    diff)
+      if [[ "\${cur}" != -* ]]; then
+        COMPREPLY=( \$(compgen -d -- "\${cur}") )
+      else
+        COMPREPLY=( \$(compgen -W "--json" -- "\${cur}") )
+      fi
+      return 0
       ;;
     completion)
       COMPREPLY=( \$(compgen -W "bash zsh" -- "\${cur}") )
@@ -107,11 +121,11 @@ _cpm_completions() {
       return 0
       ;;
     ui)
-      COMPREPLY=( \$(compgen -W "--root --depth" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--root --depth --no-global" -- "\${cur}") )
       return 0
       ;;
     audit)
-      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --exit-code" -- "\${cur}") )
       return 0
       ;;
     export)
@@ -119,11 +133,11 @@ _cpm_completions() {
       return 0
       ;;
     allow|deny|ask)
-      COMPREPLY=( \$(compgen -W "--scope --project" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--scope --project --dry-run" -- "\${cur}") )
       return 0
       ;;
     reset)
-      COMPREPLY=( \$(compgen -W "--scope --project --all --yes" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--scope --project --all --yes --dry-run" -- "\${cur}") )
       return 0
       ;;
     init)
@@ -193,10 +207,13 @@ ${commandDefs}
           _arguments \\
             '--scope[Settings scope]:scope:(${scopeList})' \\
             '--project[Project path]:project:_directories' \\
+            '--dry-run[Preview without writing]' \\
             '1:mode:(${modeList})'
           ;;
         show)
-          _arguments '1:project:_directories'
+          _arguments \\
+            '1:project:_directories' \\
+            '--json[Output as JSON]'
           ;;
         diff)
           _arguments \\
@@ -208,6 +225,7 @@ ${commandDefs}
           _arguments \\
             '--scope[Settings scope]:scope:(${scopeList})' \\
             '--project[Project path]:project:_directories' \\
+            '--dry-run[Preview without writing]' \\
             '1:rule:'
           ;;
         reset)
@@ -216,6 +234,7 @@ ${commandDefs}
             '--project[Project path]:project:_directories' \\
             '--all[Clear all rules]' \\
             '--yes[Skip confirmation]' \\
+            '--dry-run[Preview without writing]' \\
             '1:rule:'
           ;;
         init)
@@ -236,14 +255,16 @@ ${commandDefs}
         ui)
           _arguments \\
             '--root[Root directory]:root:_directories' \\
-            '--depth[Max scan depth]:depth:'
+            '--depth[Max scan depth]:depth:' \\
+            '--no-global[Skip user and managed global settings]'
           ;;
         audit)
           _arguments \\
             '--root[Root directory]:root:_directories' \\
             '--depth[Max scan depth]:depth:' \\
             '--json[Output as JSON]' \\
-            '--no-global[Skip user and managed global settings]'
+            '--no-global[Skip user and managed global settings]' \\
+            '--exit-code[Exit 1 if issues, 2 if critical (for CI)]'
           ;;
         export)
           _arguments \\

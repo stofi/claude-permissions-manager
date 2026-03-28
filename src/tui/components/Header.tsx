@@ -7,7 +7,7 @@ interface HeaderProps {
   version?: string;
 }
 
-export function Header({ title, subtitle, version = "0.1.0" }: HeaderProps) {
+export function Header({ title, subtitle, version }: HeaderProps) {
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box>

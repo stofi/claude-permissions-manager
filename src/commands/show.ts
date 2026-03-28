@@ -57,10 +57,11 @@ export async function showCommand(
       },
       mcpServers: perms.mcpServers.map((s) => ({
         name: s.name,
-        type: s.type,
+        type: s.type ?? "stdio",
         scope: s.scope,
-        approvalState: s.approvalState,
+        approvalState: s.approvalState ?? "pending",
         envVarNames: s.envVarNames,
+        headerNames: s.headerNames,
       })),
       claudeMdFiles: project.claudeMdFiles,
       warnings: perms.warnings,

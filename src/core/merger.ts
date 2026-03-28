@@ -1,3 +1,4 @@
+import { PermissionModeSchema } from "./schemas.js";
 import type {
   SettingsFile,
   SettingsScope,
@@ -90,6 +91,13 @@ function detectWarnings(
         rule: rule.raw,
       });
     }
+    if (rule.tool === "WebFetch" && !rule.specifier) {
+      warnings.push({
+        severity: "medium",
+        message: "WebFetch is allowed without any URL specifier — arbitrary URLs can be fetched",
+        rule: rule.raw,
+      });
+    }
     // Check for sensitive paths in allow
     if (
       rule.specifier &&
@@ -108,8 +116,9 @@ function detectWarnings(
   }
 
   // Only warn if there are non-trivial allow rules (not just read-only tools)
+  const READ_ONLY_TOOLS = ["Read", "Glob", "Grep", "WebFetch", "WebSearch"];
   const nonReadAllows = permissions.allow.filter(
-    (r) => !["Read", "Glob", "Grep"].includes(r.tool)
+    (r) => !READ_ONLY_TOOLS.includes(r.tool)
   );
   if (nonReadAllows.length > 0 && permissions.deny.length === 0) {
     warnings.push({
@@ -140,6 +149,17 @@ function detectWarnings(
     }
   }
 
+  // Warn about rules that appear in both ask and deny (deny wins, ask prompt never shown)
+  for (const rule of permissions.ask) {
+    if (denySet.has(rule.raw)) {
+      warnings.push({
+        severity: "low",
+        message: `Rule "${rule.raw}" is in both ask and deny — deny wins, ask prompt never shown`,
+        rule: rule.raw,
+      });
+    }
+  }
+
   // Warn when a bare tool deny semantically covers a more specific allow rule
   // e.g. deny "Bash" overrides allow "Bash(git status)" — allow has no effect
   // Also warn when deny "*" (wildcard) overrides all allow rules
@@ -160,6 +180,50 @@ function detectWarnings(
         severity: "low",
         message: `Allow rule "${rule.raw}" is overridden by wildcard deny "*" — allow has no effect`,
         rule: rule.raw,
+      });
+    }
+  }
+
+  // Warn when a bare tool deny or wildcard deny overrides a specific ask rule
+  for (const rule of permissions.ask) {
+    if (rule.specifier && bareToolDenies.has(rule.tool)) {
+      warnings.push({
+        severity: "low",
+        message: `Ask rule "${rule.raw}" is overridden by bare deny "${rule.tool}" — ask prompt never shown`,
+        rule: rule.raw,
+      });
+    } else if (wildcardDenyPresent && !denySet.has(rule.raw)) {
+      warnings.push({
+        severity: "low",
+        message: `Ask rule "${rule.raw}" is overridden by wildcard deny "*" — ask prompt never shown`,
+        rule: rule.raw,
+      });
+    }
+  }
+
+  // Warn about managed-settings-only restriction flags
+  // These flags are only respected when set in managed settings (enterprise deployment)
+  for (const file of settingsFiles) {
+    if (!file.exists || !file.data || file.scope !== "managed") continue;
+    if (file.data.allowManagedPermissionRulesOnly) {
+      warnings.push({
+        severity: "high",
+        message:
+          "allowManagedPermissionRulesOnly is set in managed settings — project-level permission rules are overridden",
+      });
+    }
+    if (file.data.allowManagedHooksOnly) {
+      warnings.push({
+        severity: "medium",
+        message:
+          "allowManagedHooksOnly is set in managed settings — project-level hooks are overridden",
+      });
+    }
+    if (file.data.allowManagedMcpServersOnly) {
+      warnings.push({
+        severity: "medium",
+        message:
+          "allowManagedMcpServersOnly is set in managed settings — project-level MCP servers are overridden",
       });
     }
   }
@@ -196,7 +260,11 @@ export function mergeSettingsFiles(
 
     const perms = file.data.permissions;
     if (perms) {
-      if (perms.defaultMode) modes.push(perms.defaultMode);
+      if (perms.defaultMode) {
+        const validMode = PermissionModeSchema.safeParse(perms.defaultMode);
+        if (validMode.success) modes.push(validMode.data);
+        // else: invalid mode value — schema warning in parseError already captures it
+      }
       if (perms.disableBypassPermissionsMode === "disable") {
         isBypassDisabled = true;
       }

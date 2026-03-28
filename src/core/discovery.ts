@@ -25,14 +25,12 @@ import {
 export interface ScanOptions {
   root?: string;
   maxDepth?: number;
-  excludePatterns?: string[];
   includeGlobal?: boolean;
 }
 
 const DEFAULT_OPTIONS: Required<ScanOptions> = {
   root: homeDir(),
   maxDepth: 8,
-  excludePatterns: [],
   includeGlobal: true,
 };
 
@@ -78,7 +76,11 @@ async function findClaudeDirs(
     }
 
     if (entry.name === ".claude") {
-      results.push(fullPath);
+      // Skip ~/.claude — it's the user global settings dir, not a project
+      const userClaudeDir = join(homeDir(), ".claude");
+      if (fullPath !== userClaudeDir) {
+        results.push(fullPath);
+      }
       // Don't recurse into .claude dirs themselves
       continue;
     }
@@ -97,7 +99,8 @@ async function findClaudeDirs(
 async function buildProject(
   claudeDir: string,
   projectMcpServers: Map<string, import("./types.js").McpServer[]>,
-  globalSettings: SettingsFile[]
+  globalSettings: SettingsFile[],
+  userMcpServers: import("./types.js").McpServer[]
 ): Promise<ClaudeProject> {
   const rootPath = resolve(claudeDir, "..");
 
@@ -122,11 +125,18 @@ async function buildProject(
     parseClaudeMdFile(join(claudeDir, "CLAUDE.md"), "project"),
   ]);
 
-  // Collect MCP servers
-  const allMcpServers = [
-    ...mcpFile.servers,
-    ...(projectMcpServers.get(rootPath) ?? []),
-  ];
+  // Collect MCP servers, deduplicating by name.
+  // Priority (lowest → highest): global user servers → .mcp.json → project-specific.
+  // Later entries always overwrite earlier ones so higher-priority sources win.
+  const mcpByName = new Map<string, import("./types.js").McpServer>();
+  for (const server of [
+    ...userMcpServers,                          // global user (lowest priority)
+    ...mcpFile.servers,                         // .mcp.json project declaration
+    ...(projectMcpServers.get(rootPath) ?? []), // project-specific approvals (highest)
+  ]) {
+    mcpByName.set(server.name, server);
+  }
+  const allMcpServers = [...mcpByName.values()];
 
   // Merge: local > project > user > managed
   const allFiles = [...settingsFiles, ...globalSettings];
@@ -189,7 +199,7 @@ export async function scan(options: ScanOptions = {}): Promise<ScanResult> {
   for (let i = 0; i < claudeDirs.length; i += BATCH_SIZE) {
     const batch = claudeDirs.slice(i, i + BATCH_SIZE);
     const batchResults = await Promise.allSettled(
-      batch.map((dir) => buildProject(dir, projectServers, globalSettingsFiles))
+      batch.map((dir) => buildProject(dir, projectServers, globalSettingsFiles, global.userMcpServers))
     );
 
     for (let j = 0; j < batchResults.length; j++) {
@@ -199,7 +209,9 @@ export async function scan(options: ScanOptions = {}): Promise<ScanResult> {
       } else {
         errors.push({
           path: batch[j],
-          error: String(result.reason),
+          error: result.reason instanceof Error
+            ? `${result.reason.name}: ${result.reason.message}`
+            : String(result.reason),
         });
       }
     }

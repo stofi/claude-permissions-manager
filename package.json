@@ -1,6 +1,6 @@
 {
   "name": "claude-permissions-manager",
-  "version": "0.6.0",
+  "version": "0.8.0",
   "description": "Discover, analyze, and manage Claude Code permissions across all your projects",
   "license": "MIT",
   "author": "stofi",
@@ -33,6 +33,7 @@
   },
   "scripts": {
     "build": "tsc && chmod +x dist/cli.js",
+    "prepublishOnly": "npm run build && npm test && npm run typecheck",
     "dev": "tsx src/cli.ts",
     "start": "node dist/cli.js",
     "test": "vitest run",

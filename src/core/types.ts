@@ -1,8 +1,11 @@
-import type { PermissionMode, SettingsData, McpFileData } from "./schemas.js";
+import type { PermissionMode, SettingsData } from "./schemas.js";
 
 export type { PermissionMode };
 
 export type SettingsScope = "managed" | "user" | "project" | "local";
+
+/** Scopes that can be written to (excludes "managed" which is system-controlled) */
+export const WRITABLE_SCOPES: SettingsScope[] = ["local", "project", "user"];
 
 export interface PermissionRule {
   tool: string;
@@ -38,7 +41,6 @@ export interface McpFile {
   parsed: boolean;
   parseError?: string;
   servers: McpServer[];
-  rawData?: McpFileData;
 }
 
 export interface ClaudeMdFile {

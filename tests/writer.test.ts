@@ -188,6 +188,21 @@ describe("addRule", () => {
     await expect(addRule("", "allow", path)).rejects.toThrow();
   });
 
+  it("throws for whitespace-only rule", async () => {
+    const path = settingsPath();
+    await expect(addRule("   ", "allow", path)).rejects.toThrow(/empty/i);
+  });
+
+  it("trims whitespace from rule before storing", async () => {
+    const path = settingsPath();
+    const result = await addRule("  Read  ", "allow", path);
+    expect(result.added).toBe(true);
+    const data = await readSettings();
+    // Should be stored as "Read", not "  Read  "
+    expect(data.permissions.allow).toContain("Read");
+    expect(data.permissions.allow).not.toContain("  Read  ");
+  });
+
   it("handles corrupt settings file where allow is not an array (non-array guard)", async () => {
     // Write a file with allow: 42 (schema-invalid)
     const path = settingsPath();
@@ -282,6 +297,16 @@ describe("removeRule", () => {
     const result = await removeRule("Read", settingsPath());
     expect(result.removed).toBe(false);
   });
+
+  it("trims whitespace from rule before searching", async () => {
+    const path = settingsPath();
+    await addRule("Read", "allow", path);
+    const result = await removeRule("  Read  ", path);
+    expect(result.removed).toBe(true);
+    expect(result.removedFrom).toContain("allow");
+    const data = await readSettings();
+    expect(data.permissions.allow).not.toContain("Read");
+  });
 });
 
 // ────────────────────────────────────────────────────────────
@@ -311,6 +336,18 @@ describe("setMode", () => {
     const data = await readSettings();
     expect(data.permissions.allow).toContain("Read");
     expect(data.permissions.defaultMode).toBe("acceptEdits");
+  });
+
+  it("works on a file with no permissions object at all", async () => {
+    const path = settingsPath();
+    const { mkdir, writeFile } = await import("fs/promises");
+    await mkdir(join(tmpDir, ".claude"), { recursive: true });
+    await writeFile(path, JSON.stringify({ someOtherKey: true }), "utf-8");
+    await setMode("plan", path);
+    const data = await readSettings();
+    expect(data.permissions.defaultMode).toBe("plan");
+    // Other fields from the file should be preserved
+    expect((data as Record<string, unknown>).someOtherKey).toBe(true);
   });
 });
 
@@ -344,5 +381,18 @@ describe("clearAllRules", () => {
     const path = settingsPath();
     await setMode("default", path);
     await expect(clearAllRules(path)).resolves.not.toThrow();
+  });
+
+  it("works on a file with no permissions object at all", async () => {
+    // Write a settings.json with no permissions key
+    const path = settingsPath();
+    const { mkdir, writeFile } = await import("fs/promises");
+    await mkdir(join(tmpDir, ".claude"), { recursive: true });
+    await writeFile(path, JSON.stringify({ someOtherKey: true }), "utf-8");
+    await clearAllRules(path);
+    const data = await readSettings();
+    expect(data.permissions.allow).toEqual([]);
+    expect(data.permissions.deny).toEqual([]);
+    expect(data.permissions.ask).toEqual([]);
   });
 });

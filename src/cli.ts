@@ -4,6 +4,7 @@ import { listCommand } from "./commands/list.js";
 import { showCommand } from "./commands/show.js";
 import { auditCommand } from "./commands/audit.js";
 import { homeDir } from "./utils/paths.js";
+import { PermissionModeSchema } from "./core/schemas.js";
 
 function parseDepth(raw: string, fallback = 8): number {
   const n = parseInt(raw, 10);
@@ -15,7 +16,7 @@ const program = new Command();
 program
   .name("cpm")
   .description("Claude Permissions Manager — discover and manage Claude Code permissions")
-  .version("0.6.0");
+  .version("0.8.0");
 
 // Default action: TUI when TTY, list otherwise
 program.action(async () => {
@@ -27,9 +28,9 @@ program.action(async () => {
   }
   if (process.stdout.isTTY) {
     const { uiCommand } = await import("./commands/ui.js");
-    await uiCommand({ root: homeDir() });
+    await uiCommand({ root: homeDir(), maxDepth: 8, includeGlobal: true });
   } else {
-    await listCommand({ root: homeDir() });
+    await listCommand({ root: homeDir(), maxDepth: 8, includeGlobal: true });
   }
 });
 
@@ -38,11 +39,13 @@ program
   .description("Launch interactive TUI")
   .option("--root <dir>", "Root directory to scan from", homeDir())
   .option("--depth <n>", "Max scan depth", "8")
+  .option("--no-global", "Skip user and managed global settings")
   .action(async (opts) => {
     const { uiCommand } = await import("./commands/ui.js");
     await uiCommand({
       root: opts.root,
       maxDepth: parseDepth(opts.depth),
+      includeGlobal: opts.global !== false,
     });
   });
 
@@ -77,12 +80,14 @@ program
   .option("--depth <n>", "Max scan depth", "8")
   .option("--json", "Output as JSON")
   .option("--no-global", "Skip user and managed global settings")
+  .option("--exit-code", "Exit with code 1 (issues found) or 2 (critical issues) for CI use")
   .action(async (opts) => {
     await auditCommand({
       root: opts.root,
       maxDepth: parseDepth(opts.depth),
       json: opts.json,
       includeGlobal: opts.global !== false,
+      exitCode: opts.exitCode,
     });
   });
 
@@ -100,9 +105,10 @@ program
   .description('Add a rule to the allow list (e.g. cpm allow "Bash(npm run *)")')
   .option("--scope <scope>", "Settings scope: local|project|user (default: local)", "local")
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
+  .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (rule, opts) => {
     const { allowCommand } = await import("./commands/manage.js");
-    await allowCommand(rule, opts);
+    await allowCommand(rule, { ...opts, dryRun: opts.dryRun });
   });
 
 program
@@ -110,9 +116,10 @@ program
   .description('Add a rule to the deny list (e.g. cpm deny "Read(**/.env)")')
   .option("--scope <scope>", "Settings scope: local|project|user (default: local)", "local")
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
+  .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (rule, opts) => {
     const { denyCommand } = await import("./commands/manage.js");
-    await denyCommand(rule, opts);
+    await denyCommand(rule, { ...opts, dryRun: opts.dryRun });
   });
 
 program
@@ -120,9 +127,10 @@ program
   .description('Add a rule to the ask list (always prompt for confirmation)')
   .option("--scope <scope>", "Settings scope: local|project|user (default: local)", "local")
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
+  .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (rule, opts) => {
     const { askCommand } = await import("./commands/manage.js");
-    await askCommand(rule, opts);
+    await askCommand(rule, { ...opts, dryRun: opts.dryRun });
   });
 
 program
@@ -131,11 +139,12 @@ program
   .option("--scope <scope>", "Settings scope: local|project|user (default: local)", "local")
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
   .option("--all", "Clear all permission rules")
-  .option("--yes", "Skip confirmation prompt")
+  .option("--yes", "Skip confirmation prompt (with --all)")
+  .option("--dry-run", "Preview what would be cleared without modifying any files (with --all)")
   .action(async (rule, opts) => {
     const { resetRuleCommand, resetAllCommand } = await import("./commands/manage.js");
     if (opts.all) {
-      await resetAllCommand(opts);
+      await resetAllCommand({ ...opts, dryRun: opts.dryRun });
     } else if (rule) {
       await resetRuleCommand(rule, opts);
     } else {
@@ -146,12 +155,13 @@ program
 
 program
   .command("mode <mode>")
-  .description("Set defaultMode: default|acceptEdits|plan|auto|dontAsk|bypassPermissions")
+  .description(`Set defaultMode: ${PermissionModeSchema.options.join("|")}`)
   .option("--scope <scope>", "Settings scope: local|project|user (default: local)", "local")
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
+  .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (mode, opts) => {
     const { modeCommand } = await import("./commands/manage.js");
-    await modeCommand(mode, opts);
+    await modeCommand(mode, { ...opts, dryRun: opts.dryRun });
   });
 
 program

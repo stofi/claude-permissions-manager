@@ -306,6 +306,14 @@ describe("denyCommand", () => {
     const calls = logSpy.mock.calls.map((c) => String(c[0]));
     expect(calls.some((m) => /also exists in allow/i.test(m))).toBe(true);
   });
+
+  it("warns when rule also exists in ask list", async () => {
+    await askCommand("Bash(rm -rf *)", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await denyCommand("Bash(rm -rf *)", { project: tmpDir, scope: "project" });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /also exists in ask/i.test(m))).toBe(true);
+  });
 });
 
 describe("askCommand", () => {
@@ -590,6 +598,16 @@ describe("showCommand — JSON", () => {
       expect(s.approvalState).toBeDefined();
       expect(typeof s.approvalState).toBe("string");
     }
+  });
+
+  it("isBypassDisabled is true when disableBypassPermissionsMode=disable is set", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+    await showCommand(join(FIXTURES, "project-bypass-locked"), { json: true });
+
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(json.effectivePermissions.isBypassDisabled).toBe(true);
   });
 });
 

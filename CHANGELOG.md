@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **`cpm show` text output**: `isBypassDisabled` was shown in TUI and `--json` but not in plain-text output (`formatEffectivePermissions`). Now shows `[bypass locked]` beside the mode line when set.
+
+### Internal
+- Test coverage expanded to 193 tests.
+  - `denyCommand`: new test for ask-conflict warning (rule exists in ask list — deny takes precedence).
+  - `showCommand --json`: new test verifying `isBypassDisabled: true` when `disableBypassPermissionsMode=disable` is present.
+  - `writer`: new tests for `addRule` `conflictsWith` when adding an ask rule that exists in deny or allow lists.
+
 ## [0.9.0] - 2026-03-28
 
 ### Added

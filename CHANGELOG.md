@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **TUI Header**: hardcoded default version `"0.1.0"` was displayed on all TUI screens; removed so no stale version appears.
 - **TUI ProjectList**: critical warnings (🚨) now show total count, consistent with non-critical warnings (`⚠ N`).
 - **TUI Audit**: scan errors (`scanResult.errors`) are now displayed at the bottom of the audit screen; previously silently ignored.
+- **TUI Audit**: pressing Enter on a warning navigates to the project detail screen; pressing ←/Esc/q from detail returns to the audit screen (previously Enter did nothing).
 
 ### Internal
 - `mode` command description in CLI now derived from `PermissionModeSchema.options` instead of being hardcoded.

@@ -12,7 +12,7 @@ import type { ScanOptions } from "../core/discovery.js";
 type Screen =
   | { name: "loading" }
   | { name: "list" }
-  | { name: "detail"; project: ClaudeProject }
+  | { name: "detail"; project: ClaudeProject; from?: "list" | "audit" }
   | { name: "audit" }
   | { name: "diff" };
 
@@ -88,7 +88,10 @@ export function App({ scanOptions }: AppProps) {
     return (
       <ProjectDetail
         project={screen.project}
-        onBack={() => { refreshCancelRef.current++; setScreen({ name: "list" }); }}
+        onBack={() => {
+          refreshCancelRef.current++;
+          setScreen(screen.from === "audit" ? { name: "audit" } : { name: "list" });
+        }}
         onRefresh={refresh}
       />
     );
@@ -99,6 +102,7 @@ export function App({ scanOptions }: AppProps) {
       <Audit
         scanResult={scanResult}
         onBack={() => setScreen({ name: "list" })}
+        onSelectProject={(p) => setScreen({ name: "detail", project: p, from: "audit" })}
       />
     );
   }

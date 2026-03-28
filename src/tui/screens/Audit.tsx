@@ -2,22 +2,23 @@ import React, { useState } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
 import { Header } from "../components/Header.js";
 import { SeverityBadge } from "../components/Badge.js";
-import type { ScanResult, Warning, WarningSeverity } from "../../core/types.js";
+import type { ScanResult, Warning, WarningSeverity, ClaudeProject } from "../../core/types.js";
 import { collapseHome } from "../../utils/paths.js";
 
 const SEVERITY_ORDER: WarningSeverity[] = ["critical", "high", "medium", "low"];
 
 interface AuditItem {
-  project: string;
+  project: ClaudeProject;
   warning: Warning;
 }
 
 interface AuditProps {
   scanResult: ScanResult;
   onBack: () => void;
+  onSelectProject: (project: ClaudeProject) => void;
 }
 
-export function Audit({ scanResult, onBack }: AuditProps) {
+export function Audit({ scanResult, onBack, onSelectProject }: AuditProps) {
   const { stdout } = useStdout();
   const termHeight = stdout?.rows ?? 24;
   const visibleRows = Math.max(5, termHeight - 12);
@@ -28,6 +29,8 @@ export function Audit({ scanResult, onBack }: AuditProps) {
   useInput((input, key) => {
     if (key.escape || input === "q" || key.leftArrow) {
       onBack();
+    } else if (key.return) {
+      if (items[cursor]) onSelectProject(items[cursor].project);
     } else if (key.downArrow || input === "j") {
       const next = Math.min(cursor + 1, items.length - 1);
       setCursor(next);
@@ -53,10 +56,7 @@ export function Audit({ scanResult, onBack }: AuditProps) {
 
   for (const project of scanResult.projects) {
     for (const w of project.effectivePermissions.warnings) {
-      byseverity[w.severity].push({
-        project: collapseHome(project.rootPath),
-        warning: w,
-      });
+      byseverity[w.severity].push({ project, warning: w });
     }
   }
 
@@ -91,7 +91,7 @@ export function Audit({ scanResult, onBack }: AuditProps) {
                 <Box>
                   {isSelected && <Text color="cyan">▶ </Text>}
                   <SeverityBadge severity={item.warning.severity} />
-                  <Text color="gray">{"  "}{item.project}</Text>
+                  <Text color="gray">{"  "}{collapseHome(item.project.rootPath)}</Text>
                 </Box>
                 <Box paddingLeft={isSelected ? 4 : 2}>
                   <Text>{item.warning.message}</Text>
@@ -127,7 +127,7 @@ export function Audit({ scanResult, onBack }: AuditProps) {
       )}
 
       <Box marginTop={1}>
-        <Text color="gray">↑↓/jk scroll  ←/Esc/q: back</Text>
+        <Text color="gray">↑↓/jk scroll  Enter: view project  ←/Esc/q: back</Text>
       </Box>
     </Box>
   );

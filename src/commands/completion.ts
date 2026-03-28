@@ -137,7 +137,7 @@ _cpm_completions() {
       return 0
       ;;
     reset)
-      COMPREPLY=( \$(compgen -W "--scope --project --all --yes" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--scope --project --all --yes --dry-run" -- "\${cur}") )
       return 0
       ;;
     init)
@@ -234,6 +234,7 @@ ${commandDefs}
             '--project[Project path]:project:_directories' \\
             '--all[Clear all rules]' \\
             '--yes[Skip confirmation]' \\
+            '--dry-run[Preview without writing]' \\
             '1:rule:'
           ;;
         init)

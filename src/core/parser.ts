@@ -187,7 +187,10 @@ export async function parseClaudeJson(claudeJsonPath: string): Promise<{
   let content: string;
   try {
     content = await readFile(claudeJsonPath, "utf-8");
-  } catch {
+  } catch (err) {
+    process.stderr.write(
+      `Warning: could not read ${claudeJsonPath}: ${err instanceof Error ? err.message : String(err)}\n`
+    );
     return { globalServers, projectServers };
   }
 
@@ -195,6 +198,7 @@ export async function parseClaudeJson(claudeJsonPath: string): Promise<{
   try {
     json = JSON.parse(content);
   } catch {
+    process.stderr.write(`Warning: ${claudeJsonPath} contains invalid JSON — MCP approval states not loaded\n`);
     return { globalServers, projectServers };
   }
 

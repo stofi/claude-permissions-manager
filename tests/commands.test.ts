@@ -424,6 +424,29 @@ describe("resetAllCommand", () => {
     expect(data.permissions.allow).toHaveLength(0);
     expect(data.permissions.deny).toHaveLength(0);
   });
+
+  it("--dry-run does not modify files and reports rule counts", async () => {
+    await allowCommand("Read", { project: tmpDir, scope: "project" });
+    await denyCommand("Bash(sudo *)", { project: tmpDir, scope: "project" });
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await resetAllCommand({ project: tmpDir, scope: "project", dryRun: true });
+    // File must be unchanged
+    const data = await readSettings();
+    expect(data.permissions.allow).toHaveLength(1);
+    expect(data.permissions.deny).toHaveLength(1);
+    // Output must mention dry-run and counts
+    const output = calls.join("\n");
+    expect(output).toMatch(/dry.run/i);
+    expect(output).toMatch(/1 allow.*1 deny/i);
+  });
+
+  it("--dry-run reports 'no rules to clear' when file has no rules", async () => {
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await resetAllCommand({ project: tmpDir, scope: "project", dryRun: true });
+    expect(calls.join("\n")).toMatch(/no permission rules/i);
+  });
 });
 
 // ────────────────────────────────────────────────────────────

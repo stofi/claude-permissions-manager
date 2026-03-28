@@ -139,11 +139,12 @@ program
   .option("--scope <scope>", "Settings scope: local|project|user (default: local)", "local")
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
   .option("--all", "Clear all permission rules")
-  .option("--yes", "Skip confirmation prompt")
+  .option("--yes", "Skip confirmation prompt (with --all)")
+  .option("--dry-run", "Preview what would be cleared without modifying any files (with --all)")
   .action(async (rule, opts) => {
     const { resetRuleCommand, resetAllCommand } = await import("./commands/manage.js");
     if (opts.all) {
-      await resetAllCommand(opts);
+      await resetAllCommand({ ...opts, dryRun: opts.dryRun });
     } else if (rule) {
       await resetRuleCommand(rule, opts);
     } else {

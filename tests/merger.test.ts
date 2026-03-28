@@ -440,6 +440,48 @@ describe("mergeSettingsFiles — warning detection", () => {
     expect(exactConflict).toBeDefined();
   });
 
+  it("emits low warning when same rule appears in both ask and deny", () => {
+    const f = makeFile("project", {
+      permissions: { ask: ["Bash(git *)"], deny: ["Bash(git *)"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const conflict = result.warnings.find(
+      (w) => w.severity === "low" && w.message.includes("both ask and deny")
+    );
+    expect(conflict).toBeDefined();
+    expect(conflict!.rule).toBe("Bash(git *)");
+  });
+
+  it("emits low warning when bare tool deny overrides specific ask rule", () => {
+    const f = makeFile("project", {
+      permissions: {
+        ask: ["Bash(git status)", "Bash(git log *)"],
+        deny: ["Bash"],
+      },
+    });
+    const result = mergeSettingsFiles([f]);
+    const overriddenWarnings = result.warnings.filter(
+      (w) => w.severity === "low" && w.message.includes("overridden by bare deny") && w.message.includes("Ask rule")
+    );
+    expect(overriddenWarnings).toHaveLength(2);
+    expect(overriddenWarnings.map((w) => w.rule)).toContain("Bash(git status)");
+  });
+
+  it("emits low warnings for ask rules overridden by wildcard deny *", () => {
+    const f = makeFile("project", {
+      permissions: {
+        ask: ["Bash(npm run *)", "Read"],
+        deny: ["*"],
+      },
+    });
+    const result = mergeSettingsFiles([f]);
+    const overrides = result.warnings.filter(
+      (w) => w.severity === "low" && w.message.includes("wildcard deny") && w.message.includes("Ask rule")
+    );
+    expect(overrides).toHaveLength(2);
+    expect(overrides.map((w) => w.rule)).toContain("Bash(npm run *)");
+  });
+
   it("emits high warning for allowManagedPermissionRulesOnly in managed settings", () => {
     const managed = makeFile("managed", {
       allowManagedPermissionRulesOnly: true,

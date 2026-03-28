@@ -149,6 +149,17 @@ function detectWarnings(
     }
   }
 
+  // Warn about rules that appear in both ask and deny (deny wins, ask prompt never shown)
+  for (const rule of permissions.ask) {
+    if (denySet.has(rule.raw)) {
+      warnings.push({
+        severity: "low",
+        message: `Rule "${rule.raw}" is in both ask and deny — deny wins, ask prompt never shown`,
+        rule: rule.raw,
+      });
+    }
+  }
+
   // Warn when a bare tool deny semantically covers a more specific allow rule
   // e.g. deny "Bash" overrides allow "Bash(git status)" — allow has no effect
   // Also warn when deny "*" (wildcard) overrides all allow rules
@@ -168,6 +179,23 @@ function detectWarnings(
       warnings.push({
         severity: "low",
         message: `Allow rule "${rule.raw}" is overridden by wildcard deny "*" — allow has no effect`,
+        rule: rule.raw,
+      });
+    }
+  }
+
+  // Warn when a bare tool deny or wildcard deny overrides a specific ask rule
+  for (const rule of permissions.ask) {
+    if (rule.specifier && bareToolDenies.has(rule.tool)) {
+      warnings.push({
+        severity: "low",
+        message: `Ask rule "${rule.raw}" is overridden by bare deny "${rule.tool}" — ask prompt never shown`,
+        rule: rule.raw,
+      });
+    } else if (wildcardDenyPresent && !denySet.has(rule.raw)) {
+      warnings.push({
+        severity: "low",
+        message: `Ask rule "${rule.raw}" is overridden by wildcard deny "*" — ask prompt never shown`,
         rule: rule.raw,
       });
     }

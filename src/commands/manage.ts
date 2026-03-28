@@ -232,11 +232,27 @@ export async function modeCommand(
 }
 
 export async function resetAllCommand(
-  opts: { project?: string; scope?: string; yes?: boolean }
+  opts: { project?: string; scope?: string; yes?: boolean; dryRun?: boolean }
 ): Promise<void> {
   const scope = resolveScope(opts.scope);
   const projectPath = resolveProject(opts.project);
   const settingsPath = resolveSettingsPath(scope, projectPath);
+
+  if (opts.dryRun) {
+    const data = await readSettingsOrEmpty(settingsPath);
+    const perms = data.permissions;
+    const allowCount = Array.isArray(perms?.allow) ? perms.allow.length : 0;
+    const denyCount = Array.isArray(perms?.deny) ? perms.deny.length : 0;
+    const askCount = Array.isArray(perms?.ask) ? perms.ask.length : 0;
+    console.log(chalk.cyan(`[dry-run] No files will be modified`));
+    if (allowCount + denyCount + askCount === 0) {
+      console.log(chalk.gray(`  No permission rules to clear`));
+    } else {
+      console.log(`  Would clear: ${allowCount} allow, ${denyCount} deny, ${askCount} ask rules`);
+    }
+    console.log(chalk.gray(`  target: ${collapseHome(settingsPath)} [${scope}]`));
+    return;
+  }
 
   if (!opts.yes) {
     console.log(

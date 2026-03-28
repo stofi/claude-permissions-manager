@@ -9,6 +9,8 @@ import { tmpdir } from "os";
 import { initCommand } from "../src/commands/init.js";
 import { exportCommand } from "../src/commands/export.js";
 import { listCommand } from "../src/commands/list.js";
+import { showCommand } from "../src/commands/show.js";
+import { diffCommand } from "../src/commands/diff.js";
 import {
   allowCommand,
   denyCommand,
@@ -472,5 +474,97 @@ describe("listCommand — JSON", () => {
     for (const project of json.projects) {
       expect(typeof project.warnings).toBe("number");
     }
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// showCommand — JSON format
+// ────────────────────────────────────────────────────────────
+
+describe("showCommand — JSON", () => {
+  it("emits valid JSON with allow/deny/ask as {rule,scope} objects", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+    await showCommand(join(FIXTURES, "project-a"), { json: true });
+
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(json).toHaveProperty("path");
+    expect(json).toHaveProperty("effectivePermissions");
+    const ep = json.effectivePermissions;
+    expect(Array.isArray(ep.allow)).toBe(true);
+    expect(Array.isArray(ep.deny)).toBe(true);
+    expect(Array.isArray(ep.ask)).toBe(true);
+    for (const rule of [...ep.allow, ...ep.deny, ...ep.ask]) {
+      expect(rule).toHaveProperty("rule");
+      expect(rule).toHaveProperty("scope");
+      expect(typeof rule.rule).toBe("string");
+      expect(typeof rule.scope).toBe("string");
+    }
+  });
+
+  it("includes settingsFiles with scope info", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+    await showCommand(join(FIXTURES, "project-a"), { json: true });
+
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(Array.isArray(json.settingsFiles)).toBe(true);
+    for (const f of json.settingsFiles) {
+      expect(f).toHaveProperty("path");
+      expect(f).toHaveProperty("scope");
+    }
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// diffCommand — JSON format
+// ────────────────────────────────────────────────────────────
+
+describe("diffCommand — JSON", () => {
+  it("emits valid JSON with onlyInA/B as {rule,scope} objects", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+    await diffCommand(
+      join(FIXTURES, "project-a"),
+      join(FIXTURES, "project-b"),
+      { json: true }
+    );
+
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(json).toHaveProperty("projectA");
+    expect(json).toHaveProperty("projectB");
+    expect(json).toHaveProperty("identical");
+    expect(typeof json.identical).toBe("boolean");
+
+    for (const list of ["allow", "deny", "ask"]) {
+      expect(json[list]).toHaveProperty("onlyInA");
+      expect(json[list]).toHaveProperty("onlyInB");
+      expect(json[list]).toHaveProperty("inBoth");
+      for (const rule of [...json[list].onlyInA, ...json[list].onlyInB]) {
+        expect(rule).toHaveProperty("rule");
+        expect(rule).toHaveProperty("scope");
+      }
+      // inBoth is plain strings
+      for (const rule of json[list].inBoth) {
+        expect(typeof rule).toBe("string");
+      }
+    }
+  });
+
+  it("identical is false when projects differ", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+    await diffCommand(
+      join(FIXTURES, "project-a"),
+      join(FIXTURES, "project-b"),
+      { json: true }
+    );
+
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(json.identical).toBe(false);
   });
 });

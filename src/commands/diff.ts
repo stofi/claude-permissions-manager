@@ -2,6 +2,7 @@ import chalk from "chalk";
 import { resolve } from "path";
 import { scan } from "../core/discovery.js";
 import { expandHome, collapseHome } from "../utils/paths.js";
+import type { SettingsScope } from "../core/types.js";
 
 export async function diffCommand(
   path1: string,
@@ -47,7 +48,7 @@ export async function diffCommand(
     const p1AskRaws = new Set(p1.ask.map((r) => r.raw));
     const p2AskRaws = new Set(p2.ask.map((r) => r.raw));
 
-    const toRuleObj = (r: { raw: string; scope: import("../core/types.js").SettingsScope }) => ({ rule: r.raw, scope: r.scope });
+    const toRuleObj = (r: { raw: string; scope: SettingsScope }) => ({ rule: r.raw, scope: r.scope });
     const allowOnlyA = p1.allow.filter((r) => !p2AllowRaws.has(r.raw)).map(toRuleObj);
     const allowOnlyB = p2.allow.filter((r) => !p1AllowRaws.has(r.raw)).map(toRuleObj);
     const denyOnlyA = p1.deny.filter((r) => !p2DenyRaws.has(r.raw)).map(toRuleObj);

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-03-28
+
+### Fixed
+- **diff**: `envVarNames` and `additionalDirs` were not compared — projects differing only in these fields incorrectly reported as identical. Both JSON and text output now include ENV VARS and ADDITIONAL DIRS diff sections.
+- **diff `--json`**: `identical` flag now correctly accounts for `envVarNames` and `additionalDirs` differences.
+- **TUI Diff**: `isIdentical` check was missing `envVarNames` and `additionalDirs`; ENV VARS and ADDITIONAL DIRS diff sections added to match CLI text output.
+- **list `--json`**: `mcpServers` entries now include `type`, `envVarNames`, and `headerNames` — consistent with `show --json` and `export --json` (previously only `name`, `scope`, `approvalState`).
+
+### Internal
+- `mode` command description in CLI now derived from `PermissionModeSchema.options` instead of being hardcoded.
+- Writer temp file names include a monotonic counter (`pid.counter`) to prevent collision when multiple writes occur concurrently within one process.
+- Test coverage expanded to 174 tests; additional tests for `showCommand --json` rule format, `diffCommand --json` identical flag, unknown preset error path, and `showCommand` no-.claude-dir error path.
+
 ## [0.7.0] - 2026-03-28
 
 ### Added
@@ -89,5 +102,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Global user settings (`~/.claude/settings.json`) merged with per-project settings
   - `~/.claude.json` parsed for MCP server approval states
 
+[0.8.0]: https://github.com/stofi/claude-permissions-manager/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/stofi/claude-permissions-manager/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/stofi/claude-permissions-manager/releases/tag/v0.6.0

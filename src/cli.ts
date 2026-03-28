@@ -4,6 +4,7 @@ import { listCommand } from "./commands/list.js";
 import { showCommand } from "./commands/show.js";
 import { auditCommand } from "./commands/audit.js";
 import { homeDir } from "./utils/paths.js";
+import { PermissionModeSchema } from "./core/schemas.js";
 
 function parseDepth(raw: string, fallback = 8): number {
   const n = parseInt(raw, 10);
@@ -15,7 +16,7 @@ const program = new Command();
 program
   .name("cpm")
   .description("Claude Permissions Manager — discover and manage Claude Code permissions")
-  .version("0.7.0");
+  .version("0.8.0");
 
 // Default action: TUI when TTY, list otherwise
 program.action(async () => {
@@ -153,7 +154,7 @@ program
 
 program
   .command("mode <mode>")
-  .description("Set defaultMode: default|acceptEdits|plan|auto|dontAsk|bypassPermissions")
+  .description(`Set defaultMode: ${PermissionModeSchema.options.join("|")}`)
   .option("--scope <scope>", "Settings scope: local|project|user (default: local)", "local")
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
   .option("--dry-run", "Preview what would be written without modifying any files")

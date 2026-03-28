@@ -48,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **TUI**: `ProjectDetail` pressing `x` on managed/user rules showed a misleading confirm dialog; now shows error immediately.
 - **format**: MCP server text display missing `envVarNames` and `headerNames` lines.
 - **list `--json`**: `mcpServers` was names-only string array; now objects with `scope` and `approvalState`.
+- **list `--json`**: `allow`/`deny`/`ask` rules are now `{ rule, scope }` objects (was plain strings), consistent with `show --json` and `export --json`.
+- **diff `--json`**: `onlyInA`/`onlyInB` rule arrays are now `{ rule, scope }` objects (was plain strings).
+- **init**: `--scope` is now validated (invalid values like `--scope bogus` exit 1 with a clear error, was silently proceeding).
+- **TUI**: Cursor position after rule deletion now stays in place when deleting a middle item; only moves up when the last item is deleted.
 
 ### Changed
 - `cpm audit --json` output includes `issueCount` field (previously only `issues` array length was available).
@@ -57,9 +61,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Internal
 - `addRule` accepts optional `{ dryRun: true }` to compute result without writing — eliminates duplicate conflict-detection logic between `previewRuleAdd` and `addRule`.
-- `VALID_MODES` in `manage.ts` derived from `PermissionModeSchema.options` (single source of truth).
+- `VALID_MODES` in `manage.ts`, `init.ts`, and `completion.ts` all derived from `PermissionModeSchema.options` (single source of truth).
+- `WRITABLE_SCOPES` constant extracted to `types.ts` — eliminates duplicated scope arrays across `manage.ts`, `init.ts`, `completion.ts`.
+- `diff.ts` JSON path: pre-computed `Set` for O(1) raw lookup (was O(n) `.some()` per item).
 - `exitWithCode()` helper extracted in `audit.ts` (was duplicated in JSON and text paths).
-- Test coverage expanded from 111 → 161 tests; new `commands.test.ts` covering all manage commands.
+- Test coverage expanded from 111 → 163 tests; new `commands.test.ts` covering all manage commands.
 - `prepublishOnly` script added to guard against accidental publish of unbuilt/failing code.
 
 ## [0.6.0] - 2025-07-15

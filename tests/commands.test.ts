@@ -1,5 +1,5 @@
 /**
- * Integration tests for CLI commands: initCommand, exportCommand, manage commands
+ * Integration tests for CLI commands: initCommand, exportCommand, listCommand, manage commands
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync } from "fs";
@@ -8,6 +8,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { initCommand } from "../src/commands/init.js";
 import { exportCommand } from "../src/commands/export.js";
+import { listCommand } from "../src/commands/list.js";
 import {
   allowCommand,
   denyCommand,
@@ -420,5 +421,56 @@ describe("resetAllCommand", () => {
     const data = await readSettings();
     expect(data.permissions.allow).toHaveLength(0);
     expect(data.permissions.deny).toHaveLength(0);
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// listCommand — JSON format
+// ────────────────────────────────────────────────────────────
+
+describe("listCommand — JSON", () => {
+  async function captureListJson() {
+    // listCommand uses console.log (not process.stdout.write), so capture it directly
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await listCommand({ root: FIXTURES, maxDepth: 3, json: true });
+    const text = calls.map((a) => a.join("")).join("");
+    return JSON.parse(text);
+  }
+
+  it("allow/deny/ask are {rule, scope} objects", async () => {
+    const json = await captureListJson();
+    expect(Array.isArray(json.projects)).toBe(true);
+    expect(json.projects.length).toBeGreaterThan(0);
+
+    for (const project of json.projects) {
+      expect(Array.isArray(project.allow)).toBe(true);
+      expect(Array.isArray(project.deny)).toBe(true);
+      expect(Array.isArray(project.ask)).toBe(true);
+      for (const rule of [...project.allow, ...project.deny, ...project.ask]) {
+        expect(rule).toHaveProperty("rule");
+        expect(rule).toHaveProperty("scope");
+        expect(typeof rule.rule).toBe("string");
+        expect(typeof rule.scope).toBe("string");
+      }
+    }
+  });
+
+  it("mcpServers have scope and approvalState", async () => {
+    const json = await captureListJson();
+    for (const project of json.projects) {
+      for (const s of project.mcpServers) {
+        expect(s).toHaveProperty("name");
+        expect(s).toHaveProperty("scope");
+        expect(s).toHaveProperty("approvalState");
+      }
+    }
+  });
+
+  it("warnings is a number", async () => {
+    const json = await captureListJson();
+    for (const project of json.projects) {
+      expect(typeof project.warnings).toBe("number");
+    }
   });
 });

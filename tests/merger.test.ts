@@ -265,6 +265,39 @@ describe("mergeSettingsFiles — warning detection", () => {
     expect(low).toBeUndefined();
   });
 
+  it("does NOT warn about missing deny rules when only WebFetch/WebSearch are allowed", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["WebFetch", "WebSearch"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const low = result.warnings.find(
+      (w) => w.message.includes("deny rules")
+    );
+    expect(low).toBeUndefined();
+  });
+
+  it("emits medium warning for bare WebFetch allow (no URL specifier)", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["WebFetch"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const med = result.warnings.find(
+      (w) => w.severity === "medium" && w.rule === "WebFetch" && w.message.includes("URL specifier")
+    );
+    expect(med).toBeDefined();
+  });
+
+  it("does NOT emit WebFetch warning when a URL specifier is provided", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["WebFetch(https://api.example.com/*)"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const webFetchWarn = result.warnings.find(
+      (w) => w.rule === "WebFetch(https://api.example.com/*)"
+    );
+    expect(webFetchWarn).toBeUndefined();
+  });
+
   it("does NOT warn about bypass mode when no explicit rules configured", () => {
     const f = makeFile("project", {
       permissions: {},
@@ -405,5 +438,44 @@ describe("mergeSettingsFiles — warning detection", () => {
       (w) => w.message.includes("both allow and deny")
     );
     expect(exactConflict).toBeDefined();
+  });
+
+  it("emits high warning for allowManagedPermissionRulesOnly in managed settings", () => {
+    const managed = makeFile("managed", {
+      allowManagedPermissionRulesOnly: true,
+    });
+    const result = mergeSettingsFiles([managed]);
+    const warn = result.warnings.find(
+      (w) => w.severity === "high" && w.message.includes("allowManagedPermissionRulesOnly")
+    );
+    expect(warn).toBeDefined();
+  });
+
+  it("emits medium warnings for allowManagedHooksOnly and allowManagedMcpServersOnly in managed settings", () => {
+    const managed = makeFile("managed", {
+      allowManagedHooksOnly: true,
+      allowManagedMcpServersOnly: true,
+    });
+    const result = mergeSettingsFiles([managed]);
+    const hooksWarn = result.warnings.find(
+      (w) => w.severity === "medium" && w.message.includes("allowManagedHooksOnly")
+    );
+    const mcpWarn = result.warnings.find(
+      (w) => w.severity === "medium" && w.message.includes("allowManagedMcpServersOnly")
+    );
+    expect(hooksWarn).toBeDefined();
+    expect(mcpWarn).toBeDefined();
+  });
+
+  it("does NOT warn about allowManaged* flags in non-managed scopes", () => {
+    const project = makeFile("project", {
+      allowManagedPermissionRulesOnly: true,
+      allowManagedHooksOnly: true,
+    });
+    const result = mergeSettingsFiles([project]);
+    const warn = result.warnings.find(
+      (w) => w.message.includes("allowManaged")
+    );
+    expect(warn).toBeUndefined();
   });
 });

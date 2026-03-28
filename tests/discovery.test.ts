@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { join } from "path";
+import { existsSync } from "fs";
+import { homedir } from "os";
 import { fileURLToPath } from "url";
 import { scan } from "../src/core/discovery.js";
 
@@ -103,6 +105,27 @@ describe("scan — fixture directory", () => {
     const after = new Date();
     expect(result.scannedAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
     expect(result.scannedAt.getTime()).toBeLessThanOrEqual(after.getTime());
+  });
+
+  it("does not treat ~/.claude as a project when scanning from home directory", async () => {
+    const home = homedir();
+    const userClaudeDir = join(home, ".claude");
+    // Only meaningful when ~/.claude actually exists (always true on Claude Code machines)
+    if (!existsSync(userClaudeDir)) return;
+
+    const result = await scan({ root: home, maxDepth: 1, includeGlobal: false });
+    const homeAsProject = result.projects.find((p) => p.rootPath === home);
+    expect(homeAsProject).toBeUndefined();
+  });
+
+  it("effectivePermissions.mcpServers has no duplicate server names per project", async () => {
+    // Regression test: servers from .mcp.json and ~/.claude.json are deduplicated by name
+    const result = await scan({ root: FIXTURES, maxDepth: 3 });
+    for (const project of result.projects) {
+      const names = project.effectivePermissions.mcpServers.map((s) => s.name);
+      const unique = new Set(names);
+      expect(names.length).toBe(unique.size);
+    }
   });
 
   it("merges effective permissions across local and project scopes for project-a", async () => {

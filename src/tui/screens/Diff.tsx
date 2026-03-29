@@ -235,18 +235,30 @@ function DiffView({
       {(() => {
         const allMcp = new Set([...mcpSetA, ...mcpSetB]);
         if (allMcp.size === 0) return null;
+        const mcpMapA = new Map(pa.mcpServers.map((s) => [s.name, s]));
+        const mcpMapB = new Map(pb.mcpServers.map((s) => [s.name, s]));
         return (
           <Box flexDirection="column" marginBottom={1}>
             <Text bold color="blue">MCP SERVERS</Text>
-            {[...allMcp].map((name) => (
-              <DiffRow
-                key={name}
-                rule={name}
-                inA={mcpSetA.has(name)}
-                inB={mcpSetB.has(name)}
-                color="blue"
-              />
-            ))}
+            {[...allMcp].map((name) => {
+              const server = mcpMapA.get(name) ?? mcpMapB.get(name);
+              return (
+                <Box key={name} flexDirection="column">
+                  <DiffRow
+                    rule={name}
+                    inA={mcpSetA.has(name)}
+                    inB={mcpSetB.has(name)}
+                    color="blue"
+                  />
+                  {server?.command && (
+                    <Text color="gray">{"    "}cmd: {server.command}</Text>
+                  )}
+                  {server?.url && (
+                    <Text color="gray">{"    "}url: {server.url}</Text>
+                  )}
+                </Box>
+              );
+            })}
           </Box>
         );
       })()}

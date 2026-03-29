@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2026-03-29
+
+### Added
+- **`cpm list` text output**: A green `[locked]` indicator now appears in the flags/warnings column for projects where `disableBypassPermissionsMode` is set (`isBypassDisabled: true`). Previously this was only visible in `cpm show` text output and `cpm list --json`. The column header is updated from "Warnings" to "Flags/Warnings".
+
+### Internal
+- Test coverage: 217 tests (+2 for the `[locked]` indicator in list text output).
+
 ## [1.0.4] - 2026-03-29
 
 ### Fixed

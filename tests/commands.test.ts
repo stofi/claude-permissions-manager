@@ -703,6 +703,26 @@ describe("listCommand — JSON", () => {
   });
 });
 
+describe("listCommand — text output", () => {
+  it("shows [locked] indicator for project with isBypassDisabled=true", async () => {
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await listCommand({ root: FIXTURES, maxDepth: 3, json: false, includeGlobal: false });
+    const output = calls.join("\n");
+    // project-bypass-locked has disableBypassPermissionsMode set — should show [locked]
+    expect(output).toMatch(/\[locked\]/);
+  });
+
+  it("does not show [locked] for projects without isBypassDisabled", async () => {
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    // project-a has no disableBypassPermissionsMode
+    await listCommand({ root: join(FIXTURES, "project-a"), maxDepth: 1, json: false, includeGlobal: false });
+    const output = calls.join("\n");
+    expect(output).not.toMatch(/\[locked\]/);
+  });
+});
+
 // ────────────────────────────────────────────────────────────
 // showCommand — JSON format
 // ────────────────────────────────────────────────────────────

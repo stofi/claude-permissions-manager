@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-03-29
+
+### Fixed
+- **Default action**: Running `cpm` with no subcommand now correctly respects `--root`, `--depth`, and `--no-global` flags. Previously these flags were silently ignored and the hardcoded defaults (root=`~`, depth=8, global=true) were always used. The flags are now defined on the root program and passed through to `uiCommand` / `listCommand`.
+
+### Internal
+- Test coverage: 215 tests (+1 for `includeGlobal=false` excluding user-scoped rules from list output).
+
 ## [1.0.2] - 2026-03-29
 
 ### Changed

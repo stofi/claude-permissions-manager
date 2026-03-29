@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-03-29
+
+### Changed
+- **Discovery scan performance**: Added 16 common build/cache directory names to the skip list (`dist`, `build`, `out`, `target`, `.next`, `.nuxt`, `.output`, `.svelte-kit`, `.astro`, `.turbo`, `.parcel-cache`, `coverage`, `.nyc_output`, `.pytest_cache`, `.tox`, `.gradle`, `env`). Scans on large monorepos and framework projects are significantly faster.
+
+### Fixed
+- **Discovery**: Broken symlinks (target deleted or inaccessible) are now recorded in `result.errors` with a `"Broken symlink: ..."` message instead of being silently skipped. Helps diagnose why a project might disappear from scan results.
+
+### Docs
+- **README**: Clarified `--exit-code` table — exit code `1` means "any non-critical issue found", not just "warnings of high/medium/low severity".
+
 ## [1.0.1] - 2026-03-29
 
 ### Fixed

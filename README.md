@@ -89,7 +89,7 @@ All commands exit `0` on success and `1` on error (missing `.claude` directory, 
 | Code | Meaning |
 |------|---------|
 | `0`  | No issues found |
-| `1`  | Warnings found (high, medium, or low severity) |
+| `1`  | Issues found (any severity below critical) |
 | `2`  | Critical issues found |
 
 #### Path arguments

@@ -72,7 +72,12 @@ async function findClaudeDirs(
         if (visitedInodes.has(st.ino)) continue; // cycle
         visitedInodes.add(st.ino);
         resolvedPath = real;
-      } catch {
+      } catch (err) {
+        // Broken symlink (target deleted or permission denied) — record and skip
+        errors.push({
+          path: fullPath,
+          error: `Broken symlink: ${err instanceof Error ? err.message : String(err)}`,
+        });
         continue;
       }
     }

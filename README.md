@@ -150,7 +150,7 @@ In project detail (permissions tab):
 - `j`/`k` — move cursor through rules
 - `a` — add allow rule, `d` — add deny rule, `s` — add ask rule
 - `x` — delete selected rule
-- `←` / `Esc` / `q` — back
+- `←` / `h` / `Esc` / `q` — back
 
 ## What it reads
 

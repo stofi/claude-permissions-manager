@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.9] - 2026-03-29
+
+### Fixed
+- **`cpm list/show/diff --json`**: MCP server `envVarNames` and `headerNames` fields now always emit `[]` instead of `undefined` when not set — consistent with `export --json` behavior.
+
+### Docs
+- **README**: Added `h` (Vi-style left navigation) as a documented back shortcut in the Project Detail TUI screen.
+
 ## [0.9.8] - 2026-03-29
 
 ### Fixed

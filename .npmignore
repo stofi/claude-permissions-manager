@@ -1,4 +1,5 @@
 src/
+tests/
 *.ts
 tsconfig.json
 RESEARCH.md
@@ -7,3 +8,4 @@ PLAN.md
 memory/
 .gitignore
 node_modules/
+*.tgz

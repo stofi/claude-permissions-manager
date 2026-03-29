@@ -901,6 +901,7 @@ describe("auditCommand", () => {
     expect(json).toHaveProperty("scanRoot");
     expect(typeof json.issueCount).toBe("number");
     expect(Array.isArray(json.issues)).toBe(true);
+    expect(Array.isArray(json.errors)).toBe(true);
     for (const issue of json.issues) {
       expect(issue).toHaveProperty("project");
       expect(issue).toHaveProperty("severity");

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-03-29
+
+### Fixed
+- **`cpm export --json` globalSettings**: `userMcpServers` now includes `approvalState`, `command`, `args`, and `url` fields — consistent with per-project MCP server objects across all JSON outputs.
+
+### Added
+- **merger**: LOW warnings for misconfigured MCP servers — `type: "stdio"` with no `command`, and `type: "http"` with no `url`. These servers would fail at runtime; now surfaced at audit/scan time.
+
+### Internal
+- Test coverage: 211 tests (+3 merger tests for MCP config warnings, +1 audit JSON `errors` field assertion).
+
 ## [0.9.5] - 2026-03-29
 
 ### Fixed

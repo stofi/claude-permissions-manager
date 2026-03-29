@@ -138,7 +138,7 @@ Run `cpm` (or `cpm ui`) for the interactive terminal UI:
 - `Enter` — view project details
 - `a` — audit view (security issues)
 - `d` — diff two projects
-- `q` — quit
+- `q` / `Ctrl+C` — quit
 
 In the audit screen:
 - `↑↓` / `j`/`k` — navigate warnings

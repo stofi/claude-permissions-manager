@@ -459,11 +459,11 @@ export function ProjectDetail({ project, onBack, onRefresh }: ProjectDetailProps
       <Box marginTop={1}>
         {tab === "permissions" && mode === "view" ? (
           <Text color="gray">
-            1:permissions  2:mcp  3:warnings  j/k:move  a:allow  d:deny  s:ask  x:delete  ←/q:back
+            1:permissions  2:mcp  3:warnings  j/k:move  a:allow  d:deny  s:ask  x:delete  ←/h/q:back
           </Text>
         ) : (
           <Text color="gray">
-            1:permissions  2:mcp  3:warnings  ←/Esc/q: back
+            1:permissions  2:mcp  3:warnings  ←/h/Esc/q: back
           </Text>
         )}
       </Box>

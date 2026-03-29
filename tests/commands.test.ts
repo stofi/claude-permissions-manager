@@ -633,6 +633,30 @@ describe("listCommand — JSON", () => {
       expect(typeof project.isBypassDisabled).toBe("boolean");
     }
   });
+
+  it("mcpServers include command/args for stdio and url for http servers", async () => {
+    // Use the FIXTURES root which contains project-a with both server types
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await listCommand({ root: FIXTURES, maxDepth: 3, json: true });
+    const text = calls.map((a) => a.join("")).join("");
+    const json = JSON.parse(text);
+
+    const projectA = json.projects.find((p: Record<string, unknown>) =>
+      String(p.path).endsWith("project-a")
+    );
+    expect(projectA).toBeDefined();
+
+    const servers = projectA.mcpServers as Record<string, unknown>[];
+    const github = servers.find((s) => s.name === "github");
+    expect(github).toBeDefined();
+    expect(github!.command).toBe("npx");
+    expect(Array.isArray(github!.args)).toBe(true);
+
+    const filesystem = servers.find((s) => s.name === "filesystem");
+    expect(filesystem).toBeDefined();
+    expect(filesystem!.url).toMatch(/^https?:\/\//);
+  });
 });
 
 // ────────────────────────────────────────────────────────────

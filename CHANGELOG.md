@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-03-29
+
 ### Fixed
 - **`cpm export --json` globalSettings**: `userMcpServers` now includes `approvalState`, `command`, `args`, and `url` fields — consistent with per-project MCP server objects across all JSON outputs.
 

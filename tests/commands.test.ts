@@ -679,6 +679,28 @@ describe("listCommand — JSON", () => {
       expect(Array.isArray(project.additionalDirs)).toBe(true);
     }
   });
+
+  it("includeGlobal=false excludes user-scope rules from effective permissions", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await listCommand({ root: FIXTURES, maxDepth: 3, json: true, includeGlobal: false });
+    const withoutGlobal = JSON.parse(calls.map((a) => a.join("")).join(""));
+
+    calls.length = 0;
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await listCommand({ root: FIXTURES, maxDepth: 3, json: true, includeGlobal: true });
+    const withGlobal = JSON.parse(calls.map((a) => a.join("")).join(""));
+
+    // Both should return the same projects
+    expect(withoutGlobal.projects.length).toBe(withGlobal.projects.length);
+    // Without global, no project should have any user-scoped allow/deny/ask rules
+    for (const project of withoutGlobal.projects) {
+      const userRules = [...project.allow, ...project.deny, ...project.ask].filter(
+        (r: Record<string, unknown>) => r.scope === "user" || r.scope === "managed"
+      );
+      expect(userRules).toHaveLength(0);
+    }
+  });
 });
 
 // ────────────────────────────────────────────────────────────

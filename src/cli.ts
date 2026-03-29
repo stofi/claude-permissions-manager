@@ -20,7 +20,10 @@ const program = new Command();
 program
   .name("cpm")
   .description("Claude Permissions Manager — discover and manage Claude Code permissions")
-  .version(version);
+  .version(version)
+  .option("--root <dir>", "Root directory to scan from", homeDir())
+  .option("--depth <n>", "Max scan depth", "8")
+  .option("--no-global", "Skip user and managed global settings");
 
 // Default action: TUI when TTY, list otherwise
 program.action(async () => {
@@ -30,11 +33,14 @@ program.action(async () => {
     process.stderr.write(`Error: Unknown command '${unknownArgs[0]}'\nRun 'cpm --help' for usage.\n`);
     process.exit(1);
   }
+  const opts = program.opts() as { root: string; depth: string; global: boolean };
+  const maxDepth = parseDepth(opts.depth);
+  const includeGlobal = opts.global !== false;
   if (process.stdout.isTTY) {
     const { uiCommand } = await import("./commands/ui.js");
-    await uiCommand({ root: homeDir(), maxDepth: 8, includeGlobal: true });
+    await uiCommand({ root: opts.root, maxDepth, includeGlobal });
   } else {
-    await listCommand({ root: homeDir(), maxDepth: 8, includeGlobal: true });
+    await listCommand({ root: opts.root, maxDepth, includeGlobal });
   }
 });
 

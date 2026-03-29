@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-03-30
+
+### Changed (breaking)
+- **`cpm list --json` and `cpm export --json`**: The `warnings` field (which was a count integer) has been renamed to `warningCount` to disambiguate it from `cpm show --json` where `warnings` is a full `Warning[]` array. Update any scripts that read `.warnings` from list/export JSON to use `.warningCount`. The `cpm export --format csv` header column also changed from `warnings` to `warning_count`.
+
+### Internal
+- Test coverage: 221 tests (+1 export JSON `warningCount` field assertion).
+
 ## [1.0.6] - 2026-03-29
 
 ### Added

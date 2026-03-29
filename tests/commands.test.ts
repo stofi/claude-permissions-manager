@@ -164,8 +164,8 @@ describe("exportCommand — JSON", () => {
       expect(project).toHaveProperty("deny");
       expect(project).toHaveProperty("ask");
       expect(project).toHaveProperty("mcpServers");
-      expect(project).toHaveProperty("warnings");
-      expect(typeof project.warnings).toBe("number");
+      expect(project).toHaveProperty("warningCount");
+      expect(typeof project.warningCount).toBe("number");
       expect(Array.isArray(project.allow)).toBe(true);
       expect(Array.isArray(project.deny)).toBe(true);
       // isBypassDisabled, envVarNames, additionalDirs are always present
@@ -207,6 +207,20 @@ describe("exportCommand — JSON", () => {
     expect(filesystem!.url).toMatch(/^https?:\/\//);
   });
 
+  it("project records include warningCount as a number", async () => {
+    const lines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      lines.push(String(chunk));
+      return true;
+    });
+    await exportCommand({ root: FIXTURES, maxDepth: 3, format: "json" });
+    const json = JSON.parse(lines.join(""));
+    for (const project of json.projects as Record<string, unknown>[]) {
+      expect(project).toHaveProperty("warningCount");
+      expect(typeof project.warningCount).toBe("number");
+    }
+  });
+
   it("globalSettings.userMcpServers include scope field", async () => {
     const lines: string[] = [];
     vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
@@ -238,7 +252,7 @@ describe("exportCommand — CSV", () => {
 
     const csv = lines.join("");
     const [header] = csv.split("\n");
-    expect(header).toBe("path,mode,allow_count,deny_count,ask_count,mcp_count,warnings,bypass_disabled");
+    expect(header).toBe("path,mode,allow_count,deny_count,ask_count,mcp_count,warning_count,bypass_disabled");
   });
 
   it("produces one data row per project", async () => {
@@ -634,10 +648,10 @@ describe("listCommand — JSON", () => {
     }
   });
 
-  it("warnings is a number", async () => {
+  it("warningCount is a number", async () => {
     const json = await captureListJson();
     for (const project of json.projects) {
-      expect(typeof project.warnings).toBe("number");
+      expect(typeof project.warningCount).toBe("number");
     }
   });
 

@@ -9,12 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **`cpm show` text output**: `isBypassDisabled` was shown in TUI and `--json` but not in plain-text output (`formatEffectivePermissions`). Now shows `[bypass locked]` beside the mode line when set.
+- **merger**: bare `WebSearch` in allow list now emits a MEDIUM warning ("WebSearch is allowed without any query specifier — arbitrary web searches can be performed"), consistent with the existing bare `WebFetch` warning. Previously only `WebFetch` triggered this check despite both being in the `READ_ONLY_TOOLS` exclusion list.
 
 ### Internal
-- Test coverage expanded to 193 tests.
+- Test coverage expanded to 196 tests.
   - `denyCommand`: new test for ask-conflict warning (rule exists in ask list — deny takes precedence).
+  - `denyCommand --dry-run`: new test for conflict display when rule exists in allow list.
   - `showCommand --json`: new test verifying `isBypassDisabled: true` when `disableBypassPermissionsMode=disable` is present.
   - `writer`: new tests for `addRule` `conflictsWith` when adding an ask rule that exists in deny or allow lists.
+  - `merger`: two new WebSearch warning tests (warning fires for bare WebSearch; suppressed when specifier provided).
 
 ## [0.9.0] - 2026-03-28
 

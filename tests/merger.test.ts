@@ -298,6 +298,28 @@ describe("mergeSettingsFiles — warning detection", () => {
     expect(webFetchWarn).toBeUndefined();
   });
 
+  it("emits medium warning for bare WebSearch allow (no query specifier)", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["WebSearch"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const med = result.warnings.find(
+      (w) => w.severity === "medium" && w.rule === "WebSearch" && w.message.includes("query specifier")
+    );
+    expect(med).toBeDefined();
+  });
+
+  it("does NOT emit WebSearch warning when a query specifier is provided", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["WebSearch(site:example.com *)"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const webSearchWarn = result.warnings.find(
+      (w) => w.rule === "WebSearch(site:example.com *)"
+    );
+    expect(webSearchWarn).toBeUndefined();
+  });
+
   it("does NOT warn about bypass mode when no explicit rules configured", () => {
     const f = makeFile("project", {
       permissions: {},

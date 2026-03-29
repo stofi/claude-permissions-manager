@@ -98,6 +98,13 @@ function detectWarnings(
         rule: rule.raw,
       });
     }
+    if (rule.tool === "WebSearch" && !rule.specifier) {
+      warnings.push({
+        severity: "medium",
+        message: "WebSearch is allowed without any query specifier — arbitrary web searches can be performed",
+        rule: rule.raw,
+      });
+    }
     // Check for sensitive paths in allow
     if (
       rule.specifier &&

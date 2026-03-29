@@ -412,6 +412,15 @@ describe("--dry-run flag", () => {
     await expect(readFile(settingsPath(), "utf-8")).rejects.toThrow();
   });
 
+  it("denyCommand --dry-run shows conflict when rule exists in allow list", async () => {
+    await allowCommand("Read", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await denyCommand("Read", { project: tmpDir, scope: "project", dryRun: true });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /dry.run/i.test(m))).toBe(true);
+    expect(calls.some((m) => /also in allow/i.test(m))).toBe(true);
+  });
+
   it("askCommand --dry-run does not write to file", async () => {
     const logSpy = vi.spyOn(console, "log");
     await askCommand("Bash(git push *)", { project: tmpDir, scope: "project", dryRun: true });

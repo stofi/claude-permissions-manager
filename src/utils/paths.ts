@@ -66,8 +66,29 @@ export const SKIP_DIR_NAMES = new Set([
   "vendor",
   ".venv",
   "venv",
+  "env",           // Python venv variant
   ".svn",
   ".hg",
   "Library",       // macOS Library within home
   "Applications",
+  // Build output — unlikely to contain project .claude dirs, skip for performance
+  "dist",
+  "build",
+  "out",
+  "target",        // Rust / Maven
+  // Framework caches
+  ".next",         // Next.js
+  ".nuxt",         // Nuxt.js
+  ".output",       // Nuxt 3 server output
+  ".svelte-kit",   // SvelteKit
+  ".astro",        // Astro
+  ".turbo",        // Turborepo cache
+  ".parcel-cache", // Parcel
+  // Test / coverage output
+  "coverage",
+  ".nyc_output",
+  ".pytest_cache",
+  ".tox",
+  // Build tool caches
+  ".gradle",
 ]);

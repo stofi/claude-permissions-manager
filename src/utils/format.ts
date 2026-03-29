@@ -56,11 +56,12 @@ export function formatProjectRow(project: ClaudeProject): string {
   const deny = perms.deny.length > 0 ? chalk.red(denyLabel) : chalk.gray(denyLabel);
   const askLabel = `${perms.ask.length} ask`.padEnd(6);
   const ask = perms.ask.length > 0 ? chalk.yellow(askLabel) : chalk.gray(askLabel);
+  const bypassLock = perms.isBypassDisabled ? chalk.green("[locked] ") : "";
   const warnings = perms.warnings.length > 0
     ? chalk.yellow(`⚠ ${perms.warnings.length}`)
     : "";
 
-  return `${path} ${mode} ${allow} ${deny} ${ask} ${warnings}`;
+  return `${path} ${mode} ${allow} ${deny} ${ask} ${bypassLock}${warnings}`;
 }
 
 export function formatProjectTable(projects: ClaudeProject[]): string {
@@ -70,7 +71,7 @@ export function formatProjectTable(projects: ClaudeProject[]): string {
     " " + "Allow".padEnd(9) +
     " " + "Deny".padEnd(7) +
     " " + "Ask".padEnd(6) +
-    " " + "Warnings"
+    " " + "Flags/Warnings"
   );
   const divider = "─".repeat(88);
   const rows = projects.map(formatProjectRow);

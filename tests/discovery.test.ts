@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { join } from "path";
 import { existsSync } from "fs";
-import { homedir } from "os";
+import { mkdtemp, symlink, rm } from "fs/promises";
+import { tmpdir, homedir } from "os";
 import { fileURLToPath } from "url";
 import { scan } from "../src/core/discovery.js";
 
@@ -125,6 +126,23 @@ describe("scan — fixture directory", () => {
       const names = project.effectivePermissions.mcpServers.map((s) => s.name);
       const unique = new Set(names);
       expect(names.length).toBe(unique.size);
+    }
+  });
+
+  it("does not treat a symlink .claude→~/.claude as a project", async () => {
+    const home = homedir();
+    const userClaudeDir = join(home, ".claude");
+    if (!existsSync(userClaudeDir)) return;
+
+    // Create a temp dir with a .claude symlink pointing to ~/.claude
+    const tmpDir = await mkdtemp(join(tmpdir(), "cpm-symlink-test-"));
+    try {
+      await symlink(userClaudeDir, join(tmpDir, ".claude"));
+      const result = await scan({ root: tmpDir, maxDepth: 1, includeGlobal: false });
+      // The symlink .claude should be excluded (it resolves to ~/.claude)
+      expect(result.projects).toHaveLength(0);
+    } finally {
+      await rm(tmpDir, { recursive: true, force: true });
     }
   });
 

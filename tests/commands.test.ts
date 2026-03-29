@@ -168,6 +168,10 @@ describe("exportCommand — JSON", () => {
       expect(typeof project.warnings).toBe("number");
       expect(Array.isArray(project.allow)).toBe(true);
       expect(Array.isArray(project.deny)).toBe(true);
+      // isBypassDisabled, envVarNames, additionalDirs are always present
+      expect(typeof project.isBypassDisabled).toBe("boolean");
+      expect(Array.isArray(project.envVarNames)).toBe(true);
+      expect(Array.isArray(project.additionalDirs)).toBe(true);
       // Each MCP server record has env and header name arrays
       for (const s of project.mcpServers) {
         expect(Array.isArray(s.envVarNames)).toBe(true);
@@ -306,6 +310,14 @@ describe("denyCommand", () => {
     const calls = logSpy.mock.calls.map((c) => String(c[0]));
     expect(calls.some((m) => /also exists in allow/i.test(m))).toBe(true);
   });
+
+  it("warns when rule also exists in ask list", async () => {
+    await askCommand("Bash(rm -rf *)", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await denyCommand("Bash(rm -rf *)", { project: tmpDir, scope: "project" });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /also exists in ask/i.test(m))).toBe(true);
+  });
 });
 
 describe("askCommand", () => {
@@ -404,12 +416,41 @@ describe("--dry-run flag", () => {
     await expect(readFile(settingsPath(), "utf-8")).rejects.toThrow();
   });
 
+  it("denyCommand --dry-run shows conflict when rule exists in allow list", async () => {
+    await allowCommand("Read", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await denyCommand("Read", { project: tmpDir, scope: "project", dryRun: true });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /dry.run/i.test(m))).toBe(true);
+    expect(calls.some((m) => /also in allow/i.test(m))).toBe(true);
+  });
+
   it("askCommand --dry-run does not write to file", async () => {
     const logSpy = vi.spyOn(console, "log");
     await askCommand("Bash(git push *)", { project: tmpDir, scope: "project", dryRun: true });
     await expect(readFile(settingsPath(), "utf-8")).rejects.toThrow();
     const calls = logSpy.mock.calls.map((c) => String(c[0]));
     expect(calls.some((m) => /dry.run/i.test(m))).toBe(true);
+  });
+
+  it("askCommand --dry-run shows 'already present' when rule exists", async () => {
+    await askCommand("Bash(git push *)", { project: tmpDir, scope: "project" }); // write it first
+    const logSpy = vi.spyOn(console, "log");
+    await askCommand("Bash(git push *)", { project: tmpDir, scope: "project", dryRun: true });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /already/i.test(m))).toBe(true);
+    // File should still have exactly one ask rule
+    const data = await readSettings();
+    expect(data.permissions.ask).toHaveLength(1);
+  });
+
+  it("askCommand --dry-run shows conflict when rule exists in deny list", async () => {
+    await denyCommand("Bash(git push *)", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await askCommand("Bash(git push *)", { project: tmpDir, scope: "project", dryRun: true });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /dry.run/i.test(m))).toBe(true);
+    expect(calls.some((m) => /deny takes precedence/i.test(m))).toBe(true);
   });
 
   it("modeCommand --dry-run shows transition and does not write", async () => {
@@ -534,6 +575,13 @@ describe("listCommand — JSON", () => {
       expect(typeof project.warnings).toBe("number");
     }
   });
+
+  it("isBypassDisabled is a boolean on every project", async () => {
+    const json = await captureListJson();
+    for (const project of json.projects) {
+      expect(typeof project.isBypassDisabled).toBe("boolean");
+    }
+  });
 });
 
 // ────────────────────────────────────────────────────────────
@@ -590,6 +638,16 @@ describe("showCommand — JSON", () => {
       expect(s.approvalState).toBeDefined();
       expect(typeof s.approvalState).toBe("string");
     }
+  });
+
+  it("isBypassDisabled is true when disableBypassPermissionsMode=disable is set", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+    await showCommand(join(FIXTURES, "project-bypass-locked"), { json: true });
+
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(json.effectivePermissions.isBypassDisabled).toBe(true);
   });
 });
 

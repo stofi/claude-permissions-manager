@@ -1,10 +1,14 @@
 #!/usr/bin/env node
+import { createRequire } from "module";
 import { Command } from "commander";
 import { listCommand } from "./commands/list.js";
 import { showCommand } from "./commands/show.js";
 import { auditCommand } from "./commands/audit.js";
 import { homeDir } from "./utils/paths.js";
 import { PermissionModeSchema } from "./core/schemas.js";
+
+const _require = createRequire(import.meta.url);
+const { version } = _require("../package.json") as { version: string };
 
 function parseDepth(raw: string, fallback = 8): number {
   const n = parseInt(raw, 10);
@@ -16,7 +20,7 @@ const program = new Command();
 program
   .name("cpm")
   .description("Claude Permissions Manager — discover and manage Claude Code permissions")
-  .version("0.9.0");
+  .version(version);
 
 // Default action: TUI when TTY, list otherwise
 program.action(async () => {

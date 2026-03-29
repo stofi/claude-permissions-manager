@@ -179,6 +179,33 @@ describe("exportCommand — JSON", () => {
       }
     }
   });
+
+  it("mcpServers include command/args for stdio and url for http servers", async () => {
+    const lines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      lines.push(String(chunk));
+      return true;
+    });
+
+    await exportCommand({ root: FIXTURES, maxDepth: 3, format: "json" });
+
+    const json = JSON.parse(lines.join(""));
+    // Find the project-a record which has both stdio and http MCP servers
+    const projectA = json.projects.find((p: Record<string, unknown>) =>
+      String(p.path).endsWith("project-a")
+    );
+    expect(projectA).toBeDefined();
+
+    const servers = projectA.mcpServers as Record<string, unknown>[];
+    const github = servers.find((s) => s.name === "github");
+    expect(github).toBeDefined();
+    expect(github!.command).toBe("npx");
+    expect(Array.isArray(github!.args)).toBe(true);
+
+    const filesystem = servers.find((s) => s.name === "filesystem");
+    expect(filesystem).toBeDefined();
+    expect(filesystem!.url).toMatch(/^https?:\/\//);
+  });
 });
 
 // ────────────────────────────────────────────────────────────
@@ -648,6 +675,27 @@ describe("showCommand — JSON", () => {
 
     const json = JSON.parse(calls.map((a) => a.join("")).join(""));
     expect(json.effectivePermissions.isBypassDisabled).toBe(true);
+  });
+
+  it("mcpServers include command/args for stdio servers and url for http servers", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+    await showCommand(join(FIXTURES, "project-a"), { json: true });
+
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    const servers = json.mcpServers as Record<string, unknown>[];
+    expect(servers.length).toBeGreaterThan(0);
+
+    const github = servers.find((s) => s.name === "github");
+    expect(github).toBeDefined();
+    expect(github!.command).toBe("npx");
+    expect(Array.isArray(github!.args)).toBe(true);
+    expect((github!.args as string[])[0]).toBe("-y");
+
+    const filesystem = servers.find((s) => s.name === "filesystem");
+    expect(filesystem).toBeDefined();
+    expect(filesystem!.url).toMatch(/^https?:\/\//);
   });
 });
 

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.9.2] - 2026-03-29
+
+### Fixed
+- **merger**: missing LOW warning when a rule appears in both `allow` and `ask` — `allow` wins silently, making the `ask` rule unreachable. Now warns "Rule X is in both allow and ask — allow wins, ask prompt never shown", consistent with the existing allow+deny and ask+deny conflict warnings.
+- **TUI ProjectDetail**: inconsistent error message for attempting to delete a managed/user scope rule — the confirm-dialog path said "Cannot edit ... scope from here" while the direct-x path said "Cannot delete ... scope rules". Both now use the same "Cannot delete ... scope rules" message.
+- **`cpm show --json` / `cpm export --json`**: MCP server records now include `command`, `args`, and `url` fields. Previously these fields were populated in the type but omitted from JSON output, making it impossible to distinguish how servers connect (stdio vs HTTP) from the JSON output alone.
+
+### Internal
+- Test coverage: 202 tests (+1 merger test for allow+ask conflict, +2 command tests for MCP command/args/url in show/export JSON).
+
 ## [0.9.1] - 2026-03-29
 
 ### Fixed

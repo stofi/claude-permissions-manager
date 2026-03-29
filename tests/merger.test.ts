@@ -474,6 +474,18 @@ describe("mergeSettingsFiles — warning detection", () => {
     expect(conflict!.rule).toBe("Bash(git *)");
   });
 
+  it("emits low warning when same rule appears in both allow and ask", () => {
+    const f = makeFile("project", {
+      permissions: { allow: ["Bash(git status)"], ask: ["Bash(git status)"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const conflict = result.warnings.find(
+      (w) => w.severity === "low" && w.message.includes("both allow and ask")
+    );
+    expect(conflict).toBeDefined();
+    expect(conflict!.rule).toBe("Bash(git status)");
+  });
+
   it("emits low warning when bare tool deny overrides specific ask rule", () => {
     const f = makeFile("project", {
       permissions: {

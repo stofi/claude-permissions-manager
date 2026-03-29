@@ -167,6 +167,18 @@ function detectWarnings(
     }
   }
 
+  // Warn about rules that appear in both allow and ask (allow wins, ask prompt never shown)
+  const allowSet = new Set(permissions.allow.map((r) => r.raw));
+  for (const rule of permissions.ask) {
+    if (allowSet.has(rule.raw)) {
+      warnings.push({
+        severity: "low",
+        message: `Rule "${rule.raw}" is in both allow and ask — allow wins, ask prompt never shown`,
+        rule: rule.raw,
+      });
+    }
+  }
+
   // Warn when a bare tool deny semantically covers a more specific allow rule
   // e.g. deny "Bash" overrides allow "Bash(git status)" — allow has no effect
   // Also warn when deny "*" (wildcard) overrides all allow rules

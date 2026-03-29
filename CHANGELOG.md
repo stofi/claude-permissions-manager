@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-03-29
+
+### Fixed
+- **discovery**: A `.claude` directory that is a symlink resolving to `~/.claude` was incorrectly treated as a project. The path comparison now uses the canonicalised (resolved) path so symlinks pointing to the user global settings directory are correctly skipped.
+
+### Internal
+- Test coverage: 214 tests (+1 symlink regression test in `discovery.test.ts`).
+
 ## [1.0.0] - 2026-03-29
 
 ### Changed

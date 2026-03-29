@@ -796,6 +796,36 @@ describe("diffCommand — JSON", () => {
     const json = JSON.parse(calls.map((a) => a.join("")).join(""));
     expect(json.identical).toBe(false);
   });
+
+  it("mcpServers onlyInA/B are full objects with command/args/url (not plain strings)", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+    // project-a has MCP servers; project-b has none — so onlyInA should be non-empty objects
+    await diffCommand(
+      join(FIXTURES, "project-a"),
+      join(FIXTURES, "project-b"),
+      { json: true }
+    );
+
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(json.mcpServers).toHaveProperty("onlyInA");
+    expect(json.mcpServers).toHaveProperty("onlyInB");
+    expect(json.mcpServers).toHaveProperty("inBoth");
+    // onlyInA should contain full objects, not strings
+    expect(json.mcpServers.onlyInA.length).toBeGreaterThan(0);
+    for (const s of json.mcpServers.onlyInA as Record<string, unknown>[]) {
+      expect(typeof s).toBe("object");
+      expect(s).toHaveProperty("name");
+      expect(s).toHaveProperty("type");
+      expect(s).toHaveProperty("scope");
+      expect(s).toHaveProperty("approvalState");
+    }
+    // inBoth is plain strings
+    for (const s of json.mcpServers.inBoth as unknown[]) {
+      expect(typeof s).toBe("string");
+    }
+  });
 });
 
 // ────────────────────────────────────────────────────────────

@@ -55,8 +55,19 @@ export async function diffCommand(
     const denyOnlyB = p2.deny.filter((r) => !p1DenyRaws.has(r.raw)).map(toRuleObj);
     const askOnlyA = p1.ask.filter((r) => !p2AskRaws.has(r.raw)).map(toRuleObj);
     const askOnlyB = p2.ask.filter((r) => !p1AskRaws.has(r.raw)).map(toRuleObj);
-    const mcpOnlyA = [...mcpNamesA].filter((n) => !mcpNamesB.has(n));
-    const mcpOnlyB = [...mcpNamesB].filter((n) => !mcpNamesA.has(n));
+    const toMcpObj = (s: (typeof p1.mcpServers)[number]) => ({
+      name: s.name,
+      type: s.type ?? "stdio",
+      scope: s.scope,
+      approvalState: s.approvalState ?? "pending",
+      command: s.command,
+      args: s.args,
+      url: s.url,
+      envVarNames: s.envVarNames,
+      headerNames: s.headerNames,
+    });
+    const mcpOnlyA = p1.mcpServers.filter((s) => !mcpNamesB.has(s.name)).map(toMcpObj);
+    const mcpOnlyB = p2.mcpServers.filter((s) => !mcpNamesA.has(s.name)).map(toMcpObj);
     const envNamesA = new Set(p1.envVarNames);
     const envNamesB = new Set(p2.envVarNames);
     const envOnlyA = p1.envVarNames.filter((v) => !envNamesB.has(v));

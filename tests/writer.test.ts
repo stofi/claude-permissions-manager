@@ -323,6 +323,28 @@ describe("removeRule", () => {
     const data = await readSettings();
     expect(data.permissions.allow).not.toContain("Read");
   });
+
+  it("dryRun=true returns removedFrom without writing", async () => {
+    const path = settingsPath();
+    await addRule("Read", "allow", path);
+    const result = await removeRule("Read", path, undefined, { dryRun: true });
+    expect(result.removed).toBe(true);
+    expect(result.removedFrom).toContain("allow");
+    // File must be unchanged — rule still present
+    const data = await readSettings();
+    expect(data.permissions.allow).toContain("Read");
+  });
+
+  it("dryRun=true returns removed=false when rule not found (no write attempted)", async () => {
+    const path = settingsPath();
+    await addRule("Glob", "allow", path);
+    const result = await removeRule("Read", path, undefined, { dryRun: true });
+    expect(result.removed).toBe(false);
+    expect(result.removedFrom).toHaveLength(0);
+    // Glob must still be present
+    const data = await readSettings();
+    expect(data.permissions.allow).toContain("Glob");
+  });
 });
 
 // ────────────────────────────────────────────────────────────

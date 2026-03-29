@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-03-29
+
+### Fixed
+- **`cpm diff --json`**: `mcpServers.onlyInA` and `mcpServers.onlyInB` were plain strings (server names only). Now emit full server objects with `name`, `type`, `scope`, `approvalState`, `command`, `args`, `url`, `envVarNames`, `headerNames` — consistent with list/show/export. `inBoth` remains plain strings.
+- **README**: `--dry-run` flag documentation incorrectly listed `reset --all` as the only reset that supports it; updated to `reset` (both single-rule and `--all` support `--dry-run` since v0.9.3).
+
+### Internal
+- Test coverage: 208 tests (+2 `removeRule` dryRun unit tests in writer.test.ts, +1 `diffCommand --json` MCP objects test).
+
 ## [0.9.4] - 2026-03-29
 
 ### Fixed

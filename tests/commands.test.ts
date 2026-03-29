@@ -168,6 +168,10 @@ describe("exportCommand — JSON", () => {
       expect(typeof project.warnings).toBe("number");
       expect(Array.isArray(project.allow)).toBe(true);
       expect(Array.isArray(project.deny)).toBe(true);
+      // isBypassDisabled, envVarNames, additionalDirs are always present
+      expect(typeof project.isBypassDisabled).toBe("boolean");
+      expect(Array.isArray(project.envVarNames)).toBe(true);
+      expect(Array.isArray(project.additionalDirs)).toBe(true);
       // Each MCP server record has env and header name arrays
       for (const s of project.mcpServers) {
         expect(Array.isArray(s.envVarNames)).toBe(true);
@@ -569,6 +573,13 @@ describe("listCommand — JSON", () => {
     const json = await captureListJson();
     for (const project of json.projects) {
       expect(typeof project.warnings).toBe("number");
+    }
+  });
+
+  it("isBypassDisabled is a boolean on every project", async () => {
+    const json = await captureListJson();
+    for (const project of json.projects) {
+      expect(typeof project.isBypassDisabled).toBe("boolean");
     }
   });
 });

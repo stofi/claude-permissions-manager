@@ -12,11 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **merger**: bare `WebSearch` in allow list now emits a MEDIUM warning ("WebSearch is allowed without any query specifier — arbitrary web searches can be performed"), consistent with the existing bare `WebFetch` warning. Previously only `WebFetch` triggered this check despite both being in the `READ_ONLY_TOOLS` exclusion list.
 
 ### Internal
-- Test coverage expanded to 198 tests.
+- Test coverage expanded to 199 tests.
   - `denyCommand`: new test for ask-conflict warning (rule exists in ask list — deny takes precedence).
   - `denyCommand --dry-run`: new test for conflict display when rule exists in allow list.
   - `askCommand --dry-run`: two new tests — "already present" (no write, message shown) and "conflict with deny" (deny-takes-precedence shown in preview).
   - `showCommand --json`: new test verifying `isBypassDisabled: true` when `disableBypassPermissionsMode=disable` is present.
+  - `listCommand --json`: new test verifying `isBypassDisabled` is a boolean on every project.
+  - `exportCommand --json`: assertions for `isBypassDisabled`, `envVarNames`, `additionalDirs` in every project record.
   - `writer`: new tests for `addRule` `conflictsWith` when adding an ask rule that exists in deny or allow lists.
   - `merger`: two new WebSearch warning tests (warning fires for bare WebSearch; suppressed when specifier provided).
 

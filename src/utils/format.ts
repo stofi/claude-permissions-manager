@@ -140,6 +140,15 @@ export function formatEffectivePermissions(
         ? chalk.red("denied")
         : chalk.yellow("pending");
       lines.push(`  ${s.name.padEnd(20)} [${s.scope}]  ${s.type ?? "stdio"}  ${approval}`);
+      if (s.command) {
+        const cmdLine = s.args && s.args.length > 0
+          ? `${s.command} ${s.args.join(" ")}`
+          : s.command;
+        lines.push(`    ${chalk.gray(`cmd: ${cmdLine}`)}`);
+      }
+      if (s.url) {
+        lines.push(`    ${chalk.gray(`url: ${s.url}`)}`);
+      }
       if (s.envVarNames && s.envVarNames.length > 0) {
         lines.push(`    ${chalk.gray(`env: ${s.envVarNames.join(", ")}`)}`);
       }

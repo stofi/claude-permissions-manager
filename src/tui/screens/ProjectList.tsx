@@ -146,6 +146,9 @@ export function ProjectList({
               ) : (
                 <Text color="gray">-</Text>
               )}
+              {perms.isBypassDisabled && (
+                <Text color="green">  [lock]</Text>
+              )}
             </Text>
           </Box>
         );

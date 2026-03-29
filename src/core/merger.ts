@@ -46,6 +46,13 @@ function detectWarnings(
     });
   }
 
+  if (permissions.defaultMode === "dontAsk") {
+    warnings.push({
+      severity: "high",
+      message: "dontAsk mode is active — Claude executes actions without asking permission (deny rules still apply)",
+    });
+  }
+
   // Only warn about missing bypass lock-out when:
   // - bypass is NOT already active (redundant if it already is)
   // - project has explicit allow/deny rules (intentional permission config)

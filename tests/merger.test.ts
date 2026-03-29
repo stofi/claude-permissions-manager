@@ -177,6 +177,25 @@ describe("mergeSettingsFiles — warning detection", () => {
     expect(crit!.message).toMatch(/bypassPermissions/);
   });
 
+  it("emits high warning for dontAsk mode", () => {
+    const f = makeFile("local", {
+      permissions: { defaultMode: "dontAsk" },
+    });
+    const result = mergeSettingsFiles([f]);
+    const high = result.warnings.find((w) => w.severity === "high" && /dontAsk/.test(w.message));
+    expect(high).toBeDefined();
+    expect(high!.message).toMatch(/executes actions without asking/i);
+  });
+
+  it("does NOT emit dontAsk warning for other modes", () => {
+    for (const mode of ["default", "acceptEdits", "plan", "auto"] as const) {
+      const f = makeFile("local", { permissions: { defaultMode: mode } });
+      const result = mergeSettingsFiles([f]);
+      const dontAskWarn = result.warnings.find((w) => /dontAsk/.test(w.message));
+      expect(dontAskWarn).toBeUndefined();
+    }
+  });
+
   it("emits high warning for wildcard * in allow", () => {
     const f = makeFile("project", {
       permissions: { allow: ["*"] },

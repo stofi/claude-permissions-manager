@@ -108,6 +108,18 @@ describe("scan — fixture directory", () => {
     expect(result.scannedAt.getTime()).toBeLessThanOrEqual(after.getTime());
   });
 
+  it("scanning an empty directory returns 0 projects and 0 errors", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "cpm-empty-test-"));
+    try {
+      const result = await scan({ root: emptyDir, maxDepth: 3, includeGlobal: false });
+      expect(result.projects).toHaveLength(0);
+      expect(result.errors).toHaveLength(0);
+      expect(result.scannedAt).toBeInstanceOf(Date);
+    } finally {
+      await rm(emptyDir, { recursive: true, force: true });
+    }
+  });
+
   it("does not treat ~/.claude as a project when scanning from home directory", async () => {
     const home = homedir();
     const userClaudeDir = join(home, ".claude");

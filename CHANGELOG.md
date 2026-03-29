@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2026-03-29
+
+### Added
+- **`dontAsk` mode warning**: `cpm audit` now emits a HIGH severity warning when `defaultMode` is `"dontAsk"` — this mode auto-executes all actions without asking for permission (deny rules still apply). Previously only `bypassPermissions` mode was warned about.
+- **TUI ProjectList `[lock]` badge**: The project list in the interactive TUI now shows a green `[lock]` indicator for projects where `disableBypassPermissionsMode` is set (`isBypassDisabled: true`), consistent with `cpm list` text output (added in v1.0.5) and the Project Detail screen.
+
+### Internal
+- Test coverage: 220 tests (+2 merger tests for `dontAsk` warning, +1 discovery test for empty-directory scan returning 0 projects/0 errors).
+
 ## [1.0.5] - 2026-03-29
 
 ### Added

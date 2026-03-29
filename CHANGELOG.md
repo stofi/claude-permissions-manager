@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] - 2026-03-29
+
+### Fixed
+- **`cpm diff` text output**: "Bypass lock:" line is now always shown (with a "(same)" suffix when equal), consistent with how "Mode:" is displayed. Previously it was only shown when the two projects differed.
+
 ## [1.0.3] - 2026-03-29
 
 ### Fixed

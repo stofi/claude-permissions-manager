@@ -61,24 +61,27 @@ async function findClaudeDirs(
     if (SKIP_DIR_NAMES.has(entry.name)) continue;
 
     const fullPath = join(dir, entry.name);
+    let resolvedPath = fullPath;
 
     if (entry.isSymbolicLink()) {
-      // Resolve to detect cycles
+      // Resolve to detect cycles and to get the canonical path for comparisons
       try {
         const real = await realpath(fullPath);
         const st = await stat(real);
         if (!st.isDirectory()) continue;
         if (visitedInodes.has(st.ino)) continue; // cycle
         visitedInodes.add(st.ino);
+        resolvedPath = real;
       } catch {
         continue;
       }
     }
 
     if (entry.name === ".claude") {
-      // Skip ~/.claude — it's the user global settings dir, not a project
+      // Skip ~/.claude — it's the user global settings dir, not a project.
+      // Use resolvedPath so a symlink pointing to ~/.claude is also skipped.
       const userClaudeDir = join(homeDir(), ".claude");
-      if (fullPath !== userClaudeDir) {
+      if (resolvedPath !== userClaudeDir) {
         results.push(fullPath);
       }
       // Don't recurse into .claude dirs themselves

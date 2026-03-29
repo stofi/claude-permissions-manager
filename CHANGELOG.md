@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`cpm reset <rule> --dry-run`**: `--dry-run` now works for single-rule removal (not just `--all`). Previously `--dry-run` was silently ignored when removing a specific rule. Now previews whether the rule would be found and removed without modifying the file. Also clarified `reset` command help text.
+
+### Internal
+- Test coverage: 204 tests (+2 `resetRuleCommand --dry-run` tests).
+
 ## [0.9.2] - 2026-03-29
 
 ### Fixed

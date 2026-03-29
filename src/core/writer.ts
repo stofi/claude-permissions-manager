@@ -133,7 +133,8 @@ export async function addRule(
 export async function removeRule(
   raw: string,
   settingsPath: string,
-  listFilter?: RuleList
+  listFilter?: RuleList,
+  options?: { dryRun?: boolean }
 ): Promise<{ removed: boolean; removedFrom: RuleList[] }> {
   raw = raw.trim();
   const data = await readSettingsOrEmpty(settingsPath);
@@ -153,6 +154,10 @@ export async function removeRule(
 
   if (removedFrom.length === 0) {
     return { removed: false, removedFrom: [] };
+  }
+
+  if (options?.dryRun) {
+    return { removed: true, removedFrom };
   }
 
   await writeSettingsAtomic(settingsPath, { ...data, permissions: newPerms });

@@ -144,6 +144,22 @@ function detectWarnings(
     });
   }
 
+  // Warn about MCP servers missing required connection config
+  for (const server of permissions.mcpServers) {
+    const type = server.type ?? "stdio";
+    if (type === "stdio" && !server.command) {
+      warnings.push({
+        severity: "low",
+        message: `MCP server "${server.name}" is type stdio but has no command configured`,
+      });
+    } else if (type === "http" && !server.url) {
+      warnings.push({
+        severity: "low",
+        message: `MCP server "${server.name}" is type http but has no url configured`,
+      });
+    }
+  }
+
   // Warn about rules that appear in both allow and deny (deny wins, allow is ineffective)
   const denySet = new Set(permissions.deny.map((r) => r.raw));
   for (const rule of permissions.allow) {

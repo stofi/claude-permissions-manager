@@ -346,6 +346,58 @@ describe("mergeSettingsFiles — warning detection", () => {
     expect(med).toBeDefined();
   });
 
+  it("emits low warning for stdio MCP server with no command", () => {
+    const f = makeFile("project", { permissions: {} });
+    const result = mergeSettingsFiles([f], [
+      {
+        name: "broken-stdio",
+        scope: "project",
+        approvalState: "approved",
+        type: "stdio",
+        // command intentionally absent
+      },
+    ]);
+    const w = result.warnings.find(
+      (w) => w.severity === "low" && w.message.includes("broken-stdio") && w.message.includes("command")
+    );
+    expect(w).toBeDefined();
+  });
+
+  it("emits low warning for http MCP server with no url", () => {
+    const f = makeFile("project", { permissions: {} });
+    const result = mergeSettingsFiles([f], [
+      {
+        name: "broken-http",
+        scope: "project",
+        approvalState: "approved",
+        type: "http",
+        // url intentionally absent
+      },
+    ]);
+    const w = result.warnings.find(
+      (w) => w.severity === "low" && w.message.includes("broken-http") && w.message.includes("url")
+    );
+    expect(w).toBeDefined();
+  });
+
+  it("does NOT emit config warning for well-formed stdio server", () => {
+    const f = makeFile("project", { permissions: {} });
+    const result = mergeSettingsFiles([f], [
+      {
+        name: "ok-stdio",
+        scope: "project",
+        approvalState: "approved",
+        type: "stdio",
+        command: "npx",
+        args: ["-y", "some-server"],
+      },
+    ]);
+    const w = result.warnings.find(
+      (w) => w.message.includes("ok-stdio") && w.message.includes("command")
+    );
+    expect(w).toBeUndefined();
+  });
+
   it("does NOT emit disableBypassPermissionsMode warning when bypass already active", () => {
     const f = makeFile("project", {
       permissions: {

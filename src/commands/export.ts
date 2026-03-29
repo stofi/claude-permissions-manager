@@ -35,7 +35,7 @@ function projectToJsonRecord(project: ClaudeProject) {
     })),
     envVarNames: perms.envVarNames,
     additionalDirs: perms.additionalDirs,
-    warnings: perms.warnings.length,
+    warningCount: perms.warnings.length,
     claudeMdFiles: project.claudeMdFiles
       .filter((f) => f.exists)
       .map((f) => f.path),
@@ -58,7 +58,7 @@ function toCsv(projects: ClaudeProject[]): string {
     "deny_count",
     "ask_count",
     "mcp_count",
-    "warnings",
+    "warning_count",
     "bypass_disabled",
   ];
 

@@ -34,7 +34,7 @@ export async function listCommand(options: ScanOptions & { json?: boolean }): Pr
         })),
         envVarNames: p.effectivePermissions.envVarNames,
         additionalDirs: p.effectivePermissions.additionalDirs,
-        warnings: p.effectivePermissions.warnings.length,
+        warningCount: p.effectivePermissions.warnings.length,
       })),
       errors: result.errors,
     };

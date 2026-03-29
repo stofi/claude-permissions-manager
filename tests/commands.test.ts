@@ -429,6 +429,26 @@ describe("--dry-run flag", () => {
     expect(calls.some((m) => /dry.run/i.test(m))).toBe(true);
   });
 
+  it("askCommand --dry-run shows 'already present' when rule exists", async () => {
+    await askCommand("Bash(git push *)", { project: tmpDir, scope: "project" }); // write it first
+    const logSpy = vi.spyOn(console, "log");
+    await askCommand("Bash(git push *)", { project: tmpDir, scope: "project", dryRun: true });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /already/i.test(m))).toBe(true);
+    // File should still have exactly one ask rule
+    const data = await readSettings();
+    expect(data.permissions.ask).toHaveLength(1);
+  });
+
+  it("askCommand --dry-run shows conflict when rule exists in deny list", async () => {
+    await denyCommand("Bash(git push *)", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await askCommand("Bash(git push *)", { project: tmpDir, scope: "project", dryRun: true });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /dry.run/i.test(m))).toBe(true);
+    expect(calls.some((m) => /deny takes precedence/i.test(m))).toBe(true);
+  });
+
   it("modeCommand --dry-run shows transition and does not write", async () => {
     const logSpy = vi.spyOn(console, "log");
     await modeCommand("acceptEdits", { project: tmpDir, scope: "project", dryRun: true });

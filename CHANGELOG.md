@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-03-29
+
 ### Fixed
 - **`cpm list --json`**: MCP server records now include `command`, `args`, and `url` fields — consistent with `cpm show --json` and `cpm export --json` (v0.9.2 fixed show/export but overlooked list).
 - **`cpm show` text output**: MCP server entries now show connection details — `cmd: npx -y @modelcontextprotocol/server-github` for stdio servers, `url: https://...` for HTTP servers. Previously only name/scope/type/approval were shown.

@@ -387,6 +387,30 @@ describe("resetRuleCommand", () => {
     const calls = logSpy.mock.calls.map((c) => String(c[0]));
     expect(calls.some((m) => /not found/i.test(m))).toBe(true);
   });
+
+  it("--dry-run does not remove the rule and reports what would be removed", async () => {
+    await allowCommand("Read", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await resetRuleCommand("Read", { project: tmpDir, scope: "project", dryRun: true });
+    // File must be unchanged
+    const data = await readSettings();
+    expect(data.permissions.allow).toContain("Read");
+    // Output must mention dry-run and the would-remove message
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /dry.run/i.test(m))).toBe(true);
+    expect(calls.some((m) => /would remove/i.test(m))).toBe(true);
+  });
+
+  it("--dry-run reports not-found when rule is absent", async () => {
+    await allowCommand("Glob", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await resetRuleCommand("Read", { project: tmpDir, scope: "project", dryRun: true });
+    // File unchanged — Glob still present
+    const data = await readSettings();
+    expect(data.permissions.allow).toContain("Glob");
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /not found/i.test(m))).toBe(true);
+  });
 });
 
 describe("modeCommand", () => {

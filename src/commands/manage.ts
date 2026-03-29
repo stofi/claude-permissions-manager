@@ -164,11 +164,23 @@ export async function askCommand(
 
 export async function resetRuleCommand(
   rule: string,
-  opts: { project?: string; scope?: string }
+  opts: { project?: string; scope?: string; dryRun?: boolean }
 ): Promise<void> {
   const scope = resolveScope(opts.scope);
   const projectPath = resolveProject(opts.project);
   const settingsPath = resolveSettingsPath(scope, projectPath);
+
+  if (opts.dryRun) {
+    const result = await removeRule(rule, settingsPath, undefined, { dryRun: true });
+    console.log(chalk.cyan(`[dry-run] No files will be modified`));
+    if (!result.removed) {
+      console.log(chalk.yellow(`  Rule "${rule}" not found in any list — no change`));
+    } else {
+      console.log(`  Would remove "${chalk.bold(rule)}" from: ${result.removedFrom.join(", ")}`);
+    }
+    console.log(chalk.gray(`  target: ${collapseHome(settingsPath)} [${scope}]`));
+    return;
+  }
 
   const result = await removeRule(rule, settingsPath);
 

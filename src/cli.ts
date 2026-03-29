@@ -139,18 +139,18 @@ program
 
 program
   .command("reset [rule]")
-  .description("Remove a rule from all lists, or --all to clear all rules")
+  .description("Remove a rule from its list, or --all to clear all rules")
   .option("--scope <scope>", "Settings scope: local|project|user (default: local)", "local")
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
   .option("--all", "Clear all permission rules")
   .option("--yes", "Skip confirmation prompt (with --all)")
-  .option("--dry-run", "Preview what would be cleared without modifying any files (with --all)")
+  .option("--dry-run", "Preview what would be removed without modifying any files")
   .action(async (rule, opts) => {
     const { resetRuleCommand, resetAllCommand } = await import("./commands/manage.js");
     if (opts.all) {
       await resetAllCommand({ ...opts, dryRun: opts.dryRun });
     } else if (rule) {
-      await resetRuleCommand(rule, opts);
+      await resetRuleCommand(rule, { ...opts, dryRun: opts.dryRun });
     } else {
       console.error("Provide a rule to remove, or --all to clear everything");
       process.exit(1);

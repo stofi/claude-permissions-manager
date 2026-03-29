@@ -147,6 +147,9 @@ export async function diffCommand(
     const aStr = p1.isBypassDisabled ? "locked" : "not locked";
     const bStr = p2.isBypassDisabled ? "locked" : "not locked";
     console.log(chalk.bold("Bypass lock:") + `  ${chalk.yellow(aStr)} → ${chalk.yellow(bStr)}`);
+  } else {
+    const sameStr = p1.isBypassDisabled ? "locked" : "not locked";
+    console.log(chalk.bold("Bypass lock:") + `  ${chalk.gray(sameStr)} (same)`);
   }
 
   console.log("");

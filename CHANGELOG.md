@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **merger**: missing LOW warning when a rule appears in both `allow` and `ask` — `allow` wins silently, making the `ask` rule unreachable. Now warns "Rule X is in both allow and ask — allow wins, ask prompt never shown", consistent with the existing allow+deny and ask+deny conflict warnings.
+- **TUI ProjectDetail**: inconsistent error message for attempting to delete a managed/user scope rule — the confirm-dialog path said "Cannot edit ... scope from here" while the direct-x path said "Cannot delete ... scope rules". Both now use the same "Cannot delete ... scope rules" message.
+
+### Internal
+- Test coverage: 200 tests (+1 merger test for allow+ask conflict).
+
 ## [0.9.1] - 2026-03-29
 
 ### Fixed

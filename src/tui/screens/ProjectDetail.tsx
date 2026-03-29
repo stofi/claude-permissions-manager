@@ -143,7 +143,7 @@ export function ProjectDetail({ project, onBack, onRefresh }: ProjectDetailProps
     setMode("view");
     if (!yes || !selectedRule) return;
     if (selectedRule.scope === "managed" || selectedRule.scope === "user") {
-      showStatus(`Cannot edit ${selectedRule.scope} scope from here`, "red");
+      showStatus(`Cannot delete ${selectedRule.scope} scope rules`, "red");
       return;
     }
     try {

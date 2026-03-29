@@ -123,6 +123,7 @@ export async function exportCommand(
         userMcpServers: result.global.userMcpServers.map((s) => ({
           name: s.name,
           type: s.type ?? "stdio",
+          scope: s.scope,
           approvalState: s.approvalState ?? "pending",
           command: s.command,
           args: s.args,

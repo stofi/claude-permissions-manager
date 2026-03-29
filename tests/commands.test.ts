@@ -206,6 +206,20 @@ describe("exportCommand — JSON", () => {
     expect(filesystem).toBeDefined();
     expect(filesystem!.url).toMatch(/^https?:\/\//);
   });
+
+  it("globalSettings.userMcpServers include scope field", async () => {
+    const lines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      lines.push(String(chunk));
+      return true;
+    });
+    await exportCommand({ root: FIXTURES, maxDepth: 3, format: "json" });
+    const json = JSON.parse(lines.join(""));
+    for (const s of json.globalSettings.userMcpServers as Record<string, unknown>[]) {
+      expect(s).toHaveProperty("scope");
+      expect(typeof s.scope).toBe("string");
+    }
+  });
 });
 
 // ────────────────────────────────────────────────────────────
@@ -656,6 +670,14 @@ describe("listCommand — JSON", () => {
     const filesystem = servers.find((s) => s.name === "filesystem");
     expect(filesystem).toBeDefined();
     expect(filesystem!.url).toMatch(/^https?:\/\//);
+  });
+
+  it("projects include envVarNames and additionalDirs arrays", async () => {
+    const json = await captureListJson();
+    for (const project of json.projects) {
+      expect(Array.isArray(project.envVarNames)).toBe(true);
+      expect(Array.isArray(project.additionalDirs)).toBe(true);
+    }
   });
 });
 

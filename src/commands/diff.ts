@@ -63,8 +63,8 @@ export async function diffCommand(
       command: s.command,
       args: s.args,
       url: s.url,
-      envVarNames: s.envVarNames,
-      headerNames: s.headerNames,
+      envVarNames: s.envVarNames ?? [],
+      headerNames: s.headerNames ?? [],
     });
     const mcpOnlyA = p1.mcpServers.filter((s) => !mcpNamesB.has(s.name)).map(toMcpObj);
     const mcpOnlyB = p2.mcpServers.filter((s) => !mcpNamesA.has(s.name)).map(toMcpObj);

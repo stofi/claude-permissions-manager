@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-03-29
+
+### Changed
+- **Version**: First stable release. The JSON API, CLI commands, and TUI are considered stable.
+
+### Fixed
+- **npm package**: Removed stale `dist/tui/components/KeyHints.*` files that were orphaned when the component was deleted. These were being published unnecessarily (119 → 115 files).
+
+### Internal
+- Added `clean` script (`npm run clean` → `rm -rf dist`).
+- `prepublishOnly` now runs `clean` before `build` to prevent stale orphaned dist files from ever being published.
+- Added `tests/` and `*.tgz` to `.npmignore` for explicit exclusion.
+
 ## [0.9.10] - 2026-03-29
 
 ### Docs

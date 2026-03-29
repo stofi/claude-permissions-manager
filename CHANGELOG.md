@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.8] - 2026-03-29
+
+### Fixed
+- **`cpm list --json`**: Each project record now includes `envVarNames` and `additionalDirs` arrays — consistent with `show --json`, `export --json`, and `diff --json`.
+- **`cpm export --json` `globalSettings.userMcpServers`**: Now includes the `scope` field — consistent with all other MCP server objects across every JSON output.
+
+### Internal
+- Test coverage: 213 tests (+2 assertions for the above fixes).
+
 ## [0.9.7] - 2026-03-29
 
 ### Fixed

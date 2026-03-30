@@ -1356,6 +1356,18 @@ describe("showCommand — --no-global", () => {
     );
     expect(userOrManagedRules).toHaveLength(0);
   });
+
+  it("settingsFiles excludes global entries when includeGlobal=false", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+    await showCommand(join(FIXTURES, "project-a"), { json: true, includeGlobal: false });
+
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    const files = json.settingsFiles as Record<string, unknown>[];
+    const globalEntries = files.filter((f) => f.scope === "user" || f.scope === "managed");
+    expect(globalEntries).toHaveLength(0);
+  });
 });
 
 // ────────────────────────────────────────────────────────────

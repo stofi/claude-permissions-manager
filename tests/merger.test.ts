@@ -208,6 +208,45 @@ describe("mergeSettingsFiles — warning detection", () => {
     expect(high!.message).toMatch(/wildcard/i);
   });
 
+  it("emits medium warning for wildcard * in deny list", () => {
+    const f = makeFile("project", {
+      permissions: { deny: ["*"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const warn = result.warnings.find(
+      (w) => w.severity === "medium" && w.rule === "*" && w.message.includes("deny list")
+    );
+    expect(warn).toBeDefined();
+    expect(warn!.message).toMatch(/all tools are blocked/i);
+  });
+
+  it("emits low warning for wildcard * in ask list", () => {
+    const f = makeFile("project", {
+      permissions: { ask: ["*"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const warn = result.warnings.find(
+      (w) => w.severity === "low" && w.rule === "*" && w.message.includes("ask list")
+    );
+    expect(warn).toBeDefined();
+    expect(warn!.message).toMatch(/explicit approval/i);
+  });
+
+  it("does NOT emit wildcard deny/ask warnings for regular rules", () => {
+    const f = makeFile("project", {
+      permissions: { deny: ["Bash(git push *)"], ask: ["Read(**/.env)"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const wildcardDenyWarn = result.warnings.find(
+      (w) => w.message.includes("deny list") && w.rule === "*"
+    );
+    const wildcardAskWarn = result.warnings.find(
+      (w) => w.message.includes("ask list") && w.rule === "*"
+    );
+    expect(wildcardDenyWarn).toBeUndefined();
+    expect(wildcardAskWarn).toBeUndefined();
+  });
+
   it("emits high warning for unqualified Bash allow", () => {
     const f = makeFile("project", {
       permissions: { allow: ["Bash"], deny: ["Read(**/.env)"] },

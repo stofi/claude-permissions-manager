@@ -201,9 +201,10 @@ program
   .option("--preset <preset>", "Template preset: safe|node|strict (default: safe)", "safe")
   .option("--mode <mode>", "Override defaultMode")
   .option("--yes", "Overwrite existing settings without prompting")
+  .option("--dry-run", "Preview what would be created without writing any files")
   .action(async (opts) => {
     const { initCommand } = await import("./commands/init.js");
-    await initCommand(opts);
+    await initCommand({ ...opts, dryRun: opts.dryRun });
   });
 
 program

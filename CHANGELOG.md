@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-03-30
+
+### Added
+- **`cpm init --dry-run`**: Preview what `init` would create or overwrite without writing any files. Shows the target file path (with "would create", "already exists", or "would overwrite" status), the mode, and all allow/deny/ask rules the preset would apply. Consistent with `--dry-run` on all other write commands.
+- **Audit warnings for wildcard `*` in deny/ask lists**: `cpm audit` now warns when `"*"` appears in the deny list (MEDIUM: "all tools blocked regardless of allow rules") or ask list (LOW: "all tools require explicit approval"). Previously only `allow: ["*"]` triggered a wildcard warning (HIGH).
+
+### Internal
+- Test coverage: 232 tests (+4 init --dry-run tests, +3 merger wildcard deny/ask warning tests).
+- Shell completion: bash and zsh completions updated for `cpm init --dry-run`.
+- README: `--dry-run` flag description updated to include `init`.
+
 ## [1.2.1] - 2026-03-30
 
 ### Documentation

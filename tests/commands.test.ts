@@ -207,6 +207,44 @@ describe("exportCommand — JSON", () => {
     expect(filesystem!.url).toMatch(/^https?:\/\//);
   });
 
+  it("project settingsFiles entries have correct shape", async () => {
+    const lines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      lines.push(String(chunk));
+      return true;
+    });
+    await exportCommand({ root: FIXTURES, maxDepth: 3, format: "json" });
+    const json = JSON.parse(lines.join(""));
+    for (const project of json.projects as Record<string, unknown>[]) {
+      expect(Array.isArray(project.settingsFiles)).toBe(true);
+      for (const f of project.settingsFiles as Record<string, unknown>[]) {
+        expect(f).toHaveProperty("path");
+        expect(f).toHaveProperty("scope");
+        expect(f).toHaveProperty("exists");
+        expect(f).toHaveProperty("readable");
+        expect(f).toHaveProperty("parsed");
+        expect(typeof f.path).toBe("string");
+        expect(typeof f.scope).toBe("string");
+        expect(typeof f.exists).toBe("boolean");
+      }
+    }
+  });
+
+  it("project settingsFiles excludes global entries when includeGlobal=false", async () => {
+    const lines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      lines.push(String(chunk));
+      return true;
+    });
+    await exportCommand({ root: FIXTURES, maxDepth: 3, format: "json", includeGlobal: false });
+    const json = JSON.parse(lines.join(""));
+    for (const project of json.projects as Record<string, unknown>[]) {
+      const files = project.settingsFiles as Record<string, unknown>[];
+      const globalEntries = files.filter((f) => f.scope === "user" || f.scope === "managed");
+      expect(globalEntries).toHaveLength(0);
+    }
+  });
+
   it("project records include warningCount as a number", async () => {
     const lines: string[] = [];
     vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {

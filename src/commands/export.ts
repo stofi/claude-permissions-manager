@@ -4,7 +4,7 @@ import { stat } from "fs/promises";
 import { scan } from "../core/discovery.js";
 import { collapseHome } from "../utils/paths.js";
 import type { ScanOptions } from "../core/discovery.js";
-import type { ClaudeProject } from "../core/types.js";
+import type { ClaudeProject, SettingsFile } from "../core/types.js";
 
 type ExportFormat = "json" | "csv";
 
@@ -13,8 +13,9 @@ function toStringArray(val: unknown): string[] {
   return Array.isArray(val) ? (val as string[]) : [];
 }
 
-function projectToJsonRecord(project: ClaudeProject) {
+function projectToJsonRecord(project: ClaudeProject, globalFiles: SettingsFile[]) {
   const perms = project.effectivePermissions;
+  const allSettingsFiles = [...project.settingsFiles, ...globalFiles];
   return {
     path: project.rootPath,
     mode: perms.defaultMode,
@@ -39,7 +40,7 @@ function projectToJsonRecord(project: ClaudeProject) {
     claudeMdFiles: project.claudeMdFiles
       .filter((f) => f.exists)
       .map((f) => f.path),
-    settingsFiles: project.settingsFiles.map((f) => ({
+    settingsFiles: allSettingsFiles.map((f) => ({
       path: f.path,
       scope: f.scope,
       exists: f.exists,
@@ -91,6 +92,10 @@ export async function exportCommand(
   process.stderr.write(chalk.gray("Scanning for Claude projects...\n"));
   const result = await scan(options);
 
+  const globalFiles = [result.global.user, result.global.managed].filter(
+    (f): f is NonNullable<typeof result.global.user> => f !== undefined
+  );
+
   let output: string;
 
   if (format === "json") {
@@ -132,7 +137,7 @@ export async function exportCommand(
           headerNames: s.headerNames ?? [],
         })),
       },
-      projects: result.projects.map(projectToJsonRecord),
+      projects: result.projects.map((p) => projectToJsonRecord(p, globalFiles)),
       errors: result.errors,
     };
     output = JSON.stringify(data, null, 2);

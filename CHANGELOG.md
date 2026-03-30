@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-03-30
+
+### Fixed
+- **`cpm export --json` `settingsFiles`**: Each project record in the export now includes global settings files (user scope: `~/.claude/settings.json`; managed scope) in its `settingsFiles` array, consistent with `cpm show --json`. Previously only local and project-scope settings files were included. Pass `--no-global` to exclude global entries.
+
+### Internal
+- Test coverage: 223 tests (+2 export `settingsFiles` shape and `--no-global` exclusion tests).
+
 ## [1.1.0] - 2026-03-30
 
 ### Changed (breaking)

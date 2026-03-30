@@ -37,9 +37,12 @@ function projectToJsonRecord(project: ClaudeProject, globalFiles: SettingsFile[]
     envVarNames: perms.envVarNames,
     additionalDirs: perms.additionalDirs,
     warningCount: perms.warnings.length,
-    claudeMdFiles: project.claudeMdFiles
-      .filter((f) => f.exists)
-      .map((f) => f.path),
+    claudeMdFiles: project.claudeMdFiles.map((f) => ({
+      path: f.path,
+      scope: f.scope,
+      exists: f.exists,
+      lineCount: f.lineCount,
+    })),
     settingsFiles: allSettingsFiles.map((f) => ({
       path: f.path,
       scope: f.scope,

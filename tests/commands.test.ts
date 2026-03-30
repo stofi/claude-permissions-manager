@@ -245,6 +245,39 @@ describe("exportCommand — JSON", () => {
     }
   });
 
+  it("claudeMdFiles entries are objects with path/scope/exists fields", async () => {
+    // Create a project with a real CLAUDE.md file so claudeMdFiles is non-empty
+    const claudeDir = join(tmpDir, ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    const { writeFile } = await import("fs/promises");
+    await writeFile(join(tmpDir, ".claude", "settings.json"), JSON.stringify({ permissions: {} }), "utf-8");
+    await writeFile(join(tmpDir, "CLAUDE.md"), "# My project\nSome instructions.", "utf-8");
+
+    const lines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      lines.push(String(chunk));
+      return true;
+    });
+    await exportCommand({ root: tmpDir, maxDepth: 1, format: "json" });
+    const json = JSON.parse(lines.join(""));
+    const project = json.projects[0] as Record<string, unknown>;
+    expect(project).toBeDefined();
+    expect(Array.isArray(project.claudeMdFiles)).toBe(true);
+    const files = project.claudeMdFiles as Record<string, unknown>[];
+    // At least the CLAUDE.md we created should appear
+    expect(files.length).toBeGreaterThan(0);
+    for (const f of files) {
+      expect(typeof f.path).toBe("string");
+      expect(typeof f.scope).toBe("string");
+      expect(typeof f.exists).toBe("boolean");
+      // claudeMdFiles entries must NOT be plain strings
+      expect(typeof f).toBe("object");
+    }
+    // Verify the existing CLAUDE.md is detected
+    const rootMd = files.find((f) => String(f.path).endsWith("CLAUDE.md") && f.exists === true);
+    expect(rootMd).toBeDefined();
+  });
+
   it("project records include warningCount as a number", async () => {
     const lines: string[] = [];
     vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
@@ -812,6 +845,22 @@ describe("showCommand — JSON", () => {
     for (const f of json.settingsFiles) {
       expect(f).toHaveProperty("path");
       expect(f).toHaveProperty("scope");
+    }
+  });
+
+  it("claudeMdFiles entries are objects with path/scope/exists fields", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+    await showCommand(join(FIXTURES, "project-a"), { json: true });
+
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(Array.isArray(json.claudeMdFiles)).toBe(true);
+    for (const f of json.claudeMdFiles as Record<string, unknown>[]) {
+      expect(typeof f.path).toBe("string");
+      expect(typeof f.scope).toBe("string");
+      expect(typeof f.exists).toBe("boolean");
+      expect(typeof f).toBe("object");
     }
   });
 

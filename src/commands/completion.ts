@@ -100,7 +100,7 @@ _cpm_completions() {
       if [[ "\${cur}" != -* ]]; then
         COMPREPLY=( \$(compgen -d -- "\${cur}") )
       else
-        COMPREPLY=( \$(compgen -W "--json" -- "\${cur}") )
+        COMPREPLY=( \$(compgen -W "--json --no-global" -- "\${cur}") )
       fi
       return 0
       ;;
@@ -108,7 +108,7 @@ _cpm_completions() {
       if [[ "\${cur}" != -* ]]; then
         COMPREPLY=( \$(compgen -d -- "\${cur}") )
       else
-        COMPREPLY=( \$(compgen -W "--json" -- "\${cur}") )
+        COMPREPLY=( \$(compgen -W "--json --no-global" -- "\${cur}") )
       fi
       return 0
       ;;
@@ -213,13 +213,15 @@ ${commandDefs}
         show)
           _arguments \\
             '1:project:_directories' \\
-            '--json[Output as JSON]'
+            '--json[Output as JSON]' \\
+            '--no-global[Skip user and managed global settings]'
           ;;
         diff)
           _arguments \\
             '1:project1:_directories' \\
             '2:project2:_directories' \\
-            '--json[Output as JSON]'
+            '--json[Output as JSON]' \\
+            '--no-global[Skip user and managed global settings]'
           ;;
         allow|deny|ask)
           _arguments \\

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-03-30
+
+### Added
+- **`cpm show --no-global`**: The `show` command now supports `--no-global` to skip user and managed global settings when scanning, consistent with `list`, `audit`, `export`, and `ui`. Global settings are still included by default.
+- **`cpm diff --no-global`**: The `diff` command now supports `--no-global` to exclude user/managed settings from the effective permissions comparison on both sides.
+- Shell completion updated: `--no-global` tab-completes for both `show` and `diff` in bash and zsh.
+
+### Internal
+- Tests: 247 (+2 `showCommand --no-global` and `diffCommand --no-global` tests).
+
 ## [1.2.9] - 2026-03-30
 
 ### Improved

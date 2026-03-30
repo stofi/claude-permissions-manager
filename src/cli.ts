@@ -79,8 +79,9 @@ program
   .command("show [path]")
   .description("Show detailed permissions for a project (default: cwd)")
   .option("--json", "Output as JSON")
+  .option("--no-global", "Skip user and managed global settings")
   .action(async (path, opts) => {
-    await showCommand(path, { json: opts.json });
+    await showCommand(path, { json: opts.json, includeGlobal: opts.global !== false });
   });
 
 program
@@ -105,9 +106,10 @@ program
   .command("diff <path1> <path2>")
   .description("Compare effective permissions between two projects")
   .option("--json", "Output as JSON")
+  .option("--no-global", "Skip user and managed global settings")
   .action(async (path1, path2, opts) => {
     const { diffCommand } = await import("./commands/diff.js");
-    await diffCommand(path1, path2, { json: opts.json });
+    await diffCommand(path1, path2, { json: opts.json, includeGlobal: opts.global !== false });
   });
 
 program

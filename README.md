@@ -73,7 +73,7 @@ cpm mode acceptEdits --project ~/my-project --scope project
 --root <dir>       Override scan root (default: ~)
 --depth <n>        Max directory depth for scanning (default: 8)
 --json             Output as JSON (list, show, audit, diff, export)
---no-global        Skip user/managed global settings (list, audit, export, ui)
+--no-global        Skip user/managed global settings (list, show, audit, diff, export, ui)
 --exit-code        Exit 1 if issues found, 2 if critical issues (audit only — useful in CI)
 --dry-run          Preview what would be written without modifying files (allow, deny, ask, reset, mode, init)
 --format <fmt>     Output format: json|csv (export only, default: json)

@@ -1337,3 +1337,49 @@ describe("auditCommand", () => {
     }
   });
 });
+
+// ────────────────────────────────────────────────────────────
+// showCommand — --no-global
+// ────────────────────────────────────────────────────────────
+
+describe("showCommand — --no-global", () => {
+  it("excludes user/managed scope rules from effectivePermissions when includeGlobal=false", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+    await showCommand(join(FIXTURES, "project-a"), { json: true, includeGlobal: false });
+
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    const ep = json.effectivePermissions;
+    const userOrManagedRules = [...ep.allow, ...ep.deny, ...ep.ask].filter(
+      (r: Record<string, unknown>) => r.scope === "user" || r.scope === "managed"
+    );
+    expect(userOrManagedRules).toHaveLength(0);
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// diffCommand — --no-global
+// ────────────────────────────────────────────────────────────
+
+describe("diffCommand — --no-global", () => {
+  it("excludes user/managed scope rules from diff when includeGlobal=false", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+    await diffCommand(
+      join(FIXTURES, "project-a"),
+      join(FIXTURES, "project-b"),
+      { json: true, includeGlobal: false }
+    );
+
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    // onlyInA/B rules should have no user/managed scope entries
+    for (const list of ["allow", "deny", "ask"]) {
+      for (const rule of [...json[list].onlyInA, ...json[list].onlyInB] as Record<string, unknown>[]) {
+        expect(rule.scope).not.toBe("user");
+        expect(rule.scope).not.toBe("managed");
+      }
+    }
+  });
+});

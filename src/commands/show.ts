@@ -6,12 +6,13 @@ import { expandHome } from "../utils/paths.js";
 
 export async function showCommand(
   projectPath: string | undefined,
-  options: { json?: boolean } = {}
+  options: { json?: boolean; includeGlobal?: boolean } = {}
 ): Promise<void> {
   const targetPath = resolve(projectPath ? expandHome(projectPath) : process.cwd());
+  const includeGlobal = options.includeGlobal ?? true;
 
   process.stderr.write(chalk.gray(`Scanning for project at ${targetPath}...\n`));
-  const result = await scan({ root: targetPath, maxDepth: 1 });
+  const result = await scan({ root: targetPath, maxDepth: 1, includeGlobal });
 
   const project = result.projects.find((p) => p.rootPath === targetPath);
   if (!project) {

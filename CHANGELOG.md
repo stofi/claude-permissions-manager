@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-03-30
+
+### Fixed
+- **TUI ProjectDetail: delete confirm hint now shows Esc as cancel key**: The hint text `y: confirm  n: cancel` did not mention Esc, even though Esc was added as a cancel key in v1.3.8. Updated to `y: confirm  n/Esc: cancel` for consistency.
+
 ## [1.3.9] - 2026-03-30
 
 ### Fixed

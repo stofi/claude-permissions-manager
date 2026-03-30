@@ -443,7 +443,7 @@ export function ProjectDetail({ project, onBack, onRefresh }: ProjectDetailProps
           <Text color="red">
             Delete "{selectedRule.raw}" from {selectedRule.scope}:{selectedRule.list}?
           </Text>
-          <Text color="gray">y: confirm  n: cancel</Text>
+          <Text color="gray">y: confirm  n/Esc: cancel</Text>
           {/* Inline input for y/n */}
           <ConfirmInput onConfirm={handleDeleteConfirm} />
         </Box>

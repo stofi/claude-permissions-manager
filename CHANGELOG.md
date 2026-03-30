@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.4] - 2026-03-30
+
+### Tests
+- **`showCommand --no-global`: verify `settingsFiles` also excludes global entries**: The existing test checked that `effectivePermissions` rules had no user/managed scope, but did not verify that `settingsFiles` in the JSON output also excludes global file entries. Added a second test mirroring the equivalent check in `exportCommand`.
+
 ## [1.3.3] - 2026-03-30
 
 ### Internal

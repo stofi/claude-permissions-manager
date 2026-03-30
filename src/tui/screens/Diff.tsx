@@ -101,14 +101,15 @@ function DiffView({
   const allDirs = new Set([...dirSetA, ...dirSetB]);
 
   type McpEntry = (typeof pa.mcpServers)[number];
+  const sortStr = (arr: string[] | undefined) => [...(arr ?? [])].sort().join("\0");
   function mcpServerChanged(a: McpEntry, b: McpEntry): boolean {
     if ((a.type ?? "stdio") !== (b.type ?? "stdio")) return true;
     if ((a.command ?? null) !== (b.command ?? null)) return true;
     if (JSON.stringify(a.args ?? []) !== JSON.stringify(b.args ?? [])) return true;
     if ((a.url ?? null) !== (b.url ?? null)) return true;
     if ((a.approvalState ?? "pending") !== (b.approvalState ?? "pending")) return true;
-    const sortStr = (arr: string[] | undefined) => [...(arr ?? [])].sort().join("\0");
     if (sortStr(a.envVarNames) !== sortStr(b.envVarNames)) return true;
+    if (sortStr(a.headerNames) !== sortStr(b.headerNames)) return true;
     return false;
   }
 
@@ -279,6 +280,12 @@ function DiffView({
                     )}
                     {(sA.approvalState ?? "pending") !== (sB.approvalState ?? "pending") && (
                       <Text color="gray">{"      approval: "}{sA.approvalState ?? "pending"}{" → "}{sB.approvalState ?? "pending"}</Text>
+                    )}
+                    {sortStr(sA.envVarNames) !== sortStr(sB.envVarNames) && (
+                      <Text color="gray">{"      env:     ["}{(sA.envVarNames ?? []).join(", ")}{"] → ["}{(sB.envVarNames ?? []).join(", ")}{"]"}</Text>
+                    )}
+                    {sortStr(sA.headerNames) !== sortStr(sB.headerNames) && (
+                      <Text color="gray">{"      headers: ["}{(sA.headerNames ?? []).join(", ")}{"] → ["}{(sB.headerNames ?? []).join(", ")}{"]"}</Text>
                     )}
                   </Box>
                 );

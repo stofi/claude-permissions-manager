@@ -162,7 +162,27 @@ All `--json` outputs share these conventions:
 }
 ```
 
-`cpm diff --json` wraps rule arrays into `onlyInA`, `onlyInB`, and `inBoth` sub-keys. `inBoth` entries are plain strings. Includes an `"identical": true/false` top-level key. Does not compare `claudeMdFiles` or `settingsFiles`.
+`cpm diff --json` structure:
+```json
+{
+  "projectA": "/abs/path/a", "projectB": "/abs/path/b",
+  "identical": false,
+  "mode": { "a": "default", "b": "acceptEdits" },
+  "isBypassDisabled": { "a": false, "b": false },
+  "allow":  { "onlyInA": [{"rule":"Read","scope":"project"}], "onlyInB": [], "inBoth": ["Glob"] },
+  "deny":   { "onlyInA": [], "onlyInB": [], "inBoth": [] },
+  "ask":    { "onlyInA": [], "onlyInB": [], "inBoth": [] },
+  "mcpServers": {
+    "onlyInA": [{"name":"github","type":"stdio","scope":"local","approvalState":"approved","command":"npx","args":["-y","@mcp/server"],"url":null,"envVarNames":["GITHUB_TOKEN"],"headerNames":[]}],
+    "onlyInB": [],
+    "inBoth":  ["filesystem"],
+    "modified": [{"name":"myserver","a":{...full object...},"b":{...full object...}}]
+  },
+  "envVarNames":    { "onlyInA": [], "onlyInB": [], "inBoth": [] },
+  "additionalDirs": { "onlyInA": [], "onlyInB": [], "inBoth": [] }
+}
+```
+`allow`/`deny`/`ask` `onlyInA`/`onlyInB` entries are `{rule, scope}` objects; `inBoth` is plain strings. `mcpServers.onlyInA`/`onlyInB` are full server objects; `inBoth` is plain strings; `modified` contains `{name, a, b}` with full server objects on both sides. Does not compare `claudeMdFiles` or `settingsFiles`.
 
 ## Shell completion
 

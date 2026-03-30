@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4] - 2026-03-30
+
+### Fixed
+- **`mcpServerChanged` now detects `headerNames` differences**: Both `cpm diff` and the TUI Diff screen were missing `headerNames` from the comparison function — servers with identical commands but different HTTP headers would incorrectly appear identical. Fixed in both `diff.ts` and `Diff.tsx`.
+- **`cpm diff` text: false "identical" banner when same-named MCPs have different config**: `hasChanges` used name-set comparison only (same bug as JSON in v1.2.3). Two projects with modified same-named MCPs would show `~ name (modified)` correctly but still print `✓ Projects have identical effective permissions.` Fixed.
+- **`cpm diff` text: envVarNames/headerNames changes missing from modified MCP detail lines**: When a same-named server differed only in env vars or headers, the `~ name (modified)` indicator appeared but no detail line was printed. Fixed: now prints `env:` and `headers:` change lines.
+- **TUI Diff screen: envVarNames/headerNames changes missing from modified MCP display**: Same issue in `Diff.tsx`. Fixed.
+
+### Documentation
+- **README `cpm diff --json` section**: Fully documented all JSON fields including `mode`, `isBypassDisabled`, `envVarNames`, `additionalDirs`, `mcpServers.modified`, and the object shapes.
+
+### Internal
+- Test coverage: 238 tests (+4 diff text output tests).
+
 ## [1.2.3] - 2026-03-30
 
 ### Fixed

@@ -184,8 +184,7 @@ export async function diffCommand(
   function printDiff(
     label: string,
     rulesA: { raw: string }[],
-    rulesB: { raw: string }[],
-    color: string
+    rulesB: { raw: string }[]
   ) {
     const setA = new Set(rulesA.map((r) => r.raw));
     const setB = new Set(rulesB.map((r) => r.raw));
@@ -207,9 +206,9 @@ export async function diffCommand(
     console.log("");
   }
 
-  printDiff("ALLOW", p1.allow, p2.allow, "green");
-  printDiff("DENY", p1.deny, p2.deny, "red");
-  printDiff("ASK", p1.ask, p2.ask, "yellow");
+  printDiff("ALLOW", p1.allow, p2.allow);
+  printDiff("DENY", p1.deny, p2.deny);
+  printDiff("ASK", p1.ask, p2.ask);
 
   // Helper for plain string set diffs (env vars, dirs)
   function printStringsDiff(label: string, a: string[], b: string[]) {

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.7] - 2026-03-30
+
+### Fixed
+- **`additionalDirs` warning suppressed when `bypassPermissions` is active**: When `bypassPermissions` mode is the effective mode, the LOW "N additional directories configured" warning is now suppressed. It was redundant noise alongside the CRITICAL bypass warning, following the same suppression pattern already used for the `disableBypassPermissionsMode` LOW warning.
+
+### Internal
+- Test coverage: 245 tests (+1 additionalDirs bypass-suppression test).
+
 ## [1.2.6] - 2026-03-30
 
 ### Added

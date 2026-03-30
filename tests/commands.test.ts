@@ -616,6 +616,15 @@ describe("--dry-run flag", () => {
     expect(calls.some((m) => /also in allow/i.test(m))).toBe(true);
   });
 
+  it("denyCommand --dry-run shows conflict when rule exists in ask list", async () => {
+    await askCommand("Bash(git push *)", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await denyCommand("Bash(git push *)", { project: tmpDir, scope: "project", dryRun: true });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /dry.run/i.test(m))).toBe(true);
+    expect(calls.some((m) => /also in ask/i.test(m))).toBe(true);
+  });
+
   it("askCommand --dry-run does not write to file", async () => {
     const logSpy = vi.spyOn(console, "log");
     await askCommand("Bash(git push *)", { project: tmpDir, scope: "project", dryRun: true });
@@ -642,6 +651,15 @@ describe("--dry-run flag", () => {
     const calls = logSpy.mock.calls.map((c) => String(c[0]));
     expect(calls.some((m) => /dry.run/i.test(m))).toBe(true);
     expect(calls.some((m) => /deny takes precedence/i.test(m))).toBe(true);
+  });
+
+  it("askCommand --dry-run shows conflict when rule exists in allow list", async () => {
+    await allowCommand("Bash(git push *)", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await askCommand("Bash(git push *)", { project: tmpDir, scope: "project", dryRun: true });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /dry.run/i.test(m))).toBe(true);
+    expect(calls.some((m) => /also in allow/i.test(m))).toBe(true);
   });
 
   it("modeCommand --dry-run shows transition and does not write", async () => {

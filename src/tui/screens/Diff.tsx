@@ -275,6 +275,9 @@ function DiffView({
                     {(sA.command ?? "") !== (sB.command ?? "") && (
                       <Text color="gray">{"      cmd:  "}{sA.command ?? "(none)"}{" → "}{sB.command ?? "(none)"}</Text>
                     )}
+                    {JSON.stringify(sA.args ?? []) !== JSON.stringify(sB.args ?? []) && (
+                      <Text color="gray">{"      args: ["}{(sA.args ?? []).join(", ")}{"] → ["}{(sB.args ?? []).join(", ")}{"]"}</Text>
+                    )}
                     {(sA.url ?? "") !== (sB.url ?? "") && (
                       <Text color="gray">{"      url:  "}{sA.url ?? "(none)"}{" → "}{sB.url ?? "(none)"}</Text>
                     )}

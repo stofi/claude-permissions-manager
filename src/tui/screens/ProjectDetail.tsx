@@ -474,9 +474,9 @@ export function ProjectDetail({ project, onBack, onRefresh }: ProjectDetailProps
 // Minimal inline confirm (y/n) — only rendered while mode === "confirming-delete"
 function ConfirmInput({ onConfirm }: { onConfirm: (yes: boolean) => void }) {
   useInput(
-    (input) => {
+    (input, key) => {
       if (input === "y" || input === "Y") onConfirm(true);
-      else if (input === "n" || input === "N" || input === "q") onConfirm(false);
+      else if (input === "n" || input === "N" || input === "q" || key.escape) onConfirm(false);
     },
     { isActive: true }
   );

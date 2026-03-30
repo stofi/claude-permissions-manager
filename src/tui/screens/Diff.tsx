@@ -375,13 +375,17 @@ export function Diff({ scanResult, onBack }: DiffProps) {
     const cursor =
       state.phase === "selectA" ? state.cursorA : state.cursorB;
 
-    if (key.escape || (input === "q" && state.phase === "selectA")) {
-      onBack();
+    if (key.escape) {
+      if (state.phase === "selectB") {
+        setState({ phase: "selectA", cursorA: state.cursorA });
+        setScrollOffset(0);
+      } else {
+        onBack();
+      }
       return;
     }
-    if (key.escape && state.phase === "selectB") {
-      setState({ phase: "selectA", cursorA: state.cursorA });
-      setScrollOffset(0);
+    if (input === "q" && state.phase === "selectA") {
+      onBack();
       return;
     }
 

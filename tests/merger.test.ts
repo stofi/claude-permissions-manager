@@ -196,6 +196,24 @@ describe("mergeSettingsFiles — warning detection", () => {
     }
   });
 
+  it("emits medium warning for acceptEdits mode", () => {
+    const f = makeFile("local", { permissions: { defaultMode: "acceptEdits" } });
+    const result = mergeSettingsFiles([f]);
+    const warn = result.warnings.find((w) => w.severity === "medium" && /acceptEdits/.test(w.message));
+    expect(warn).toBeDefined();
+    expect(warn!.message).toMatch(/file edits are accepted without confirmation/i);
+  });
+
+  it("does NOT emit acceptEdits warning for other modes", () => {
+    for (const mode of ["default", "dontAsk", "plan", "auto"] as const) {
+      const f = makeFile("local", { permissions: { defaultMode: mode } });
+      const result = mergeSettingsFiles([f]);
+      const warn = result.warnings.find((w) => /acceptEdits/.test(w.message));
+      // dontAsk mode triggers its own warnings, just verify no acceptEdits-specific warning
+      expect(warn).toBeUndefined();
+    }
+  });
+
   it("emits high warning for wildcard * in allow", () => {
     const f = makeFile("project", {
       permissions: { allow: ["*"] },
@@ -662,6 +680,41 @@ describe("mergeSettingsFiles — warning detection", () => {
     const warn = result.warnings.find(
       (w) => w.message.includes("allowManaged")
     );
+    expect(warn).toBeUndefined();
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// additionalDirs expansion warning
+// ────────────────────────────────────────────────────────────
+
+describe("additionalDirs warning", () => {
+  it("emits low warning when additionalDirs is non-empty", () => {
+    const f = makeFile("project", { additionalDirectories: ["/tmp/extra"] });
+    const result = mergeSettingsFiles([f]);
+    const warn = result.warnings.find((w) => w.severity === "low" && /additional director/i.test(w.message));
+    expect(warn).toBeDefined();
+    expect(warn!.message).toMatch(/filesystem access beyond the project root/i);
+  });
+
+  it("message uses singular 'directory' for one dir", () => {
+    const f = makeFile("project", { additionalDirectories: ["/a"] });
+    const result = mergeSettingsFiles([f]);
+    const warn = result.warnings.find((w) => /additional director/i.test(w.message));
+    expect(warn!.message).toMatch(/1 additional directory/);
+  });
+
+  it("message uses plural 'directories' for multiple dirs", () => {
+    const f = makeFile("project", { additionalDirectories: ["/a", "/b"] });
+    const result = mergeSettingsFiles([f]);
+    const warn = result.warnings.find((w) => /additional director/i.test(w.message));
+    expect(warn!.message).toMatch(/2 additional directories/);
+  });
+
+  it("does NOT emit warning when additionalDirs is empty", () => {
+    const f = makeFile("project", { permissions: {} });
+    const result = mergeSettingsFiles([f]);
+    const warn = result.warnings.find((w) => /additional director/i.test(w.message));
     expect(warn).toBeUndefined();
   });
 });

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.6] - 2026-03-30
+
+### Added
+- **`acceptEdits` mode audit warning (MEDIUM)**: `cpm audit` now emits a MEDIUM severity warning when `acceptEdits` mode is active — "acceptEdits mode is active — file edits are accepted without confirmation prompts". This alerts users in shared/project settings when Claude will silently accept all file edits without showing them for review.
+- **`additionalDirs` expansion audit warning (LOW)**: `cpm audit` now emits a LOW severity warning when `additionalDirectories` are configured — "N additional director(y/ies) configured — Claude has filesystem access beyond the project root". Helps users notice when Claude's filesystem access scope has been expanded.
+
+### Internal
+- Test coverage: 244 tests (+6: 2 acceptEdits warnings tests, 4 additionalDirs warning tests).
+
 ## [1.2.5] - 2026-03-30
 
 ### Improved

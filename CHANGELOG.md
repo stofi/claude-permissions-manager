@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.9] - 2026-03-30
+
+### Fixed
+- **TUI DiffView: show args changes for modified MCP servers**: The modified-server detail block rendered cmd, url, approval, env, and headers diffs but omitted args. Added an args diff line after cmd, matching the CLI `diff` command output.
+
 ## [1.3.8] - 2026-03-30
 
 ### Fixed

@@ -38,6 +38,20 @@ export async function diffCommand(
 
   const mcpNamesA = new Set(p1.mcpServers.map((s) => s.name));
   const mcpNamesB = new Set(p2.mcpServers.map((s) => s.name));
+  const mcpMapA = new Map(p1.mcpServers.map((s) => [s.name, s]));
+  const mcpMapB = new Map(p2.mcpServers.map((s) => [s.name, s]));
+
+  type McpEntry = (typeof p1.mcpServers)[number];
+  function mcpServerChanged(a: McpEntry, b: McpEntry): boolean {
+    if ((a.type ?? "stdio") !== (b.type ?? "stdio")) return true;
+    if ((a.command ?? null) !== (b.command ?? null)) return true;
+    if (JSON.stringify(a.args ?? []) !== JSON.stringify(b.args ?? [])) return true;
+    if ((a.url ?? null) !== (b.url ?? null)) return true;
+    if ((a.approvalState ?? "pending") !== (b.approvalState ?? "pending")) return true;
+    const sortStr = (arr: string[] | undefined) => [...(arr ?? [])].sort().join("\0");
+    if (sortStr(a.envVarNames) !== sortStr(b.envVarNames)) return true;
+    return false;
+  }
 
   if (opts.json) {
     // Pre-compute Sets for O(1) lookup instead of O(n) per-item scan
@@ -68,6 +82,13 @@ export async function diffCommand(
     });
     const mcpOnlyA = p1.mcpServers.filter((s) => !mcpNamesB.has(s.name)).map(toMcpObj);
     const mcpOnlyB = p2.mcpServers.filter((s) => !mcpNamesA.has(s.name)).map(toMcpObj);
+    const mcpBothNames = [...mcpNamesA].filter((n) => mcpNamesB.has(n));
+    const mcpModified = mcpBothNames
+      .filter((n) => mcpServerChanged(mcpMapA.get(n)!, mcpMapB.get(n)!))
+      .map((n) => ({ name: n, a: toMcpObj(mcpMapA.get(n)!), b: toMcpObj(mcpMapB.get(n)!) }));
+    const mcpInBoth = mcpBothNames.filter(
+      (n) => !mcpServerChanged(mcpMapA.get(n)!, mcpMapB.get(n)!)
+    );
     const envNamesA = new Set(p1.envVarNames);
     const envNamesB = new Set(p2.envVarNames);
     const envOnlyA = p1.envVarNames.filter((v) => !envNamesB.has(v));
@@ -83,6 +104,7 @@ export async function diffCommand(
       denyOnlyA.length === 0 && denyOnlyB.length === 0 &&
       askOnlyA.length === 0 && askOnlyB.length === 0 &&
       mcpOnlyA.length === 0 && mcpOnlyB.length === 0 &&
+      mcpModified.length === 0 &&
       envOnlyA.length === 0 && envOnlyB.length === 0 &&
       dirsOnlyA.length === 0 && dirsOnlyB.length === 0;
 
@@ -110,7 +132,8 @@ export async function diffCommand(
       mcpServers: {
         onlyInA: mcpOnlyA,
         onlyInB: mcpOnlyB,
-        inBoth: [...mcpNamesA].filter((n) => mcpNamesB.has(n)),
+        inBoth: mcpInBoth,
+        modified: mcpModified,
       },
       envVarNames: {
         onlyInA: envOnlyA,
@@ -214,7 +237,26 @@ export async function diffCommand(
       const inA = mcpNamesA.has(name);
       const inB = mcpNamesB.has(name);
       if (inA && inB) {
-        console.log(chalk.gray(`  = ${name}`));
+        const sA = mcpMapA.get(name)!;
+        const sB = mcpMapB.get(name)!;
+        if (mcpServerChanged(sA, sB)) {
+          console.log(chalk.yellow(`  ~ ${name}  (modified)`));
+          const typeA = sA.type ?? "stdio"; const typeB = sB.type ?? "stdio";
+          if (typeA !== typeB) console.log(chalk.gray(`      type: ${typeA} → ${typeB}`));
+          if ((sA.command ?? "") !== (sB.command ?? "")) {
+            console.log(chalk.gray(`      cmd:  ${sA.command ?? "(none)"} → ${sB.command ?? "(none)"}`));
+          }
+          if (JSON.stringify(sA.args ?? []) !== JSON.stringify(sB.args ?? [])) {
+            console.log(chalk.gray(`      args: [${(sA.args ?? []).join(", ")}] → [${(sB.args ?? []).join(", ")}]`));
+          }
+          if ((sA.url ?? "") !== (sB.url ?? "")) {
+            console.log(chalk.gray(`      url:  ${sA.url ?? "(none)"} → ${sB.url ?? "(none)"}`));
+          }
+          const apA = sA.approvalState ?? "pending"; const apB = sB.approvalState ?? "pending";
+          if (apA !== apB) console.log(chalk.gray(`      approval: ${apA} → ${apB}`));
+        } else {
+          console.log(chalk.gray(`  = ${name}`));
+        }
       } else if (inA) {
         console.log(chalk.red(`  - ${name}  (only in A)`));
       } else {

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] - 2026-03-30
+
+### Fixed
+- **`cpm diff` MCP server config comparison**: Same-named MCP servers with different configurations (command, args, url, type, approvalState, or env var names) were incorrectly reported as identical. Now correctly detected as "modified" with a `~` indicator in text output and a `modified` array in `--json` output.
+- **`cpm diff --json` `identical` flag**: Was `true` when two projects had same-named MCP servers but with different configs. Now correctly `false`.
+- **`cpm diff --json` `mcpServers.inBoth`**: Previously included same-named servers even when their configs differed. Now `inBoth` only contains truly unchanged servers; changed servers appear in the new `mcpServers.modified` array.
+- **TUI Diff screen `isIdentical`**: Fixed the same name-only comparison bug so the "✓ Projects have identical effective permissions" message is no longer shown when same-named MCP servers have different configs.
+- **TUI Diff MCP display**: Same-named modified servers now show a `~` indicator with per-field change lines (type, cmd, url, approval state) instead of displaying as identical.
+
+### Internal
+- Test coverage: 234 tests (+2 diff MCP tests).
+
 ## [1.2.2] - 2026-03-30
 
 ### Added

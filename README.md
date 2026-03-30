@@ -103,20 +103,55 @@ cpm show ~              # ✗ won't expand to home directory
 
 ### JSON output format
 
-When using `--json`, allow/deny/ask rules are emitted as objects with `rule` and `scope` fields (consistent across `list`, `show`, `diff`, and `export`):
+All `--json` outputs share these conventions:
 
+**Allow/deny/ask rules** — emitted as objects with `rule` and `scope` fields:
+```json
+{ "rule": "Bash(npm run *)", "scope": "project" }
+```
+`scope` is one of `"managed"`, `"user"`, `"project"`, or `"local"`.
+
+**MCP servers** — consistent shape across all commands:
 ```json
 {
-  "allow": [
-    { "rule": "Bash(npm run *)", "scope": "project" },
-    { "rule": "Read", "scope": "user" }
-  ]
+  "name": "github", "type": "stdio", "scope": "local",
+  "approvalState": "approved",
+  "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"],
+  "url": null, "envVarNames": ["GITHUB_TOKEN"], "headerNames": []
+}
+```
+`approvalState` is `"approved"`, `"denied"`, or `"pending"`. `type` defaults to `"stdio"`.
+
+**claudeMdFiles** — objects in both `show` and `export`:
+```json
+{ "path": "/path/to/CLAUDE.md", "scope": "project", "exists": true, "lineCount": 42 }
+```
+
+**settingsFiles** — objects with parse status:
+```json
+{ "path": "/path/to/settings.json", "scope": "project", "exists": true, "readable": true, "parsed": true, "parseError": null }
+```
+
+#### Per-command differences
+
+`cpm show --json` nests permissions under an `effectivePermissions` key and uses `defaultMode` as the mode field name. It also emits `warnings` as a full array of objects (`[{ "severity": "high", "message": "..." }]`).
+
+`cpm list --json` and `cpm export --json` use a **flat** structure with `mode` at the root, and emit `warningCount` (a number) instead of the full warnings array. Use `cpm show --json` or `cpm audit --json` for full warning details.
+
+`cpm list --json` is a **summary** format — it omits `settingsFiles` and `claudeMdFiles` to keep output compact. Use `cpm export --json` for the full data dump.
+
+`cpm audit --json` output structure:
+```json
+{
+  "generatedAt": "...", "scanRoot": "...", "projectCount": 3, "issueCount": 2,
+  "issues": [
+    { "project": "/path/to/project", "severity": "high", "message": "...", "rule": "Bash" }
+  ],
+  "errors": []
 }
 ```
 
-`scope` is one of `"managed"`, `"user"`, `"project"`, or `"local"`.
-
-`cpm diff --json` additionally wraps rule arrays into `onlyInA`, `onlyInB`, and `inBoth` sub-keys. `inBoth` entries are plain strings (the scope is the same in both projects by definition).
+`cpm diff --json` wraps rule arrays into `onlyInA`, `onlyInB`, and `inBoth` sub-keys. `inBoth` entries are plain strings. Includes an `"identical": true/false` top-level key.
 
 ## Shell completion
 

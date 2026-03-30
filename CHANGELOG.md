@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-03-30
+
+### Changed (breaking)
+- **`cpm export --json` `claudeMdFiles`**: Each project record now emits `claudeMdFiles` as an array of objects (`{ path, scope, exists, lineCount? }`), consistent with `cpm show --json`. Previously it was a string array of paths filtered to only existing files — this was lossy and inconsistent. Update any consumers that iterated `project.claudeMdFiles` as strings to access `.path` instead.
+
+### Documentation
+- Expanded "JSON output format" section in README with per-command format differences: show nesting vs list/export flat structure, `warningCount` vs `warnings`, `claudeMdFiles`/`settingsFiles` object shapes, `mcpServers` full field reference, `audit --json` structure, and `diff --json` conventions.
+
+### Internal
+- Test coverage: 225 tests (+2 for claudeMdFiles object shape in export and show JSON).
+
 ## [1.1.1] - 2026-03-30
 
 ### Fixed

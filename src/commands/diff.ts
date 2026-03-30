@@ -55,6 +55,9 @@ export async function diffCommand(
     return false;
   }
 
+  // Names of servers present in both A and B (used in both JSON and text paths)
+  const mcpBothNames = [...mcpNamesA].filter((n) => mcpNamesB.has(n));
+
   if (opts.json) {
     // Pre-compute Sets for O(1) lookup instead of O(n) per-item scan
     const p1AllowRaws = new Set(p1.allow.map((r) => r.raw));
@@ -84,7 +87,6 @@ export async function diffCommand(
     });
     const mcpOnlyA = p1.mcpServers.filter((s) => !mcpNamesB.has(s.name)).map(toMcpObj);
     const mcpOnlyB = p2.mcpServers.filter((s) => !mcpNamesA.has(s.name)).map(toMcpObj);
-    const mcpBothNames = [...mcpNamesA].filter((n) => mcpNamesB.has(n));
     const mcpModified = mcpBothNames
       .filter((n) => mcpServerChanged(mcpMapA.get(n)!, mcpMapB.get(n)!))
       .map((n) => ({ name: n, a: toMcpObj(mcpMapA.get(n)!), b: toMcpObj(mcpMapB.get(n)!) }));
@@ -288,8 +290,7 @@ export async function diffCommand(
     return true;
   }
 
-  const mcpBothNamesText = [...mcpNamesA].filter((n) => mcpNamesB.has(n));
-  const anyMcpModified = mcpBothNamesText.some((n) =>
+  const anyMcpModified = mcpBothNames.some((n) =>
     mcpServerChanged(mcpMapA.get(n)!, mcpMapB.get(n)!)
   );
 

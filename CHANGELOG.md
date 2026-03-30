@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-03-30
+
+### Documentation
+- **README JSON format matrix**: Added a per-command capability table clarifying which fields each command emits, where they are nested, and the format differences between `list/export` (flat) and `show` (nested under `effectivePermissions`). Also notes that `diff --json` does not compare `claudeMdFiles` or `settingsFiles`.
+- **Clarified `effectivePermissions` nesting**: README now explicitly documents that `isBypassDisabled`, `envVarNames`, `additionalDirs`, `allow`, `deny`, and `ask` are nested inside `effectivePermissions` in `show --json` (not just `defaultMode`).
+
+### Internal
+- Strengthened `claudeMdFiles` tests: both `export --json` and `show --json` now assert `lineCount` is a number > 0 for existing CLAUDE.md files. Show test was updated to use a temp project with a real CLAUDE.md instead of a fixture with no CLAUDE.md files.
+
 ## [1.2.0] - 2026-03-30
 
 ### Changed (breaking)

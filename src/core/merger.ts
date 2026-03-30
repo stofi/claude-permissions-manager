@@ -273,7 +273,8 @@ function detectWarnings(
   }
 
   // Warn when additionalDirs expand filesystem access beyond project root
-  if (permissions.additionalDirs.length > 0) {
+  // Suppress when bypassPermissions is active — bypass already disables all access controls
+  if (permissions.additionalDirs.length > 0 && permissions.defaultMode !== "bypassPermissions") {
     const n = permissions.additionalDirs.length;
     warnings.push({
       severity: "low",

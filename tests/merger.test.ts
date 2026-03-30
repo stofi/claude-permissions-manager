@@ -717,6 +717,19 @@ describe("additionalDirs warning", () => {
     const warn = result.warnings.find((w) => /additional director/i.test(w.message));
     expect(warn).toBeUndefined();
   });
+
+  it("does NOT emit additionalDirs warning when bypassPermissions is active (redundant with CRITICAL warning)", () => {
+    const f = makeFile("local", {
+      permissions: { defaultMode: "bypassPermissions", additionalDirectories: ["/extra"] },
+      additionalDirectories: ["/extra"],
+    });
+    const result = mergeSettingsFiles([f]);
+    const warn = result.warnings.find((w) => /additional director/i.test(w.message));
+    expect(warn).toBeUndefined();
+    // CRITICAL bypass warning should still fire
+    const crit = result.warnings.find((w) => w.severity === "critical");
+    expect(crit).toBeDefined();
+  });
 });
 
 // ────────────────────────────────────────────────────────────

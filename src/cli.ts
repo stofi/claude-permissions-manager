@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createRequire } from "module";
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { listCommand } from "./commands/list.js";
 import { showCommand } from "./commands/show.js";
 import { auditCommand } from "./commands/audit.js";
@@ -113,7 +113,7 @@ program
 program
   .command("allow <rule>")
   .description('Add a rule to the allow list (e.g. cpm allow "Bash(npm run *)")')
-  .option("--scope <scope>", "Settings scope: local|project|user (default: local)", "local")
+  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(["local", "project", "user"]).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
   .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (rule, opts) => {
@@ -124,7 +124,7 @@ program
 program
   .command("deny <rule>")
   .description('Add a rule to the deny list (e.g. cpm deny "Read(**/.env)")')
-  .option("--scope <scope>", "Settings scope: local|project|user (default: local)", "local")
+  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(["local", "project", "user"]).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
   .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (rule, opts) => {
@@ -135,7 +135,7 @@ program
 program
   .command("ask <rule>")
   .description('Add a rule to the ask list (always prompt for confirmation)')
-  .option("--scope <scope>", "Settings scope: local|project|user (default: local)", "local")
+  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(["local", "project", "user"]).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
   .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (rule, opts) => {
@@ -146,7 +146,7 @@ program
 program
   .command("reset [rule]")
   .description("Remove a rule from its list, or --all to clear all rules")
-  .option("--scope <scope>", "Settings scope: local|project|user (default: local)", "local")
+  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(["local", "project", "user"]).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
   .option("--all", "Clear all permission rules")
   .option("--yes", "Skip confirmation prompt (with --all)")
@@ -166,7 +166,7 @@ program
 program
   .command("mode <mode>")
   .description(`Set defaultMode: ${PermissionModeSchema.options.join("|")}`)
-  .option("--scope <scope>", "Settings scope: local|project|user (default: local)", "local")
+  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(["local", "project", "user"]).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
   .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (mode, opts) => {
@@ -197,7 +197,7 @@ program
   .command("init")
   .description("Create a starter settings.json from a preset template")
   .option("--project <path>", "Project path (default: current directory)")
-  .option("--scope <scope>", "Settings scope: local|project|user (default: project)", "project")
+  .addOption(new Option("--scope <scope>", "Settings scope (default: project)").choices(["local", "project", "user"]).default("project"))
   .option("--preset <preset>", "Template preset: safe|node|strict (default: safe)", "safe")
   .option("--mode <mode>", "Override defaultMode")
   .option("--yes", "Overwrite existing settings without prompting")

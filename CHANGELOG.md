@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.7] - 2026-03-30
+
+### Documentation
+- **README: added TUI diff screen navigation keys**: The Interactive TUI section documented the main list, audit, and project detail screens but was missing the diff screen. Added step-by-step navigation for all three diff phases (selectA, selectB, diff view).
+
 ## [1.3.6] - 2026-03-30
 
 ### Fixed

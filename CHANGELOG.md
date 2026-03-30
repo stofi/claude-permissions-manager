@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.8] - 2026-03-30
+
+### Improved
+- **`cpm mode <mode>` parse-time validation**: The mode positional argument now uses `Argument.choices()` — invalid modes like `cpm mode bogus` are rejected immediately with a Commander error listing all valid choices, instead of failing inside `modeCommand()`. Help text shows `(choices: "default", "acceptEdits", "plan", "auto", "dontAsk", "bypassPermissions")`.
+- **`cpm init --preset` parse-time validation**: The `--preset` option now uses `Option.choices(["safe","node","strict"])` — invalid presets fail at parse time with a Commander error. Consistent with the `--scope` fix in v1.2.5.
+
 ## [1.2.7] - 2026-03-30
 
 ### Fixed

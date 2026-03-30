@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createRequire } from "module";
-import { Command, Option } from "commander";
+import { Command, Option, Argument } from "commander";
 import { listCommand } from "./commands/list.js";
 import { showCommand } from "./commands/show.js";
 import { auditCommand } from "./commands/audit.js";
@@ -164,7 +164,8 @@ program
   });
 
 program
-  .command("mode <mode>")
+  .command("mode")
+  .addArgument(new Argument("<mode>", "Permission mode").choices(PermissionModeSchema.options))
   .description(`Set defaultMode: ${PermissionModeSchema.options.join("|")}`)
   .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(["local", "project", "user"]).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
@@ -198,7 +199,7 @@ program
   .description("Create a starter settings.json from a preset template")
   .option("--project <path>", "Project path (default: current directory)")
   .addOption(new Option("--scope <scope>", "Settings scope (default: project)").choices(["local", "project", "user"]).default("project"))
-  .option("--preset <preset>", "Template preset: safe|node|strict (default: safe)", "safe")
+  .addOption(new Option("--preset <preset>", "Starter template (default: safe)").choices(["safe", "node", "strict"]).default("safe"))
   .option("--mode <mode>", "Override defaultMode")
   .option("--yes", "Overwrite existing settings without prompting")
   .option("--dry-run", "Preview what would be created without writing any files")

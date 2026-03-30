@@ -469,8 +469,8 @@ export function Diff({ scanResult, onBack }: DiffProps) {
           {state.phase === "view"
             ? "←/Esc/q: back to selection"
             : state.phase === "selectB"
-            ? "↑↓ select  Enter: confirm  Esc: back"
-            : "↑↓ select  Enter: confirm  q: back"}
+            ? "↑↓/jk select  Enter: confirm  Esc: back"
+            : "↑↓/jk select  Enter: confirm  q: back"}
         </Text>
       </Box>
     </Box>

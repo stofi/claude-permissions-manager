@@ -6,6 +6,7 @@ import { showCommand } from "./commands/show.js";
 import { auditCommand } from "./commands/audit.js";
 import { homeDir } from "./utils/paths.js";
 import { PermissionModeSchema } from "./core/schemas.js";
+import { WRITABLE_SCOPES } from "./core/types.js";
 
 const _require = createRequire(import.meta.url);
 const { version } = _require("../package.json") as { version: string };
@@ -115,7 +116,7 @@ program
 program
   .command("allow <rule>")
   .description('Add a rule to the allow list (e.g. cpm allow "Bash(npm run *)")')
-  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(["local", "project", "user"]).default("local"))
+  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
   .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (rule, opts) => {
@@ -126,7 +127,7 @@ program
 program
   .command("deny <rule>")
   .description('Add a rule to the deny list (e.g. cpm deny "Read(**/.env)")')
-  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(["local", "project", "user"]).default("local"))
+  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
   .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (rule, opts) => {
@@ -137,7 +138,7 @@ program
 program
   .command("ask <rule>")
   .description('Add a rule to the ask list (always prompt for confirmation)')
-  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(["local", "project", "user"]).default("local"))
+  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
   .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (rule, opts) => {
@@ -148,7 +149,7 @@ program
 program
   .command("reset [rule]")
   .description("Remove a rule from its list, or --all to clear all rules")
-  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(["local", "project", "user"]).default("local"))
+  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
   .option("--all", "Clear all permission rules")
   .option("--yes", "Skip confirmation prompt (with --all)")
@@ -169,7 +170,7 @@ program
   .command("mode")
   .addArgument(new Argument("<mode>", "Permission mode").choices(PermissionModeSchema.options))
   .description(`Set defaultMode: ${PermissionModeSchema.options.join("|")}`)
-  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(["local", "project", "user"]).default("local"))
+  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
   .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (mode, opts) => {
@@ -200,7 +201,7 @@ program
   .command("init")
   .description("Create a starter settings.json from a preset template")
   .option("--project <path>", "Project path (default: current directory)")
-  .addOption(new Option("--scope <scope>", "Settings scope (default: project)").choices(["local", "project", "user"]).default("project"))
+  .addOption(new Option("--scope <scope>", "Settings scope (default: project)").choices(WRITABLE_SCOPES).default("project"))
   .addOption(new Option("--preset <preset>", "Starter template (default: safe)").choices(["safe", "node", "strict"]).default("safe"))
   .addOption(new Option("--mode <mode>", "Override defaultMode").choices(PermissionModeSchema.options))
   .option("--yes", "Overwrite existing settings without prompting")

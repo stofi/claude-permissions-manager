@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-03-31
+
+### Changed
+- **cli.ts and ScopePicker: use WRITABLE_SCOPES constant**: Replaced 6 hardcoded `["local","project","user"]` scope arrays in `cli.ts` and the local duplicate in `ScopePicker.tsx` with the exported `WRITABLE_SCOPES` constant from `types.ts`, making it the single source of truth for valid writable scopes.
+
 ## [1.4.0] - 2026-03-30
 
 ### Fixed

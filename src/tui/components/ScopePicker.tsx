@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
+import { WRITABLE_SCOPES } from "../../core/types.js";
 import type { SettingsScope } from "../../core/types.js";
-
-const WRITABLE_SCOPES: SettingsScope[] = ["local", "project", "user"];
 
 const SCOPE_DESCRIPTIONS: Record<string, string> = {
   local: "settings.local.json (you, this project)",

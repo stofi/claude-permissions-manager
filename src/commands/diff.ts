@@ -42,14 +42,15 @@ export async function diffCommand(
   const mcpMapB = new Map(p2.mcpServers.map((s) => [s.name, s]));
 
   type McpEntry = (typeof p1.mcpServers)[number];
+  const sortStr = (arr: string[] | undefined) => [...(arr ?? [])].sort().join("\0");
   function mcpServerChanged(a: McpEntry, b: McpEntry): boolean {
     if ((a.type ?? "stdio") !== (b.type ?? "stdio")) return true;
     if ((a.command ?? null) !== (b.command ?? null)) return true;
     if (JSON.stringify(a.args ?? []) !== JSON.stringify(b.args ?? [])) return true;
     if ((a.url ?? null) !== (b.url ?? null)) return true;
     if ((a.approvalState ?? "pending") !== (b.approvalState ?? "pending")) return true;
-    const sortStr = (arr: string[] | undefined) => [...(arr ?? [])].sort().join("\0");
     if (sortStr(a.envVarNames) !== sortStr(b.envVarNames)) return true;
+    if (sortStr(a.headerNames) !== sortStr(b.headerNames)) return true;
     return false;
   }
 
@@ -254,6 +255,12 @@ export async function diffCommand(
           }
           const apA = sA.approvalState ?? "pending"; const apB = sB.approvalState ?? "pending";
           if (apA !== apB) console.log(chalk.gray(`      approval: ${apA} → ${apB}`));
+          if (sortStr(sA.envVarNames) !== sortStr(sB.envVarNames)) {
+            console.log(chalk.gray(`      env:     [${(sA.envVarNames ?? []).join(", ")}] → [${(sB.envVarNames ?? []).join(", ")}]`));
+          }
+          if (sortStr(sA.headerNames) !== sortStr(sB.headerNames)) {
+            console.log(chalk.gray(`      headers: [${(sA.headerNames ?? []).join(", ")}] → [${(sB.headerNames ?? []).join(", ")}]`));
+          }
         } else {
           console.log(chalk.gray(`  = ${name}`));
         }
@@ -280,6 +287,11 @@ export async function diffCommand(
     return true;
   }
 
+  const mcpBothNamesText = [...mcpNamesA].filter((n) => mcpNamesB.has(n));
+  const anyMcpModified = mcpBothNamesText.some((n) =>
+    mcpServerChanged(mcpMapA.get(n)!, mcpMapB.get(n)!)
+  );
+
   const hasChanges =
     p1.defaultMode !== p2.defaultMode ||
     p1.isBypassDisabled !== p2.isBypassDisabled ||
@@ -287,6 +299,7 @@ export async function diffCommand(
     !setsEqual(p1.deny, p2.deny) ||
     !setsEqual(p1.ask, p2.ask) ||
     !setsOfStringsEqual(mcpNamesA, mcpNamesB) ||
+    anyMcpModified ||
     !setsOfStringsEqual(new Set(p1.envVarNames), new Set(p2.envVarNames)) ||
     !setsOfStringsEqual(new Set(p1.additionalDirs), new Set(p2.additionalDirs));
 

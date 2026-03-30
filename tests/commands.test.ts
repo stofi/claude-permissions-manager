@@ -1162,6 +1162,105 @@ describe("diffCommand — identical projects", () => {
 });
 
 // ────────────────────────────────────────────────────────────
+// diffCommand — text output
+// ────────────────────────────────────────────────────────────
+
+describe("diffCommand — text output", () => {
+  it("shows + and - indicators for rules that differ between projects", async () => {
+    const calls: string[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+
+    await diffCommand(
+      join(FIXTURES, "project-a"),
+      join(FIXTURES, "project-b"),
+      {}
+    );
+
+    const output = calls.map((a) => a.join("")).join("\n");
+    // project-a has allow rules that project-b doesn't — should show as "only in A"
+    expect(output).toMatch(/ALLOW/);
+    expect(output).toMatch(/-.*only in A/);
+  });
+
+  it("shows identical banner when both projects are the same", async () => {
+    const calls: string[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+
+    await diffCommand(
+      join(FIXTURES, "project-a"),
+      join(FIXTURES, "project-a"),
+      {}
+    );
+
+    const output = calls.map((a) => a.join("")).join("\n");
+    expect(output).toMatch(/identical effective permissions/);
+  });
+
+  it("shows ~ indicator in text output for modified same-named MCP server", async () => {
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-txt-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-txt-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      await wf(join(dirA, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { command: "cmd-a", args: [] } }
+      }));
+      await wf(join(dirB, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { command: "cmd-b", args: [] } }
+      }));
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+
+      await diffCommand(dirA, dirB, {});
+
+      const output = calls.map((a) => a.join("")).join("\n");
+      expect(output).toMatch(/~.*myserver.*modified/);
+      expect(output).toMatch(/cmd:.*cmd-a.*cmd-b/);
+      // Should NOT show identical banner (configs differ)
+      expect(output).not.toMatch(/identical effective permissions/);
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
+
+  it("shows env and headers change lines for modified MCP server", async () => {
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-env-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-env-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      // Same command, different env vars
+      await wf(join(dirA, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { command: "run", args: [], env: { TOKEN: "x" } } }
+      }));
+      await wf(join(dirB, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { command: "run", args: [], env: { TOKEN: "x", EXTRA: "y" } } }
+      }));
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+
+      await diffCommand(dirA, dirB, {});
+
+      const output = calls.map((a) => a.join("")).join("\n");
+      expect(output).toMatch(/~.*myserver.*modified/);
+      expect(output).toMatch(/env:/);
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
+});
+
+// ────────────────────────────────────────────────────────────
 // auditCommand
 // ────────────────────────────────────────────────────────────
 

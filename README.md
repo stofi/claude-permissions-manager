@@ -245,6 +245,11 @@ In the audit screen:
 - `Enter` — jump to that project's detail screen (back returns to audit)
 - `←` / `Esc` / `q` — back to list
 
+In the diff screen (press `d` from the project list):
+- Step 1 — select project A: `↑↓` / `j`/`k` navigate, `Enter` confirm, `q` cancel back to list
+- Step 2 — select project B: `↑↓` / `j`/`k` navigate, `Enter` confirm, `Esc` back to step 1
+- Diff view: `←` / `Esc` / `q` — back to project selection
+
 In project detail (permissions tab):
 - `1` / `2` / `3` — switch tabs (permissions / MCP / warnings)
 - `j`/`k` — move cursor through rules

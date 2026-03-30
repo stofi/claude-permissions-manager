@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5] - 2026-03-30
+
+### Improved
+- **`--scope` option now shows valid choices in `--help`**: All write commands (`allow`, `deny`, `ask`, `mode`, `reset`, `init`) now use Commander's `Option.choices()` for `--scope`. This produces `(choices: "local", "project", "user")` in the help text and rejects invalid scope values at parse time with a clear error message instead of at runtime. E.g. `cpm allow "Read" --scope managed` now immediately errors: `option '--scope <scope>' argument 'managed' is invalid. Allowed choices are local, project, user.`
+
 ## [1.2.4] - 2026-03-30
 
 ### Fixed

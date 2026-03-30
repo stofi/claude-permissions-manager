@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.6] - 2026-03-30
+
+### Fixed
+- **TUI Diff: Esc in selectB phase now returns to selectA instead of exiting to ProjectList**: The outer `useInput` handler checked `key.escape` without a phase guard, so the intended phase-specific handler (`if (key.escape && state.phase === "selectB")`) was dead code — unreachable because the earlier branch returned first. Restructured to be phase-aware: Esc in selectB → back to selectA; Esc/q in selectA → back to ProjectList.
+
 ## [1.3.5] - 2026-03-30
 
 ### Internal

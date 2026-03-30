@@ -1104,6 +1104,61 @@ describe("diffCommand — identical projects", () => {
     expect(json.envVarNames).toHaveProperty("onlyInB");
     expect(json.envVarNames).toHaveProperty("inBoth");
   });
+
+  it("mcpServers.modified is present in JSON output", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+    await diffCommand(
+      join(FIXTURES, "project-a"),
+      join(FIXTURES, "project-b"),
+      { json: true }
+    );
+
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(json.mcpServers).toHaveProperty("modified");
+    expect(Array.isArray(json.mcpServers.modified)).toBe(true);
+  });
+
+  it("identical is false and modified is populated when same-named MCP server has different config", async () => {
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-mcp-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-mcp-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      // Same server name "myserver", different command
+      await wf(join(dirA, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { command: "cmd-a", args: [] } }
+      }));
+      await wf(join(dirB, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { command: "cmd-b", args: [] } }
+      }));
+      // Minimal settings so scan finds both projects
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+
+      const calls: unknown[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+      await diffCommand(dirA, dirB, { json: true });
+
+      const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+      expect(json.identical).toBe(false);
+      expect(json.mcpServers.modified).toHaveLength(1);
+      expect(json.mcpServers.modified[0].name).toBe("myserver");
+      expect(json.mcpServers.modified[0].a.command).toBe("cmd-a");
+      expect(json.mcpServers.modified[0].b.command).toBe("cmd-b");
+      // onlyInA and onlyInB should be empty (server exists in both)
+      expect(json.mcpServers.onlyInA).toHaveLength(0);
+      expect(json.mcpServers.onlyInB).toHaveLength(0);
+      // inBoth should be empty (it's modified, not identical)
+      expect(json.mcpServers.inBoth).toHaveLength(0);
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
 });
 
 // ────────────────────────────────────────────────────────────

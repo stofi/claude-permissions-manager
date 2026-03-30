@@ -87,6 +87,8 @@ function DiffView({
   const askB = new Set(pb.ask.map((r) => r.raw));
   const mcpSetA = new Set(pa.mcpServers.map((s) => s.name));
   const mcpSetB = new Set(pb.mcpServers.map((s) => s.name));
+  const mcpMapA = new Map(pa.mcpServers.map((s) => [s.name, s]));
+  const mcpMapB = new Map(pb.mcpServers.map((s) => [s.name, s]));
   const envSetA = new Set(pa.envVarNames);
   const envSetB = new Set(pb.envVarNames);
   const dirSetA = new Set(pa.additionalDirs);
@@ -97,6 +99,23 @@ function DiffView({
   const allAsk = new Set([...askA, ...askB]);
   const allEnv = new Set([...envSetA, ...envSetB]);
   const allDirs = new Set([...dirSetA, ...dirSetB]);
+
+  type McpEntry = (typeof pa.mcpServers)[number];
+  function mcpServerChanged(a: McpEntry, b: McpEntry): boolean {
+    if ((a.type ?? "stdio") !== (b.type ?? "stdio")) return true;
+    if ((a.command ?? null) !== (b.command ?? null)) return true;
+    if (JSON.stringify(a.args ?? []) !== JSON.stringify(b.args ?? [])) return true;
+    if ((a.url ?? null) !== (b.url ?? null)) return true;
+    if ((a.approvalState ?? "pending") !== (b.approvalState ?? "pending")) return true;
+    const sortStr = (arr: string[] | undefined) => [...(arr ?? [])].sort().join("\0");
+    if (sortStr(a.envVarNames) !== sortStr(b.envVarNames)) return true;
+    return false;
+  }
+
+  const mcpBothNames = [...mcpSetA].filter((n) => mcpSetB.has(n));
+  const mcpModifiedNames = new Set(
+    mcpBothNames.filter((n) => mcpServerChanged(mcpMapA.get(n)!, mcpMapB.get(n)!))
+  );
 
   function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
     if (a.size !== b.size) return false;
@@ -111,6 +130,7 @@ function DiffView({
     setsEqual(denyA, denyB) &&
     setsEqual(askA, askB) &&
     setsEqual(mcpSetA, mcpSetB) &&
+    mcpModifiedNames.size === 0 &&
     setsEqual(envSetA, envSetB) &&
     setsEqual(dirSetA, dirSetB);
 
@@ -235,19 +255,41 @@ function DiffView({
       {(() => {
         const allMcp = new Set([...mcpSetA, ...mcpSetB]);
         if (allMcp.size === 0) return null;
-        const mcpMapA = new Map(pa.mcpServers.map((s) => [s.name, s]));
-        const mcpMapB = new Map(pb.mcpServers.map((s) => [s.name, s]));
         return (
           <Box flexDirection="column" marginBottom={1}>
             <Text bold color="blue">MCP SERVERS</Text>
             {[...allMcp].map((name) => {
-              const server = mcpMapA.get(name) ?? mcpMapB.get(name);
+              const inA = mcpSetA.has(name);
+              const inB = mcpSetB.has(name);
+              const modified = inA && inB && mcpModifiedNames.has(name);
+              const sA = mcpMapA.get(name);
+              const sB = mcpMapB.get(name);
+              if (modified && sA && sB) {
+                return (
+                  <Box key={name} flexDirection="column">
+                    <Text color="yellow">{"  ~ "}{name.padEnd(44)}{"(modified)"}</Text>
+                    {(sA.type ?? "stdio") !== (sB.type ?? "stdio") && (
+                      <Text color="gray">{"      type: "}{sA.type ?? "stdio"}{" → "}{sB.type ?? "stdio"}</Text>
+                    )}
+                    {(sA.command ?? "") !== (sB.command ?? "") && (
+                      <Text color="gray">{"      cmd:  "}{sA.command ?? "(none)"}{" → "}{sB.command ?? "(none)"}</Text>
+                    )}
+                    {(sA.url ?? "") !== (sB.url ?? "") && (
+                      <Text color="gray">{"      url:  "}{sA.url ?? "(none)"}{" → "}{sB.url ?? "(none)"}</Text>
+                    )}
+                    {(sA.approvalState ?? "pending") !== (sB.approvalState ?? "pending") && (
+                      <Text color="gray">{"      approval: "}{sA.approvalState ?? "pending"}{" → "}{sB.approvalState ?? "pending"}</Text>
+                    )}
+                  </Box>
+                );
+              }
+              const server = sA ?? sB;
               return (
                 <Box key={name} flexDirection="column">
                   <DiffRow
                     rule={name}
-                    inA={mcpSetA.has(name)}
-                    inB={mcpSetB.has(name)}
+                    inA={inA}
+                    inB={inB}
                     color="blue"
                   />
                   {server?.command && (

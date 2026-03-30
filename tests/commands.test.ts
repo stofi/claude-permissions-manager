@@ -273,9 +273,11 @@ describe("exportCommand — JSON", () => {
       // claudeMdFiles entries must NOT be plain strings
       expect(typeof f).toBe("object");
     }
-    // Verify the existing CLAUDE.md is detected
+    // Verify the existing CLAUDE.md is detected with all fields including lineCount
     const rootMd = files.find((f) => String(f.path).endsWith("CLAUDE.md") && f.exists === true);
     expect(rootMd).toBeDefined();
+    expect(typeof rootMd!.lineCount).toBe("number");
+    expect((rootMd!.lineCount as number)).toBeGreaterThan(0);
   });
 
   it("project records include warningCount as a number", async () => {
@@ -848,20 +850,33 @@ describe("showCommand — JSON", () => {
     }
   });
 
-  it("claudeMdFiles entries are objects with path/scope/exists fields", async () => {
+  it("claudeMdFiles entries are objects with path/scope/exists/lineCount fields", async () => {
+    // Create a temp project with a CLAUDE.md so we can assert lineCount
+    const claudeDir = join(tmpDir, ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    const { writeFile } = await import("fs/promises");
+    await writeFile(join(tmpDir, ".claude", "settings.json"), JSON.stringify({ permissions: {} }), "utf-8");
+    await writeFile(join(tmpDir, "CLAUDE.md"), "# Test\nLine two.\nLine three.", "utf-8");
+
     const calls: unknown[][] = [];
     vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
 
-    await showCommand(join(FIXTURES, "project-a"), { json: true });
+    await showCommand(tmpDir, { json: true });
 
     const json = JSON.parse(calls.map((a) => a.join("")).join(""));
     expect(Array.isArray(json.claudeMdFiles)).toBe(true);
+    // At least the CLAUDE.md we created should appear
+    expect(json.claudeMdFiles.length).toBeGreaterThan(0);
     for (const f of json.claudeMdFiles as Record<string, unknown>[]) {
       expect(typeof f.path).toBe("string");
       expect(typeof f.scope).toBe("string");
       expect(typeof f.exists).toBe("boolean");
-      expect(typeof f).toBe("object");
     }
+    // The existing file must have a lineCount
+    const existingMd = (json.claudeMdFiles as Record<string, unknown>[]).find((f) => f.exists === true);
+    expect(existingMd).toBeDefined();
+    expect(typeof existingMd!.lineCount).toBe("number");
+    expect((existingMd!.lineCount as number)).toBeGreaterThan(0);
   });
 
   it("mcpServers have type and approvalState defaults (never undefined/null)", async () => {

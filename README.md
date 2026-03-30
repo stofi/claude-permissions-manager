@@ -134,11 +134,22 @@ All `--json` outputs share these conventions:
 
 #### Per-command differences
 
-`cpm show --json` nests permissions under an `effectivePermissions` key and uses `defaultMode` as the mode field name. It also emits `warnings` as a full array of objects (`[{ "severity": "high", "message": "..." }]`).
+**Command capability matrix:**
 
-`cpm list --json` and `cpm export --json` use a **flat** structure with `mode` at the root, and emit `warningCount` (a number) instead of the full warnings array. Use `cpm show --json` or `cpm audit --json` for full warning details.
+| Field | `list` | `show` | `export` | `audit` |
+|-------|--------|--------|----------|---------|
+| `mode` / `defaultMode` | `mode` (flat) | `effectivePermissions.defaultMode` (nested) | `mode` (flat) | — |
+| `isBypassDisabled` | flat root | inside `effectivePermissions` | flat root | — |
+| `envVarNames` / `additionalDirs` | flat root | inside `effectivePermissions` | flat root | — |
+| `allow` / `deny` / `ask` | flat root | inside `effectivePermissions` | flat root | — |
+| `mcpServers` | ✓ | ✓ | ✓ | — |
+| `warnings` | `warningCount` (number) | `warnings` (array of objects) | `warningCount` (number) | `issues` (array) |
+| `settingsFiles` | — | ✓ (incl. global) | ✓ (incl. global) | — |
+| `claudeMdFiles` | — | ✓ (objects) | ✓ (objects) | — |
 
-`cpm list --json` is a **summary** format — it omits `settingsFiles` and `claudeMdFiles` to keep output compact. Use `cpm export --json` for the full data dump.
+`cpm show --json` is the **detail view** for a single project. It nests `defaultMode`, `allow`, `deny`, `ask`, `isBypassDisabled`, `envVarNames`, and `additionalDirs` under an `effectivePermissions` key. It emits `warnings` as a full array of objects.
+
+`cpm list --json` is the **summary** format (compact, no `settingsFiles`/`claudeMdFiles`). Fields are flat at the project root. Use `cpm export --json` for the full data dump.
 
 `cpm audit --json` output structure:
 ```json
@@ -151,7 +162,7 @@ All `--json` outputs share these conventions:
 }
 ```
 
-`cpm diff --json` wraps rule arrays into `onlyInA`, `onlyInB`, and `inBoth` sub-keys. `inBoth` entries are plain strings. Includes an `"identical": true/false` top-level key.
+`cpm diff --json` wraps rule arrays into `onlyInA`, `onlyInB`, and `inBoth` sub-keys. `inBoth` entries are plain strings. Includes an `"identical": true/false` top-level key. Does not compare `claudeMdFiles` or `settingsFiles`.
 
 ## Shell completion
 

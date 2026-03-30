@@ -221,17 +221,15 @@ export async function modeCommand(
 
   await setMode(mode as PermissionMode, settingsPath);
 
-  const modeColors: Record<string, string> = {
-    bypassPermissions: "red",
-    auto: "yellow",
-    acceptEdits: "blue",
-    dontAsk: "magenta",
-    plan: "cyan",
-    default: "gray",
+  const modeColorFns: Record<string, (s: string) => string> = {
+    bypassPermissions: chalk.red,
+    auto: chalk.yellow,
+    acceptEdits: chalk.blue,
+    dontAsk: chalk.magenta,
+    plan: chalk.cyan,
+    default: chalk.gray,
   };
-  const color = modeColors[mode] ?? "white";
-  const colorFn = (chalk as unknown as Record<string, (s: string) => string>)[color];
-  const colored = colorFn ? colorFn(mode) : mode;
+  const colored = (modeColorFns[mode] ?? chalk.white)(mode);
   console.log(`✓ Set defaultMode to ${colored}`);
   console.log(chalk.gray(`  in: ${collapseHome(settingsPath)} [${scope}]`));
   if (mode === "bypassPermissions") {

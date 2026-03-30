@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] - 2026-03-30
+
+### Internal
+- **`manage.ts`: replaced unsafe chalk cast with typed function map**: `modeCommand` was using `(chalk as unknown as Record<string, fn>)[color]` to apply colour by string name. Replaced with a `Record<string, (s: string) => string>` map of chalk function references — the same pattern used in `format.ts` — eliminating the double cast entirely. No behaviour change.
+
 ## [1.3.2] - 2026-03-30
 
 ### Internal

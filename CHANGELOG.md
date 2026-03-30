@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.9] - 2026-03-30
+
+### Improved
+- **`cpm init --mode` parse-time validation**: The `--mode` override option on the `init` command now uses `Option.choices(PermissionModeSchema.options)`, completing the Commander choices coverage across all mode-bearing inputs. Invalid modes like `--mode bogus` fail at parse time with a clear error listing all 6 valid choices.
+- **README: Audit warnings reference**: Added a complete warnings catalogue table documenting all warning severities and triggers, including the `acceptEdits` (MEDIUM) and `additionalDirs` (LOW) warnings added in v1.2.6.
+
 ## [1.2.8] - 2026-03-30
 
 ### Improved

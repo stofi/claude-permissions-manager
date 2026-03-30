@@ -200,7 +200,7 @@ program
   .option("--project <path>", "Project path (default: current directory)")
   .addOption(new Option("--scope <scope>", "Settings scope (default: project)").choices(["local", "project", "user"]).default("project"))
   .addOption(new Option("--preset <preset>", "Starter template (default: safe)").choices(["safe", "node", "strict"]).default("safe"))
-  .option("--mode <mode>", "Override defaultMode")
+  .addOption(new Option("--mode <mode>", "Override defaultMode").choices(PermissionModeSchema.options))
   .option("--yes", "Overwrite existing settings without prompting")
   .option("--dry-run", "Preview what would be created without writing any files")
   .action(async (opts) => {

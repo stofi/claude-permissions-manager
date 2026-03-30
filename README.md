@@ -101,6 +101,40 @@ cpm show ~/my-project   # ✓ works
 cpm show ~              # ✗ won't expand to home directory
 ```
 
+### Audit warnings reference
+
+`cpm audit` (and the TUI warnings tab) surfaces issues at four severity levels:
+
+| Severity | Meaning |
+|----------|---------|
+| `critical` | Immediate security risk — review before continuing |
+| `high` | Significant risk — Claude has broad or unrestricted access |
+| `medium` | Notable configuration — worth reviewing |
+| `low` | Informational — minor concern or best-practice note |
+
+**Warning catalogue:**
+
+| Severity | Trigger |
+|----------|---------|
+| `critical` | `bypassPermissions` mode active — all permission checks disabled |
+| `high` | `dontAsk` mode active — Claude executes actions without asking |
+| `high` | Wildcard `"*"` in allow list — all tools permitted |
+| `high` | `Bash`, `Write`, or `Edit` allowed without a specifier |
+| `high` | `allowManagedPermissionRulesOnly` set in managed settings |
+| `medium` | `acceptEdits` mode active — file edits auto-accepted without prompts |
+| `medium` | `WebFetch` or `WebSearch` allowed without a URL/query specifier |
+| `medium` | Sensitive path in allow rule (`.env`, `.key`, `secrets`, `~/.ssh`, `~/.aws`) |
+| `medium` | MCP server has not been approved or denied (`pending`) |
+| `medium` | `allowManagedHooksOnly` or `allowManagedMcpServersOnly` in managed settings |
+| `medium` | Wildcard `"*"` in deny list — all tools blocked |
+| `low` | `disableBypassPermissionsMode` not set (bypass mode can be activated) |
+| `low` | No deny rules configured when non-read-only tools are allowed |
+| `low` | MCP server has no `command` (stdio) or no `url` (http) configured |
+| `low` | Rule appears in conflicting lists (allow+deny, ask+deny, allow+ask) |
+| `low` | Allow/ask rule overridden by bare-tool deny or wildcard deny |
+| `low` | `additionalDirectories` configured — filesystem access beyond project root |
+| `low` | Wildcard `"*"` in ask list — all tools require approval |
+
 ### JSON output format
 
 All `--json` outputs share these conventions:
@@ -233,7 +267,7 @@ Values from all scopes are merged. Deny rules at any scope win absolutely.
 
 - Never displays environment variable values (only names)
 - Never displays MCP header values (only names)
-- Warns prominently for `bypassPermissions` mode
+- Warns for dangerous modes (`bypassPermissions` → critical, `dontAsk` → high, `acceptEdits` → medium)
 - Atomic file writes (write to temp file, then rename)
 - No network access — fully local
 

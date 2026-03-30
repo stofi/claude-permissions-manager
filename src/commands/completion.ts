@@ -141,7 +141,7 @@ _cpm_completions() {
       return 0
       ;;
     init)
-      COMPREPLY=( \$(compgen -W "--project --scope --preset --mode --yes" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--project --scope --preset --mode --yes --dry-run" -- "\${cur}") )
       return 0
       ;;
   esac
@@ -243,7 +243,8 @@ ${commandDefs}
             '--scope[Settings scope]:scope:(${scopeList})' \\
             '--preset[Template preset]:preset:(${presetList})' \\
             '--mode[Default mode]:mode:(${modeList})' \\
-            '--yes[Overwrite without prompting]'
+            '--yes[Overwrite without prompting]' \\
+            '--dry-run[Preview without writing]'
           ;;
         list)
           _arguments \\

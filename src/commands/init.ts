@@ -17,6 +17,7 @@ interface InitOptions {
   mode?: string;
   preset?: string;
   yes?: boolean;
+  dryRun?: boolean;
 }
 
 const PRESETS: Record<string, {
@@ -135,13 +136,37 @@ export async function initCommand(opts: InitOptions): Promise<void> {
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
   }
 
-  if (exists && !opts.yes) {
+  if (exists && !opts.yes && !opts.dryRun) {
     console.log(chalk.yellow(`Settings file already exists: ${collapseHome(settingsPath)}`));
     console.log(chalk.gray("Use --yes to overwrite, or choose a different --scope."));
     process.exit(1);
   }
 
   const mode = (opts.mode as PermissionMode | undefined) ?? template.mode;
+
+  if (opts.dryRun) {
+    console.log(chalk.cyan("[dry-run] No files will be modified"));
+    console.log(
+      chalk.bold(`Would initialize settings [${scope}] for: ${collapseHome(projectPath)}`)
+    );
+    console.log(chalk.gray(`Preset: ${preset} — ${template.description}`));
+    console.log(
+      chalk.gray(
+        `File:   ${collapseHome(settingsPath)} (${exists ? (opts.yes ? "would overwrite" : "already exists") : "would create"})\n`
+      )
+    );
+    console.log(chalk.gray(`  mode: ${mode}`));
+    for (const rule of template.allow) {
+      console.log(chalk.green(`  + allow: ${rule}`));
+    }
+    for (const rule of template.deny) {
+      console.log(chalk.red(`  - deny:  ${rule}`));
+    }
+    for (const rule of template.ask) {
+      console.log(chalk.yellow(`  ? ask:   ${rule}`));
+    }
+    return;
+  }
 
   console.log(
     chalk.bold(`Initializing settings [${scope}] for: ${collapseHome(projectPath)}`)

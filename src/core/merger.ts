@@ -167,6 +167,28 @@ function detectWarnings(
     }
   }
 
+  // Warn about wildcard deny (blocks all tools)
+  for (const rule of permissions.deny) {
+    if (rule.raw === "*") {
+      warnings.push({
+        severity: "medium",
+        message: 'Wildcard "*" in deny list — all tools are blocked regardless of allow rules',
+        rule: rule.raw,
+      });
+    }
+  }
+
+  // Warn about wildcard ask (requires prompt for every tool)
+  for (const rule of permissions.ask) {
+    if (rule.raw === "*") {
+      warnings.push({
+        severity: "low",
+        message: 'Wildcard "*" in ask list — all tools require explicit approval before use',
+        rule: rule.raw,
+      });
+    }
+  }
+
   // Warn about rules that appear in both allow and deny (deny wins, allow is ineffective)
   const denySet = new Set(permissions.deny.map((r) => r.raw));
   for (const rule of permissions.allow) {

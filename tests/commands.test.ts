@@ -121,6 +121,45 @@ describe("initCommand", () => {
     await expect(initCommand({ project: tmpDir, mode: "invalid-mode" })).rejects.toThrow("exit:1");
     exitSpy.mockRestore();
   });
+
+  it("--dry-run does not create any files", async () => {
+    const { existsSync } = await import("fs");
+    const settingsFile = join(tmpDir, ".claude", "settings.json");
+    await initCommand({ project: tmpDir, preset: "node", scope: "project", dryRun: true });
+    expect(existsSync(settingsFile)).toBe(false);
+  });
+
+  it("--dry-run shows [dry-run] prefix and would-create path", async () => {
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { logs.push(args.join(" ")); });
+    await initCommand({ project: tmpDir, preset: "safe", scope: "project", dryRun: true });
+    const combined = logs.join("\n");
+    expect(combined).toMatch(/\[dry-run\]/i);
+    expect(combined).toMatch(/would create|would initialize|would/i);
+  });
+
+  it("--dry-run with existing file shows 'already exists' message", async () => {
+    // Create the settings file first
+    await initCommand({ project: tmpDir, preset: "safe", scope: "project" });
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { logs.push(args.join(" ")); });
+    await initCommand({ project: tmpDir, preset: "node", scope: "project", dryRun: true });
+    const combined = logs.join("\n");
+    expect(combined).toMatch(/already exists/i);
+  });
+
+  it("--dry-run with --yes and existing file shows 'would overwrite' message", async () => {
+    await initCommand({ project: tmpDir, preset: "safe", scope: "project" });
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { logs.push(args.join(" ")); });
+    await initCommand({ project: tmpDir, preset: "node", scope: "project", dryRun: true, yes: true });
+    const combined = logs.join("\n");
+    expect(combined).toMatch(/would overwrite/i);
+    // File should NOT have been changed
+    const content = JSON.parse(await import("fs/promises").then(m => m.readFile(join(tmpDir, ".claude", "settings.json"), "utf-8")));
+    // Original "safe" preset sets mode: default; "node" preset would set acceptEdits — verify unchanged
+    expect(content.permissions?.defaultMode ?? "default").toBe("default");
+  });
 });
 
 // ────────────────────────────────────────────────────────────

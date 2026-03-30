@@ -53,6 +53,13 @@ function detectWarnings(
     });
   }
 
+  if (permissions.defaultMode === "acceptEdits") {
+    warnings.push({
+      severity: "medium",
+      message: "acceptEdits mode is active — file edits are accepted without confirmation prompts",
+    });
+  }
+
   // Only warn about missing bypass lock-out when:
   // - bypass is NOT already active (redundant if it already is)
   // - project has explicit allow/deny rules (intentional permission config)
@@ -263,6 +270,15 @@ function detectWarnings(
         rule: rule.raw,
       });
     }
+  }
+
+  // Warn when additionalDirs expand filesystem access beyond project root
+  if (permissions.additionalDirs.length > 0) {
+    const n = permissions.additionalDirs.length;
+    warnings.push({
+      severity: "low",
+      message: `${n} additional director${n === 1 ? "y" : "ies"} configured — Claude has filesystem access beyond the project root`,
+    });
   }
 
   // Warn about managed-settings-only restriction flags

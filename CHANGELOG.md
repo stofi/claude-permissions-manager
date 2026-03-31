@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.16] - 2026-03-31
+
+### Tests
+- **diffCommand text: ENV VARS section**: Added test verifying `diff.ts:232` `printStringsDiff("ENV VARS")` produces output when projects differ in `envVarNames` (project-a has `NODE_ENV`, project-b has none). Previously the section was executed but never asserted.
+- **diffCommand text: ADDITIONAL DIRS section**: Added test with two temp projects where one has `additionalDirectories`, verifying `diff.ts:233` `printStringsDiff("ADDITIONAL DIRS")` non-return path. No fixture has `additionalDirs` so this branch was completely untested.
+- **diffCommand error: exits 1 when path has no .claude directory**: Added test verifying `diff.ts:28-30` `!proj1` → `process.exit(1)` error path. Previously no test covered the diff error case.
+
 ## [1.4.15] - 2026-03-31
 
 ### Tests

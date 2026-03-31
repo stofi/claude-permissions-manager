@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.15] - 2026-03-31
+
+### Tests
+- **denyCommand alreadyPresent message**: Added test that calls `denyCommand` twice with the same rule, verifying `manage.ts:116-119` emits "already in deny list" and the rule appears only once in the file.
+- **askCommand alreadyPresent message**: Added test that calls `askCommand` twice with the same rule, verifying `manage.ts:150-153` emits "already in ask list" and the rule appears only once in the file.
+- **resetRuleCommand success text**: Added test verifying `manage.ts:191-195` emits `✓ Removed "<rule>" from: allow` after a successful rule removal.
+
 ## [1.4.14] - 2026-03-31
 
 ### Tests

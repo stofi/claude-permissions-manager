@@ -515,6 +515,18 @@ describe("denyCommand", () => {
     const calls = logSpy.mock.calls.map((c) => String(c[0]));
     expect(calls.some((m) => /also exists in ask/i.test(m))).toBe(true);
   });
+
+  it("shows alreadyPresent message when rule is already in deny list", async () => {
+    // manage.ts:116-119: `Rule "X" is already in deny list`
+    await denyCommand("Bash(sudo *)", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await denyCommand("Bash(sudo *)", { project: tmpDir, scope: "project" });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /already in deny/i.test(m))).toBe(true);
+    // File must still have exactly one entry
+    const data = await readSettings();
+    expect(data.permissions.deny.filter((r: string) => r === "Bash(sudo *)")).toHaveLength(1);
+  });
 });
 
 describe("askCommand", () => {
@@ -538,6 +550,17 @@ describe("askCommand", () => {
     await askCommand("Bash(git push *)", { project: tmpDir, scope: "project" });
     const calls = logSpy.mock.calls.map((c) => String(c[0]));
     expect(calls.some((m) => /also in allow/i.test(m))).toBe(true);
+  });
+
+  it("shows alreadyPresent message when rule is already in ask list", async () => {
+    // manage.ts:150-153: `Rule "X" is already in ask list`
+    await askCommand("Bash(git push *)", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await askCommand("Bash(git push *)", { project: tmpDir, scope: "project" });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /already in ask/i.test(m))).toBe(true);
+    const data = await readSettings();
+    expect(data.permissions.ask.filter((r: string) => r === "Bash(git push *)")).toHaveLength(1);
   });
 });
 
@@ -580,6 +603,16 @@ describe("resetRuleCommand", () => {
     expect(data.permissions.allow).toContain("Glob");
     const calls = logSpy.mock.calls.map((c) => String(c[0]));
     expect(calls.some((m) => /not found/i.test(m))).toBe(true);
+  });
+
+  it("shows success message with rule and list name when rule is removed", async () => {
+    // manage.ts:191-195: `✓ Removed "${rule}" from: ${result.removedFrom.join(", ")}`
+    await allowCommand("Read", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await resetRuleCommand("Read", { project: tmpDir, scope: "project" });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /Removed.*Read.*from/i.test(m))).toBe(true);
+    expect(calls.some((m) => /allow/i.test(m))).toBe(true);
   });
 });
 

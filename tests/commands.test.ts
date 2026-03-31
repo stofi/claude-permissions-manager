@@ -1334,6 +1334,47 @@ describe("diffCommand — text output", () => {
     }
   });
 
+  it("shows mode arrow when modes differ between projects", async () => {
+    const calls: string[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+
+    // project-bypass has bypassPermissions; project-b has default → different modes
+    await diffCommand(
+      join(FIXTURES, "project-bypass"),
+      join(FIXTURES, "project-b"),
+      { includeGlobal: false }
+    );
+
+    const output = calls.map((a) => a.join("")).join("\n");
+    // Mode line should show arrow (→) — contains both mode names, not "(same)"
+    expect(output).toMatch(/Mode:/);
+    expect(output).toContain("bypassPermissions");
+    expect(output).toContain("default");
+    // The mode line specifically should not say "(same)" — use line-level check
+    const modeLine = output.split("\n").find((l) => l.includes("Mode:"));
+    expect(modeLine).toBeDefined();
+    expect(modeLine).not.toMatch(/\(same\)/);
+  });
+
+  it("shows bypass lock arrow when isBypassDisabled differs between projects", async () => {
+    const calls: string[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+
+    // project-bypass-locked has isBypassDisabled=true; project-b has false
+    await diffCommand(
+      join(FIXTURES, "project-bypass-locked"),
+      join(FIXTURES, "project-b"),
+      { includeGlobal: false }
+    );
+
+    const output = calls.map((a) => a.join("")).join("\n");
+    // Bypass lock line should show the arrow transition
+    expect(output).toMatch(/Bypass lock:/);
+    expect(output).toContain("locked");
+    expect(output).toContain("not locked");
+    expect(output).not.toMatch(/Bypass lock:.*\(same\)/);
+  });
+
   it("shows env and headers change lines for modified MCP server", async () => {
     const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-env-a-"));
     const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-env-b-"));

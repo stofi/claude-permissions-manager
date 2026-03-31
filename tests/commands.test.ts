@@ -1439,6 +1439,10 @@ describe("auditCommand — text output", () => {
     expect(output).toMatch(/bypassPermissions/);
     // Project path segment appears in output
     expect(output).toContain("project-bypass");
+    // project-bypass has allow:["Bash"] — bare Bash triggers HIGH warning with rule="Bash"
+    // audit.ts line 74: `if (issue.rule) console.log(`    Rule: ${issue.rule}`)`
+    expect(output).toMatch(/Rule:/i);
+    expect(output).toContain("Bash");
   });
 
   it("prints 'No issues found' banner for a clean project", async () => {

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
-import { parseSettingsFile, parseMcpFile, parseClaudeJson } from "../src/core/parser.js";
+import { parseSettingsFile, parseMcpFile, parseClaudeJson, parseClaudeMdFile } from "../src/core/parser.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const FIXTURES = join(__dirname, "fixtures");
@@ -300,5 +300,40 @@ describe("parseClaudeJson", () => {
     const result = await parseClaudeJson(claudeJsonPath);
     expect(result.globalServers).toHaveLength(0);
     expect(result.projectServers.size).toBe(1);
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// parseClaudeMdFile
+// ────────────────────────────────────────────────────────────
+
+describe("parseClaudeMdFile", () => {
+  let mdTmpDir: string;
+
+  beforeEach(() => {
+    mdTmpDir = mkdtempSync(join(tmpdir(), "cpm-parser-md-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(mdTmpDir, { recursive: true, force: true });
+  });
+
+  it("returns exists=true with lineCount when file exists", async () => {
+    const filePath = join(mdTmpDir, "CLAUDE.md");
+    writeFileSync(filePath, "# Title\nLine two\nLine three");
+    const result = await parseClaudeMdFile(filePath, "project");
+    expect(result.exists).toBe(true);
+    expect(result.scope).toBe("project");
+    expect(result.path).toBe(filePath);
+    expect(result.lineCount).toBe(3);
+  });
+
+  it("returns exists=false when file does not exist", async () => {
+    const filePath = join(mdTmpDir, "MISSING.md");
+    const result = await parseClaudeMdFile(filePath, "local");
+    expect(result.exists).toBe(false);
+    expect(result.scope).toBe("local");
+    expect(result.path).toBe(filePath);
+    expect(result.lineCount).toBeUndefined();
   });
 });

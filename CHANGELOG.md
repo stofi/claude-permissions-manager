@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.23] - 2026-03-31
+
+### Tests
+- **merger sensitive path variants**: Added 4 tests for `merger.ts:126-129` — the `.key`, `secrets`, `~/.ssh`, and `~/.aws` branches of the sensitive-path-in-allow-rule warning. Only the `/.env` pattern was previously verified; each `includes()` arm is now individually confirmed to trigger the medium-severity warning.
+- **writer conflictsWith precedence (ask + allow + deny)**: Added test for `writer.ts:113-114` — when adding a rule to the "ask" list and the rule is already in **both** "allow" and "deny", `conflictsWith` returns `"allow"` (the first match in `["allow","deny"]` since `Array.prototype.find` returns the first hit). Prior tests only covered the case where the rule was in exactly one of the opposing lists.
+
 ## [1.4.22] - 2026-03-31
 
 ### Tests

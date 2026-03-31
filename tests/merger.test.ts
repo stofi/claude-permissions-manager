@@ -319,6 +319,54 @@ describe("mergeSettingsFiles — warning detection", () => {
     expect(med).toBeDefined();
   });
 
+  it("emits medium warning for .key sensitive path in allow", () => {
+    // merger.ts:126: rule.specifier.includes(".key") — not covered by the /.env test above
+    const f = makeFile("project", {
+      permissions: { allow: ["Read(~/.config/secrets.key)"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const med = result.warnings.find(
+      (w) => w.severity === "medium" && w.rule === "Read(~/.config/secrets.key)"
+    );
+    expect(med).toBeDefined();
+  });
+
+  it("emits medium warning for 'secrets' sensitive path in allow", () => {
+    // merger.ts:127: rule.specifier.includes("secrets")
+    const f = makeFile("project", {
+      permissions: { allow: ["Write(/opt/app/secrets/token)"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const med = result.warnings.find(
+      (w) => w.severity === "medium" && w.rule === "Write(/opt/app/secrets/token)"
+    );
+    expect(med).toBeDefined();
+  });
+
+  it("emits medium warning for ~/.ssh sensitive path in allow", () => {
+    // merger.ts:128: rule.specifier.includes("~/.ssh")
+    const f = makeFile("project", {
+      permissions: { allow: ["Read(~/.ssh/id_rsa)"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const med = result.warnings.find(
+      (w) => w.severity === "medium" && w.rule === "Read(~/.ssh/id_rsa)"
+    );
+    expect(med).toBeDefined();
+  });
+
+  it("emits medium warning for ~/.aws sensitive path in allow", () => {
+    // merger.ts:129: rule.specifier.includes("~/.aws")
+    const f = makeFile("project", {
+      permissions: { allow: ["Read(~/.aws/credentials)"] },
+    });
+    const result = mergeSettingsFiles([f]);
+    const med = result.warnings.find(
+      (w) => w.severity === "medium" && w.rule === "Read(~/.aws/credentials)"
+    );
+    expect(med).toBeDefined();
+  });
+
   it("emits low warning for missing deny when Bash is allowed", () => {
     const f = makeFile("project", {
       permissions: { allow: ["Bash(npm run *)"] },

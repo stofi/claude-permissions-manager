@@ -210,5 +210,8 @@ export async function initCommand(opts: InitOptions): Promise<void> {
   if (mode === "bypassPermissions") {
     console.log(chalk.red.bold("\n⚠ WARNING: bypassPermissions disables ALL permission checks."));
     console.log(chalk.red("  Claude can now read, write, and execute anything without asking."));
+    if (scope === "user") {
+      console.log(chalk.red.bold("  ⚠ This is set at user scope — it applies to ALL Claude Code projects on this machine."));
+    }
   }
 }

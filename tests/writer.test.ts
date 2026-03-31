@@ -110,6 +110,13 @@ describe("resolveSettingsPath", () => {
     expect(p).toBe("/my/project/.claude/settings.local.json");
   });
 
+  it("returns user settings path for scope=user", () => {
+    const p = resolveSettingsPath("user");
+    // Should be an absolute path ending in .claude/settings.json
+    expect(p).toMatch(/\.claude[/\\]settings\.json$/);
+    expect(p.startsWith("/")).toBe(true);
+  });
+
   it("throws for managed scope", () => {
     expect(() => resolveSettingsPath("managed")).toThrow(/managed/i);
   });
@@ -262,6 +269,28 @@ describe("addRule", () => {
     const result = await addRule("Bash(git push *)", "ask", path);
     expect(result.added).toBe(true);
     expect(result.conflictsWith).toBe("allow");
+  });
+
+  it("dryRun=true returns added=true without writing the file", async () => {
+    const path = settingsPath();
+    const result = await addRule("Read", "allow", path, { dryRun: true });
+    expect(result.added).toBe(true);
+    expect(result.alreadyPresent).toBe(false);
+    // File must NOT have been created — nothing was written
+    const { stat } = await import("fs/promises");
+    await expect(stat(path)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("dryRun=true reports conflictsWith without writing the new rule", async () => {
+    const path = settingsPath();
+    await addRule("Read", "deny", path);
+    const result = await addRule("Read", "allow", path, { dryRun: true });
+    expect(result.added).toBe(true);
+    expect(result.conflictsWith).toBe("deny");
+    // File must NOT contain the allow rule — only the deny rule was written
+    const data = await readSettings();
+    expect(data.permissions.allow ?? []).toHaveLength(0);
+    expect(data.permissions.deny).toContain("Read");
   });
 });
 

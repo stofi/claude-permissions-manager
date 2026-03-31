@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.6] - 2026-03-31
+
+### Tests
+- **writer.test.ts: addRule dryRun unit tests**: Added two missing unit tests for `addRule` with `dryRun: true` — verifies the option returns `added: true` without writing the file, and correctly reports `conflictsWith` without persisting the new rule. The `removeRule` function already had analogous dryRun tests.
+- **writer.test.ts: resolveSettingsPath user-scope test**: Added missing test for `resolveSettingsPath("user")` — verifies it returns an absolute path ending in `.claude/settings.json`.
+
 ## [1.4.5] - 2026-03-31
 
 ### Fixed

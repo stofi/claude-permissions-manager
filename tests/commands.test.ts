@@ -985,6 +985,25 @@ describe("showCommand — JSON", () => {
 });
 
 // ────────────────────────────────────────────────────────────
+// showCommand — text output
+// ────────────────────────────────────────────────────────────
+
+describe("showCommand — text output", () => {
+  it("outputs project path and known rules from fixture", async () => {
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await showCommand(join(FIXTURES, "project-a"), { json: false });
+    const output = calls.join("\n");
+    // Project path should appear somewhere in output
+    expect(output).toContain("project-a");
+    // Known allow rule from project-a fixture
+    expect(output).toContain("Bash(npm run *)");
+    // Known deny rule from project-a fixture
+    expect(output).toContain("Read(**/.env)");
+  });
+});
+
+// ────────────────────────────────────────────────────────────
 // diffCommand — JSON format
 // ────────────────────────────────────────────────────────────
 
@@ -1352,6 +1371,50 @@ describe("auditCommand", () => {
       // Should complete without calling process.exit
     } finally {
       rmSync(emptyDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// auditCommand — text output
+// ────────────────────────────────────────────────────────────
+
+describe("auditCommand — text output", () => {
+  it("groups issues by severity and shows project path and message", async () => {
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    // project-bypass fixture has CRITICAL bypassPermissions mode
+    await auditCommand({ root: join(FIXTURES, "project-bypass"), maxDepth: 1, includeGlobal: false });
+    const output = calls.join("\n");
+    // Severity group header
+    expect(output).toMatch(/CRITICAL/i);
+    // Warning message content
+    expect(output).toMatch(/bypassPermissions/);
+    // Project path segment appears in output
+    expect(output).toContain("project-bypass");
+  });
+
+  it("prints 'No issues found' banner for a clean project", async () => {
+    const cleanDir = mkdtempSync(join(tmpdir(), "cpm-audit-text-clean-"));
+    const claudeDir = join(cleanDir, "proj", ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    await import("fs/promises").then((fs) =>
+      fs.writeFile(join(claudeDir, "settings.json"), JSON.stringify({
+        permissions: {
+          allow: ["Bash(npm run *)"],
+          deny: ["Read(**/.env)"],
+          disableBypassPermissionsMode: "disable",
+        },
+      }))
+    );
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await auditCommand({ root: cleanDir, maxDepth: 2, includeGlobal: false });
+      const output = calls.join("\n");
+      expect(output).toMatch(/No issues found/i);
+    } finally {
+      rmSync(cleanDir, { recursive: true, force: true });
     }
   });
 });

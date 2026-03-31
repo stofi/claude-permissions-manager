@@ -143,6 +143,21 @@ describe("parseMcpFile", () => {
       expect(server.approvalState).toBe("pending");
     }
   });
+
+  it("returns parsed=false and empty servers for invalid JSON .mcp.json", async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "cpm-mcp-invalid-"));
+    writeFileSync(join(tmpDir, ".mcp.json"), "{ not valid json {{");
+    try {
+      const mcp = await parseMcpFile(tmpDir, "project");
+      expect(mcp.exists).toBe(true);
+      expect(mcp.parsed).toBe(false);
+      expect(mcp.parseError).toBeDefined();
+      expect(mcp.parseError).toMatch(/JSON/i);
+      expect(mcp.servers).toHaveLength(0);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ────────────────────────────────────────────────────────────

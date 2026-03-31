@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.7] - 2026-03-31
+
+### Tests
+- **auditCommand text output**: Added two missing tests for the non-JSON path: one verifies severity group headers and project paths appear when issues exist (using the `project-bypass` CRITICAL fixture), one verifies the "✓ No issues found" banner for a clean project. All 5 previous auditCommand tests used `json: true`.
+- **showCommand text output**: Added one test verifying the text output contains the project path and known rules (`Bash(npm run *)`, `Read(**/.env)`) from the project-a fixture. All previous showCommand tests used `json: true`.
+- **parseMcpFile invalid JSON**: Added test for the JSON parse error path (parser.ts:121-129): creates a temp `.mcp.json` with invalid JSON, verifies `exists: true`, `parsed: false`, `parseError` contains "JSON", and `servers: []`. Analogous to the existing `parseSettingsFile` invalid JSON test.
+
 ## [1.4.6] - 2026-03-31
 
 ### Tests

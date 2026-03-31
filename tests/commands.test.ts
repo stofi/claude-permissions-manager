@@ -173,6 +173,17 @@ describe("initCommand", () => {
     // Original "safe" preset sets mode: default; "node" preset would set acceptEdits — verify unchanged
     expect(content.permissions?.defaultMode ?? "default").toBe("default");
   });
+
+  it("prints bypassPermissions warning when mode=bypassPermissions", async () => {
+    // init.ts:210-212: `if (mode === "bypassPermissions") { ... }` block
+    // Never reached in other tests — all use default/plan/acceptEdits modes
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { logs.push(args.join(" ")); });
+    await initCommand({ project: tmpDir, scope: "project", mode: "bypassPermissions" });
+    const combined = logs.join("\n");
+    expect(combined).toMatch(/WARNING/i);
+    expect(combined).toMatch(/bypassPermissions/i);
+  });
 });
 
 // ────────────────────────────────────────────────────────────
@@ -1595,6 +1606,19 @@ describe("auditCommand", () => {
     const json = JSON.parse(calls.map((a) => a.join("")).join(""));
     // project-bypass has bypassPermissions mode — should produce at least one warning
     expect(json.issueCount).toBeGreaterThan(0);
+  });
+
+  it("--json + --exit-code exits 2 when critical issues found in JSON mode", async () => {
+    // audit.ts:44: exitWithCode() is called in the json branch too, but all existing exitCode
+    // tests use json:false. This covers the json:true + exitCode:true + critical path.
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit:2"); });
+    // project-bypass has bypassPermissions mode → CRITICAL warning → exit 2
+    await expect(
+      auditCommand({ root: join(FIXTURES, "project-bypass"), maxDepth: 1, json: true, exitCode: true })
+    ).rejects.toThrow("exit:2");
+    expect(exitSpy).toHaveBeenCalledWith(2);
+    exitSpy.mockRestore();
   });
 
   it("--exit-code exits 2 when critical issues found", async () => {

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.13] - 2026-03-31
+
+### Tests
+- **exportCommand invalid format**: Added test for `export.ts:90-93` — calling exportCommand with `format: "yaml"` exits 1 with `process.exit(1)`. Previously no test covered the unknown-format guard.
+- **initCommand file-already-exists exit**: Added test for `init.ts:139-143` — when settings file already exists and neither `--yes` nor `--dry-run` is given, command exits 1 with "Settings file already exists" message.
+- **auditCommand "No issues found" with scan errors**: Added test for `audit.ts:50-55` — when all projects are clean but the scan produced errors (broken symlink), the "No issues found" path still shows the scan errors section.
+- **auditCommand issues + scan errors**: Added test for `audit.ts:79-84` — when issues exist AND scan errors are present, the errors section at the bottom of text output is shown.
+
 ## [1.4.12] - 2026-03-31
 
 ### Tests

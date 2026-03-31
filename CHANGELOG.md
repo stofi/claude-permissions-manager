@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.22] - 2026-03-31
+
+### Tests
+- **discovery SKIP_DIR_NAMES**: Added test verifying `discovery.ts:61` `if (SKIP_DIR_NAMES.has(entry.name)) continue` — the branch that skips directories like `node_modules`, `.git`, etc. Creates `root/node_modules/my-pkg/.claude/settings.json` and verifies `scan()` finds zero projects (no previous test exercised this skip logic).
+- **discovery symlink→file**: Added test verifying `discovery.ts:71` `if (!st.isDirectory()) continue` — the branch that silently skips symlinks that resolve to a regular file rather than a directory. Creates `root/file-link → root/regular.txt` and verifies `scan()` finds zero projects and records zero errors.
+
 ## [1.4.21] - 2026-03-31
 
 ### Tests

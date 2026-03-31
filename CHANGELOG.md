@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.11] - 2026-03-31
+
+### Tests
+- **discovery: broken symlink scan error**: Added test verifying that a broken symlink (target does not exist) encountered during directory traversal is recorded in `result.errors` with message matching `"Broken symlink"` (discovery.ts:76-82). Previously zero coverage of this error path.
+- **listCommand text: scan errors display**: Added test verifying that `list.ts:71-76` ("N error(s) during scan:" section) is shown when the scan produces errors. Sets up a project with a broken symlink alongside it (so list doesn't short-circuit on "no projects found") and verifies both the "error(s) during scan" message and the bad-link path appear in output.
+
 ## [1.4.10] - 2026-03-31
 
 ### Tests

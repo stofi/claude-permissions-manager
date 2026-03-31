@@ -271,6 +271,17 @@ describe("addRule", () => {
     expect(result.conflictsWith).toBe("allow");
   });
 
+  it("reports conflictsWith=allow (first match) when ask rule is in both allow and deny", async () => {
+    // writer.ts:113-114: opposingLists = ["allow","deny"] when adding to "ask"
+    // .find() returns the first match — allow is checked before deny
+    const path = settingsPath();
+    await addRule("Bash(git push *)", "allow", path);
+    await addRule("Bash(git push *)", "deny", path);
+    const result = await addRule("Bash(git push *)", "ask", path);
+    expect(result.added).toBe(true);
+    expect(result.conflictsWith).toBe("allow");
+  });
+
   it("dryRun=true returns added=true without writing the file", async () => {
     const path = settingsPath();
     const result = await addRule("Read", "allow", path, { dryRun: true });

@@ -22,6 +22,7 @@ import {
 } from "../src/commands/manage.js";
 import { formatEffectivePermissions } from "../src/utils/format.js";
 import type { ClaudeProject } from "../src/core/types.js";
+import { completionCommand } from "../src/commands/completion.js";
 
 // ────────────────────────────────────────────────────────────
 // Helpers
@@ -1921,5 +1922,41 @@ describe("formatEffectivePermissions — MCP approval state display", () => {
     // Must NOT contain "approved" or "pending" for this server
     expect(output).not.toContain("approved");
     expect(output).not.toContain("pending");
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// completionCommand
+// ────────────────────────────────────────────────────────────
+
+describe("completionCommand", () => {
+  it("outputs bash completion script when shell=bash", async () => {
+    // completion.ts:293-294: shell === "bash" → console.log(bashScript()) — never tested
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await completionCommand("bash");
+    const output = lines.join("\n");
+    // Bash completion uses _cpm_completions function and complete builtin
+    expect(output).toContain("_cpm_completions");
+    expect(output).toContain("complete -F _cpm_completions cpm");
+  });
+
+  it("outputs zsh completion script when shell=zsh", async () => {
+    // completion.ts:295-296: shell === "zsh" → console.log(zshScript()) — never tested
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await completionCommand("zsh");
+    const output = lines.join("\n");
+    // Zsh completion starts with #compdef directive
+    expect(output).toContain("#compdef cpm");
+    expect(output).toContain("_cpm");
+  });
+
+  it("exits 1 for unknown shell", async () => {
+    // completion.ts:297-299: else → console.error + process.exit(1) — never tested
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    await expect(completionCommand("fish")).rejects.toThrow("exit:1");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
   });
 });

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.20] - 2026-03-31
+
+### Tests
+- **completionCommand bash**: Added test verifying `completion.ts:293-294` `shell === "bash"` branch — outputs a bash completion script containing `_cpm_completions` function and `complete -F _cpm_completions cpm`. The entire `completionCommand` function had zero test coverage.
+- **completionCommand zsh**: Added test verifying `completion.ts:295-296` `shell === "zsh"` branch — outputs a zsh completion script containing `#compdef cpm` and `_cpm` function.
+- **completionCommand unknown shell**: Added test verifying `completion.ts:297-299` else branch — exits 1 for an unrecognized shell name (e.g. "fish").
+
 ## [1.4.19] - 2026-03-31
 
 ### Tests

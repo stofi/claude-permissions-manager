@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { join } from "path";
 import { existsSync } from "fs";
-import { mkdtemp, symlink, rm } from "fs/promises";
+import { mkdtemp, mkdir, writeFile, symlink, rm } from "fs/promises";
 import { tmpdir, homedir } from "os";
 import { fileURLToPath } from "url";
 import { scan } from "../src/core/discovery.js";
@@ -186,6 +186,38 @@ describe("scan — fixture directory", () => {
       const result = await scan({ root, maxDepth: 4, includeGlobal: false });
       expect(result.errors).toHaveLength(0);
       expect(result.projects).toHaveLength(0);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("skips directories whose name is in SKIP_DIR_NAMES (e.g. node_modules)", async () => {
+    // discovery.ts:61: if (SKIP_DIR_NAMES.has(entry.name)) continue;
+    // A .claude dir nested inside node_modules should never be discovered.
+    const root = await mkdtemp(join(tmpdir(), "cpm-skip-nm-"));
+    try {
+      await mkdir(join(root, "node_modules", "my-pkg", ".claude"), { recursive: true });
+      await writeFile(
+        join(root, "node_modules", "my-pkg", ".claude", "settings.json"),
+        JSON.stringify({ permissions: {} })
+      );
+      const result = await scan({ root, maxDepth: 4, includeGlobal: false });
+      expect(result.projects).toHaveLength(0);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("skips symlinks that resolve to a regular file (not a directory)", async () => {
+    // discovery.ts:71: if (!st.isDirectory()) continue; — after resolving symlink
+    // A symlink pointing to a plain file is silently skipped (no error recorded).
+    const root = await mkdtemp(join(tmpdir(), "cpm-sym-file-"));
+    try {
+      await writeFile(join(root, "regular.txt"), "hello");
+      await symlink(join(root, "regular.txt"), join(root, "file-link"));
+      const result = await scan({ root, maxDepth: 1, includeGlobal: false });
+      expect(result.projects).toHaveLength(0);
+      expect(result.errors).toHaveLength(0);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

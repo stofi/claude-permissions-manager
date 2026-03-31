@@ -1140,6 +1140,20 @@ describe("showCommand — text output", () => {
     expect(output).toMatch(/Warning/i);
   });
 
+  it("shows cmd, url, and headers detail lines for MCP servers", async () => {
+    // format.ts:144-148: if (s.command) → renders `cmd: <command> [args]`
+    // format.ts:150-152: if (s.url)     → renders `url: <url>`
+    // format.ts:156-158: if (s.headerNames && ...) → renders `headers: <name,...>`
+    // project-a has github (command+args+env) and filesystem (http, url, headers) servers
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await showCommand(join(FIXTURES, "project-a"), { json: false, includeGlobal: false });
+    const output = calls.join("\n");
+    expect(output).toContain("cmd: npx");                         // github server command
+    expect(output).toContain("url: https://mcp.example.com/fs"); // filesystem server url
+    expect(output).toContain("headers: Authorization");           // filesystem server headers
+  });
+
   it("shows [bypass locked] in mode line when isBypassDisabled=true", async () => {
     const calls: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });

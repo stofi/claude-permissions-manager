@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.26] - 2026-04-01
+
+### Tests
+- **format CRITICAL/HIGH severity in formatWarning**: Added `showCommand(project-bypass)` text output test asserting `[CRITICAL]` and `[HIGH]` prefixes appear. `format.ts:37` — `formatWarning()` is only invoked from `formatEffectivePermissions()` (show text output); all prior show tests used `project-a` which only generates MEDIUM/LOW warnings. `SEVERITY_COLORS["critical"]` (`chalk.red.bold`) and `["high"]` (`chalk.red`) were never exercised.
+- **format truncatePath "…" character**: Added assertion to the existing `listCommand(FIXTURES)` test verifying the "…" ellipsis prefix appears in output. `format.ts:42-43` — FIXTURES project paths exceed 40 characters, so `truncatePath` triggers the truncation branch; the "…" character was never explicitly asserted.
+
 ## [1.4.25] - 2026-04-01
 
 ### Tests

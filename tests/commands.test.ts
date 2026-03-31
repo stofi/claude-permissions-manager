@@ -932,6 +932,8 @@ describe("listCommand — text output", () => {
     const output = calls.join("\n");
     // project-bypass-locked has disableBypassPermissionsMode set — should show [locked]
     expect(output).toMatch(/\[locked\]/);
+    // format.ts:41-43: truncatePath — FIXTURES paths exceed 40 chars → truncated with "…"
+    expect(output).toContain("…");
   });
 
   it("does not show [locked] for projects without isBypassDisabled", async () => {
@@ -1200,6 +1202,19 @@ describe("showCommand — text output", () => {
     } finally {
       rmSync(testDir, { recursive: true, force: true });
     }
+  });
+
+  it("shows CRITICAL and HIGH severity warnings via formatWarning", async () => {
+    // format.ts:24-28: SEVERITY_COLORS["critical"] = chalk.red.bold, ["high"] = chalk.red
+    // format.ts:37: formatWarning() is only called in formatEffectivePermissions (show text output)
+    // Existing show tests use project-a (MEDIUM/LOW only) — never CRITICAL or HIGH.
+    // project-bypass: defaultMode=bypassPermissions → CRITICAL, allow:["Bash"] → HIGH
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await showCommand(join(FIXTURES, "project-bypass"), { json: false, includeGlobal: false });
+    const output = calls.join("\n");
+    expect(output).toMatch(/\[CRITICAL\]/);
+    expect(output).toMatch(/\[HIGH\]/);
   });
 
   it("shows ADDITIONAL DIRS section when project has additionalDirectories", async () => {

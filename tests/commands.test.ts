@@ -450,6 +450,14 @@ describe("allowCommand", () => {
     expect(calls.some((m) => /deny takes precedence/i.test(m))).toBe(true);
   });
 
+  it("warns on conflict when rule also exists in ask list", async () => {
+    await askCommand("Bash(git push *)", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await allowCommand("Bash(git push *)", { project: tmpDir, scope: "project" });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /also in ask/i.test(m))).toBe(true);
+  });
+
   it("rejects invalid rule and exits", async () => {
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
     await expect(allowCommand("", { project: tmpDir, scope: "project" })).rejects.toThrow();
@@ -1022,6 +1030,23 @@ describe("showCommand — text output", () => {
     expect(output).toContain("Bash(npm run *)");
     // Known deny rule from project-a fixture
     expect(output).toContain("Read(**/.env)");
+  });
+
+  it("shows ask rules, MCP servers, env vars and warnings sections", async () => {
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await showCommand(join(FIXTURES, "project-a"), { json: false, includeGlobal: false });
+    const output = calls.join("\n");
+    // ASK section — project-a settings.json has ask: ["Bash(git push *)"]
+    expect(output).toContain("Bash(git push *)");
+    // MCP Servers section — project-a has .mcp.json with github and filesystem servers
+    expect(output).toMatch(/MCP Servers/i);
+    expect(output).toContain("github");
+    // ENV VARS section — project-a settings.json has env: {NODE_ENV: "development"}
+    expect(output).toMatch(/ENV VAR/i);
+    expect(output).toContain("NODE_ENV");
+    // Warnings section — pending MCP servers trigger medium warnings
+    expect(output).toMatch(/Warning/i);
   });
 });
 

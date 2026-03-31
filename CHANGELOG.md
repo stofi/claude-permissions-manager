@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.9] - 2026-03-31
+
+### Tests
+- **allowCommand warns when rule is in ask list**: Added test for the previously untested `else` branch of the allowCommand conflict message (manage.ts:87-89). When a rule is added to the allow list but already exists in the ask list, the message "rule also in ask — behavior may be unexpected" should appear. The existing "deny" conflict path was tested but not the "ask" conflict path.
+- **showCommand text output: additional sections**: Added test verifying that `showCommand` text output includes ask rules, MCP Servers, ENV VARS, and Warnings sections using the project-a fixture (which has all four). The existing test only checked for allow/deny rules and the project path.
+
 ## [1.4.8] - 2026-03-31
 
 ### Tests

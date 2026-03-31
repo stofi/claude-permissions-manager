@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.18] - 2026-03-31
+
+### Tests
+- **initCommand bypassPermissions warning**: Added test verifying `init.ts:210-212` `if (mode === "bypassPermissions")` warning block fires after a successful `initCommand` call with `mode: "bypassPermissions"`. Previously all initCommand tests used default/plan/acceptEdits modes, so this block was never reached.
+- **auditCommand JSON + exitCode**: Added test for `auditCommand({ json: true, exitCode: true })` with a project containing CRITICAL issues, verifying `audit.ts:44` `exitWithCode()` call in the JSON branch. All previous `--exit-code` tests used `json: false`; the JSON path's `exitWithCode()` was never exercised.
+
 ## [1.4.17] - 2026-03-31
 
 ### Tests

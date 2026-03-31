@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.10] - 2026-03-31
+
+### Tests
+- **parseClaudeMdFile unit tests**: Added first direct tests for `parseClaudeMdFile` in parser.test.ts. This function (parser.ts:161-171) was exported and used by discovery.ts but had zero unit tests. Two tests added: (1) file exists → returns `exists: true`, correct `scope` and `lineCount`; (2) file missing → returns `exists: false`, `lineCount: undefined`.
+- **auditCommand text: issue.rule display**: Added assertions to the existing "groups issues by severity" test to verify the `Rule:` line (audit.ts:74) is emitted. The project-bypass fixture's `allow: ["Bash"]` triggers a HIGH warning with `rule: "Bash"`, so the `if (issue.rule)` branch at line 74 fires — but was not previously asserted.
+
 ## [1.4.9] - 2026-03-31
 
 ### Tests

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.12] - 2026-03-31
+
+### Tests
+- **diffCommand text: mode-differs branch**: Added test using project-bypass (bypassPermissions) vs project-b (default) to verify that `diff.ts:163-167` emits the `Mode: A → B` line when projects have different effective modes. Previously all text diff tests used same-mode pairs, leaving this branch untested.
+- **diffCommand text: bypass-lock-differs branch**: Added test using project-bypass-locked (isBypassDisabled=true) vs project-b (false) to verify that `diff.ts:173-176` emits the `Bypass lock: locked → not locked` line when bypass lock state differs. Previously this branch had zero coverage.
+
 ## [1.4.11] - 2026-03-31
 
 ### Tests

@@ -158,6 +158,22 @@ describe("scan — fixture directory", () => {
     }
   });
 
+  it("records broken symlinks as scan errors", async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "cpm-broken-sym-"));
+    try {
+      // Create a symlink whose target does not exist
+      await symlink("/nonexistent-cpm-broken-target", join(tmpDir, "broken-link"));
+      const result = await scan({ root: tmpDir, maxDepth: 1, includeGlobal: false });
+      // discovery.ts:76-82: broken symlink → errors.push({ path, error: "Broken symlink: ..." })
+      expect(result.errors.length).toBeGreaterThan(0);
+      const entry = result.errors.find((e) => e.path.includes("broken-link"));
+      expect(entry).toBeDefined();
+      expect(entry!.error).toMatch(/Broken symlink/);
+    } finally {
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it("merges effective permissions across local and project scopes for project-a", async () => {
     const result = await scan({ root: FIXTURES, maxDepth: 3 });
     const projectA = result.projects.find(

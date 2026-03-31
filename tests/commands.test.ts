@@ -895,6 +895,28 @@ describe("listCommand — text output", () => {
     const output = calls.join("\n");
     expect(output).toMatch(/warning.*across all projects/i);
   });
+
+  it("shows scan errors section when scan produces errors", async () => {
+    // Needs both a valid project (so list doesn't return early on "no projects found")
+    // and a broken symlink (to trigger a scan error via discovery.ts:76-82)
+    const { symlinkSync } = await import("fs");
+    const root = mkdtempSync(join(tmpdir(), "cpm-list-scan-errs-"));
+    try {
+      // allowCommand creates root/proj/.claude/settings.json (the valid project)
+      await allowCommand("Read", { project: join(root, "proj"), scope: "project" });
+      // Broken symlink alongside the project dir triggers a scan error
+      symlinkSync("/nonexistent-cpm-scan-err-target", join(root, "proj", "bad-link"));
+      const calls: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+      await listCommand({ root, maxDepth: 2, json: false, includeGlobal: false });
+      const output = calls.join("\n");
+      // list.ts:71-76: "N error(s) during scan:" section
+      expect(output).toMatch(/error.*during scan/i);
+      expect(output).toContain("bad-link");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 // ────────────────────────────────────────────────────────────

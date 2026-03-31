@@ -1092,6 +1092,39 @@ describe("showCommand — text output", () => {
     // Warnings section — pending MCP servers trigger medium warnings
     expect(output).toMatch(/Warning/i);
   });
+
+  it("shows [bypass locked] in mode line when isBypassDisabled=true", async () => {
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    // project-bypass-locked has disableBypassPermissionsMode: "disable" → isBypassDisabled=true
+    // format.ts:89: `perms.isBypassDisabled ? chalk.green("  [bypass locked]") : ""`
+    await showCommand(join(FIXTURES, "project-bypass-locked"), { json: false, includeGlobal: false });
+    const output = calls.join("\n");
+    expect(output).toMatch(/bypass locked/i);
+  });
+
+  it("shows ADDITIONAL DIRS section when project has additionalDirectories", async () => {
+    const testDir = mkdtempSync(join(tmpdir(), "cpm-show-addl-dirs-"));
+    const claudeDir = join(testDir, ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    await import("fs/promises").then((fs) =>
+      fs.writeFile(join(claudeDir, "settings.json"), JSON.stringify({
+        additionalDirectories: ["/tmp/extra-dir"],
+        permissions: {},
+      }))
+    );
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      // format.ts:169-175: additionalDirs section only shown when non-empty
+      await showCommand(testDir, { json: false, includeGlobal: false });
+      const output = calls.join("\n");
+      expect(output).toMatch(/ADDITIONAL DIRS/i);
+      expect(output).toContain("/tmp/extra-dir");
+    } finally {
+      rmSync(testDir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ────────────────────────────────────────────────────────────

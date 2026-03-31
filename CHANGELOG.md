@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.14] - 2026-03-31
+
+### Tests
+- **showCommand text: bypass-locked display**: Added test using `project-bypass-locked` fixture to verify `format.ts:89` emits `[bypass locked]` in the mode line when `isBypassDisabled=true`. Previously no text-mode show test covered this branch.
+- **showCommand text: ADDITIONAL DIRS section**: Added test with a temp project containing `additionalDirectories` to verify `format.ts:169-175` ADDITIONAL DIRS section is rendered. Previously no test triggered this section.
+
 ## [1.4.13] - 2026-03-31
 
 ### Tests

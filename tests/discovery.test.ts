@@ -174,6 +174,23 @@ describe("scan — fixture directory", () => {
     }
   });
 
+  it("handles symlink cycles without hanging", async () => {
+    // discovery.ts:72: if (visitedInodes.has(st.ino)) continue; — cycle detection
+    // All existing symlink tests use broken symlinks or .claude→~/.claude, but none
+    // creates a true directory cycle (dir/link → dir) that exercises the inode-visited check.
+    const root = await mkdtemp(join(tmpdir(), "cpm-cycle-"));
+    try {
+      // Create root/cycle-link → root (self-referential symlink cycle)
+      await symlink(root, join(root, "cycle-link"));
+      // Scan should complete without hanging; the cycle is silently skipped (no error pushed)
+      const result = await scan({ root, maxDepth: 4, includeGlobal: false });
+      expect(result.errors).toHaveLength(0);
+      expect(result.projects).toHaveLength(0);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("merges effective permissions across local and project scopes for project-a", async () => {
     const result = await scan({ root: FIXTURES, maxDepth: 3 });
     const projectA = result.projects.find(

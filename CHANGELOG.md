@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.21] - 2026-03-31
+
+### Tests
+- **discovery symlink cycle detection**: Added test verifying `discovery.ts:72` `if (visitedInodes.has(st.ino)) continue` — the symlink cycle-detection branch. Creates a self-referential symlink `root/cycle-link → root` and verifies `scan()` terminates without hanging, produces no broken-symlink errors, and finds zero projects. All previous symlink tests used either broken symlinks or `.claude→~/.claude`; none exercised the inode-visited fast-path that prevents infinite recursion.
+
 ## [1.4.20] - 2026-03-31
 
 ### Tests

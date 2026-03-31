@@ -374,6 +374,21 @@ describe("removeRule", () => {
     const data = await readSettings();
     expect(data.permissions.allow).toContain("Glob");
   });
+
+  it("listFilter restricts removal to the specified list only", async () => {
+    // writer.ts:143: listFilter ? [listFilter] : ["allow","deny","ask"]
+    // When listFilter is provided only that list is searched — never tested before
+    const path = settingsPath();
+    await addRule("Read", "allow", path);
+    await addRule("Read", "deny", path); // same rule in deny too (unusual but valid)
+    // Remove from allow only — deny entry must survive
+    const result = await removeRule("Read", path, "allow");
+    expect(result.removed).toBe(true);
+    expect(result.removedFrom).toEqual(["allow"]);
+    const data = await readSettings();
+    expect(data.permissions.allow).not.toContain("Read");
+    expect(data.permissions.deny).toContain("Read");
+  });
 });
 
 // ────────────────────────────────────────────────────────────

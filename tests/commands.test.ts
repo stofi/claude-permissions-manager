@@ -1493,6 +1493,75 @@ describe("diffCommand — text output", () => {
       rmSync(dirB, { recursive: true, force: true });
     }
   });
+
+  it("shows ENV VARS section when projects have different envVarNames", async () => {
+    // diff.ts:232 printStringsDiff("ENV VARS", p1.envVarNames, p2.envVarNames)
+    // project-a has env: {NODE_ENV: "development"} → envVarNames: ["NODE_ENV"]
+    // project-b has no env field → envVarNames: []
+    // The section only renders when all.size > 0 — verified by asserting it appears
+    const calls: string[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+
+    await diffCommand(
+      join(FIXTURES, "project-a"),
+      join(FIXTURES, "project-b"),
+      { includeGlobal: false }
+    );
+
+    const output = calls.map((a) => a.join("")).join("\n");
+    expect(output).toMatch(/ENV VARS/);
+    expect(output).toContain("NODE_ENV");
+  });
+
+  it("shows ADDITIONAL DIRS section when one project has additionalDirs", async () => {
+    // diff.ts:233 printStringsDiff("ADDITIONAL DIRS", ...) — no fixture has additionalDirs
+    // so this branch (all.size > 0 path) is otherwise completely untested
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-dirs-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-dirs-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({
+        additionalDirectories: ["/tmp/extra"],
+        permissions: {},
+      }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+
+      await diffCommand(dirA, dirB, { includeGlobal: false });
+
+      const output = calls.map((a) => a.join("")).join("\n");
+      expect(output).toMatch(/ADDITIONAL DIRS/);
+      expect(output).toContain("/tmp/extra");
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// diffCommand — error cases
+// ────────────────────────────────────────────────────────────
+
+describe("diffCommand — error cases", () => {
+  it("exits 1 when first path has no .claude directory", async () => {
+    // diff.ts:28-30: !proj1 → console.error + process.exit(1)
+    const emptyDir = mkdtempSync(join(tmpdir(), "cpm-diff-empty-"));
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    try {
+      await expect(
+        diffCommand(emptyDir, join(FIXTURES, "project-a"), { json: false })
+      ).rejects.toThrow("exit:1");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    } finally {
+      rmSync(emptyDir, { recursive: true, force: true });
+      exitSpy.mockRestore();
+    }
+  });
 });
 
 // ────────────────────────────────────────────────────────────

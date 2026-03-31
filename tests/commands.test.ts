@@ -1554,6 +1554,48 @@ describe("diffCommand — text output", () => {
       rmSync(dirB, { recursive: true, force: true });
     }
   });
+
+  it("shows = indicator for shared env vars and + indicator for env vars only in B", async () => {
+    // diff.ts:221: setA.has(v) && setB.has(v) → "= v" (gray) — never tested
+    // diff.ts:226-227: else (only in B) → "+ v" (green) — never tested
+    // diff.ts:272: MCP "+" (only in B) — never tested (all existing tests have MCP only in A)
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-shared-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-shared-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      // A: SHARED_VAR + A_ONLY_VAR; B: SHARED_VAR + B_ONLY_VAR
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({
+        permissions: {},
+        env: { SHARED_VAR: "x", A_ONLY_VAR: "y" },
+      }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({
+        permissions: {},
+        env: { SHARED_VAR: "x", B_ONLY_VAR: "z" },
+      }));
+      // B has an MCP server A doesn't — tests "only in B" display (diff.ts:272)
+      await wf(join(dirB, ".mcp.json"), JSON.stringify({
+        mcpServers: { "b-only-server": { command: "run" } },
+      }));
+
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+
+      await diffCommand(dirA, dirB, { includeGlobal: false });
+
+      const output = calls.map((a) => a.join("")).join("\n");
+      // "= v" branch: SHARED_VAR appears in both
+      expect(output).toMatch(/=.*SHARED_VAR/);
+      // "only in B" branch for env vars: B_ONLY_VAR
+      expect(output).toMatch(/\+.*B_ONLY_VAR.*only in B/);
+      // MCP "only in B" branch: b-only-server in B but not A
+      expect(output).toMatch(/\+.*b-only-server.*only in B/);
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
 });
 
 // ────────────────────────────────────────────────────────────

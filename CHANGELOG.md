@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.17] - 2026-03-31
+
+### Tests
+- **writer.ts removeRule listFilter**: Added test verifying `writer.ts:143` `listFilter ? [listFilter] : [...]` branch — when `removeRule` is called with a `listFilter` argument, only that list is searched/modified and sibling lists are untouched. Previously all callers used `undefined`.
+- **format.ts MCP approvalState=approved**: Added test constructing a minimal `ClaudeProject` with an MCP server in `approvalState: "approved"` state and asserting `formatEffectivePermissions` outputs "approved" (`format.ts:138-139` `chalk.green` branch — never previously exercised).
+- **format.ts MCP approvalState=denied**: Added test for `approvalState: "denied"` MCP server, asserting output contains "denied" (`format.ts:140-141` `chalk.red` branch — never previously exercised).
+
 ## [1.4.16] - 2026-03-31
 
 ### Tests

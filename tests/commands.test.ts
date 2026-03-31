@@ -20,6 +20,8 @@ import {
   modeCommand,
   resetAllCommand,
 } from "../src/commands/manage.js";
+import { formatEffectivePermissions } from "../src/utils/format.js";
+import type { ClaudeProject } from "../src/core/types.js";
 
 // ────────────────────────────────────────────────────────────
 // Helpers
@@ -1803,5 +1805,55 @@ describe("diffCommand — --no-global", () => {
         expect(rule.scope).not.toBe("managed");
       }
     }
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// formatEffectivePermissions — MCP approval state display
+// ────────────────────────────────────────────────────────────
+
+function makeProject(mcpServers: ClaudeProject["effectivePermissions"]["mcpServers"]): ClaudeProject {
+  return {
+    rootPath: "/tmp/test-proj",
+    claudeDir: "/tmp/test-proj/.claude",
+    settingsFiles: [],
+    claudeMdFiles: [],
+    effectivePermissions: {
+      defaultMode: "default",
+      allow: [],
+      deny: [],
+      ask: [],
+      isBypassDisabled: false,
+      mcpServers,
+      envVarNames: [],
+      additionalDirs: [],
+      warnings: [],
+    },
+  };
+}
+
+describe("formatEffectivePermissions — MCP approval state display", () => {
+  it("shows 'approved' text for MCP server with approvalState=approved", () => {
+    // format.ts:138-139: s.approvalState === "approved" ? chalk.green("approved") — never tested
+    const project = makeProject([
+      { name: "my-server", scope: "local", approvalState: "approved" },
+    ]);
+    const output = formatEffectivePermissions(project);
+    expect(output).toContain("approved");
+    // Must NOT contain "denied" or "pending" for this server
+    expect(output).not.toContain("denied");
+    expect(output).not.toContain("pending");
+  });
+
+  it("shows 'denied' text for MCP server with approvalState=denied", () => {
+    // format.ts:140-141: s.approvalState === "denied" ? chalk.red("denied") — never tested
+    const project = makeProject([
+      { name: "blocked-server", scope: "local", approvalState: "denied" },
+    ]);
+    const output = formatEffectivePermissions(project);
+    expect(output).toContain("denied");
+    // Must NOT contain "approved" or "pending" for this server
+    expect(output).not.toContain("approved");
+    expect(output).not.toContain("pending");
   });
 });

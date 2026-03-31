@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.5] - 2026-03-31
+
+### Fixed
+- **init: user-scope bypassPermissions warning now matches mode command**: `cpm init --scope user --mode bypassPermissions` now shows the additional "⚠ This is set at user scope — it applies to ALL Claude Code projects on this machine." warning, consistent with `cpm mode bypassPermissions --scope user`.
+
 ## [1.4.4] - 2026-03-31
 
 ### Fixed

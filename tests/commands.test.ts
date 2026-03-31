@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync } from "fs";
-import { readFile, mkdir } from "fs/promises";
+import { readFile, mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { initCommand } from "../src/commands/init.js";
@@ -1162,6 +1162,44 @@ describe("showCommand — text output", () => {
     await showCommand(join(FIXTURES, "project-bypass-locked"), { json: false, includeGlobal: false });
     const output = calls.join("\n");
     expect(output).toMatch(/bypass locked/i);
+  });
+
+  it("shows 'parse error' status for settings file with invalid JSON", async () => {
+    // format.ts:101-102: !f.parsed → "⚠ parse error: ..." for corrupted settings.json
+    // format.ts:97-98:   !f.exists → "✗ not present" for settings.local.json (never created)
+    const testDir = mkdtempSync(join(tmpdir(), "cpm-show-parse-err-"));
+    try {
+      await mkdir(join(testDir, ".claude"), { recursive: true });
+      await writeFile(join(testDir, ".claude", "settings.json"), "{ invalid json !!!");
+      const calls: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+      await showCommand(testDir, { json: false, includeGlobal: false });
+      const output = calls.join("\n");
+      expect(output).toMatch(/parse error/i);
+      expect(output).toMatch(/not present/i);
+    } finally {
+      rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  it("shows 'schema warning' status for settings file with schema-violating JSON", async () => {
+    // format.ts:103-104: f.parseError && f.parsed → "⚠ schema warning"
+    // Valid JSON that fails zod schema: allow should be string[] not "string"
+    const testDir = mkdtempSync(join(tmpdir(), "cpm-show-schema-warn-"));
+    try {
+      await mkdir(join(testDir, ".claude"), { recursive: true });
+      await writeFile(
+        join(testDir, ".claude", "settings.json"),
+        JSON.stringify({ permissions: { allow: "not-an-array" } })
+      );
+      const calls: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+      await showCommand(testDir, { json: false, includeGlobal: false });
+      const output = calls.join("\n");
+      expect(output).toMatch(/schema warning/i);
+    } finally {
+      rmSync(testDir, { recursive: true, force: true });
+    }
   });
 
   it("shows ADDITIONAL DIRS section when project has additionalDirectories", async () => {

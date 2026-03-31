@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.25] - 2026-04-01
+
+### Tests
+- **format settings file status branches**: Added two tests covering `format.ts:97-104` — the settings file status display in `formatEffectivePermissions`:
+  - `!f.exists` → "✗ not present" (`format.ts:97-98`): exercised via a project that has no `settings.local.json`
+  - `!f.parsed` → "⚠ parse error: ..." (`format.ts:101-102`): create `.claude/settings.json` with `{ invalid json !!!`, verify "parse error" in text output
+  - `f.parseError && f.parsed` → "⚠ schema warning" (`format.ts:103-104`): create `settings.json` with `{ permissions: { allow: "not-an-array" } }` (valid JSON, fails zod `z.array(z.string())` constraint), verify "schema warning" in text output
+
 ## [1.4.24] - 2026-03-31
 
 ### Tests

@@ -375,7 +375,12 @@ export function ProjectDetail({ project, onBack, onRefresh }: ProjectDetailProps
                     </Text>
                   </Box>
                   {s.command && (
-                    <Text color="gray">{"    "}cmd: {s.command}</Text>
+                    <Text color="gray">
+                      {"    "}cmd:{" "}
+                      {s.args && s.args.length > 0
+                        ? `${s.command} ${s.args.join(" ")}`
+                        : s.command}
+                    </Text>
                   )}
                   {s.url && (
                     <Text color="gray">{"    "}url: {s.url}</Text>

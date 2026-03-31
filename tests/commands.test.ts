@@ -99,6 +99,17 @@ describe("initCommand", () => {
     expect(data.permissions.allow).toContain("Read");
   });
 
+  it("exits 1 when file already exists and neither --yes nor --dry-run given", async () => {
+    // Create file first
+    await initCommand({ project: tmpDir, preset: "safe", scope: "project" });
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    await expect(
+      initCommand({ project: tmpDir, preset: "strict", scope: "project" })
+    ).rejects.toThrow("exit:1");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
+  });
+
   it("--yes overwrites existing file and applies preset fresh", async () => {
     // Create file with safe preset first
     await initCommand({ project: tmpDir, preset: "safe", scope: "project" });
@@ -413,6 +424,17 @@ describe("exportCommand — --output", () => {
     await expect(
       exportCommand({ root: FIXTURES, maxDepth: 3, format: "json", output: outFile })
     ).rejects.toThrow();
+  });
+});
+
+describe("exportCommand — invalid format", () => {
+  it("exits 1 when unknown format is specified", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    await expect(
+      exportCommand({ root: FIXTURES, maxDepth: 3, format: "yaml" })
+    ).rejects.toThrow("exit:1");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
   });
 });
 
@@ -1529,6 +1551,64 @@ describe("auditCommand — text output", () => {
       expect(output).toMatch(/No issues found/i);
     } finally {
       rmSync(cleanDir, { recursive: true, force: true });
+    }
+  });
+
+  it("shows scan errors in 'No issues found' path when errors present", async () => {
+    // Needs a clean project (no warnings) AND a broken symlink (scan error)
+    const { symlinkSync } = await import("fs");
+    const root = mkdtempSync(join(tmpdir(), "cpm-audit-clean-errs-"));
+    const claudeDir = join(root, "proj", ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    await import("fs/promises").then((fs) =>
+      fs.writeFile(join(claudeDir, "settings.json"), JSON.stringify({
+        permissions: {
+          allow: ["Bash(npm run *)"],
+          deny: ["Read(**/.env)"],
+          disableBypassPermissionsMode: "disable",
+        },
+      }))
+    );
+    // Broken symlink creates a scan error without adding any project warnings
+    symlinkSync("/nonexistent-cpm-audit-clean-target", join(root, "bad-link"));
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await auditCommand({ root, maxDepth: 2, includeGlobal: false });
+      const output = calls.join("\n");
+      // audit.ts:48-55: allIssues.length === 0 branch with result.errors.length > 0
+      expect(output).toMatch(/No issues found/i);
+      expect(output).toMatch(/scan error/i);
+      expect(output).toContain("bad-link");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("shows scan errors section when issues AND errors both present", async () => {
+    // Needs a project WITH warnings AND a broken symlink
+    const { symlinkSync } = await import("fs");
+    const root = mkdtempSync(join(tmpdir(), "cpm-audit-warn-errs-"));
+    const claudeDir = join(root, "proj", ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    await import("fs/promises").then((fs) =>
+      // allow: ["Bash"] — bare Bash triggers HIGH warning
+      fs.writeFile(join(claudeDir, "settings.json"), JSON.stringify({
+        permissions: { allow: ["Bash"] },
+      }))
+    );
+    symlinkSync("/nonexistent-cpm-audit-warn-target", join(root, "bad-link2"));
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await auditCommand({ root, maxDepth: 2, includeGlobal: false });
+      const output = calls.join("\n");
+      // audit.ts:79-84: errors section when allIssues.length > 0 AND result.errors.length > 0
+      expect(output).toMatch(/HIGH/i);
+      expect(output).toMatch(/scan error/i);
+      expect(output).toContain("bad-link2");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });

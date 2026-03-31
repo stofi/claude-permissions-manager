@@ -303,7 +303,12 @@ function DiffView({
                     color="blue"
                   />
                   {server?.command && (
-                    <Text color="gray">{"    "}cmd: {server.command}</Text>
+                    <Text color="gray">
+                      {"    "}cmd:{" "}
+                      {server.args && server.args.length > 0
+                        ? `${server.command} ${server.args.join(" ")}`
+                        : server.command}
+                    </Text>
                   )}
                   {server?.url && (
                     <Text color="gray">{"    "}url: {server.url}</Text>

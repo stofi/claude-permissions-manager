@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.8] - 2026-03-31
+
+### Tests
+- **listCommand text output: missing edge case tests**: Added two tests for previously untested code paths in `list.ts` text mode: (1) "No Claude projects found" banner (list.ts:45-50) shown for an empty scan root, (2) `⚠ N warning(s) across all projects` footer (list.ts:63-69) shown when projects have warnings. Both paths existed but had zero test coverage.
+
 ## [1.4.7] - 2026-03-31
 
 ### Tests

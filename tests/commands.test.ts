@@ -865,6 +865,28 @@ describe("listCommand — text output", () => {
     const output = calls.join("\n");
     expect(output).not.toMatch(/\[locked\]/);
   });
+
+  it("shows 'No Claude projects found' banner for empty directory", async () => {
+    const emptyDir = mkdtempSync(join(tmpdir(), "cpm-list-empty-"));
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await listCommand({ root: emptyDir, maxDepth: 1, json: false, includeGlobal: false });
+      const output = calls.join("\n");
+      expect(output).toMatch(/No Claude projects found/i);
+    } finally {
+      rmSync(emptyDir, { recursive: true, force: true });
+    }
+  });
+
+  it("shows warning count footer when projects have warnings", async () => {
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    // project-bypass has CRITICAL bypassPermissions → at least one warning
+    await listCommand({ root: FIXTURES, maxDepth: 3, json: false, includeGlobal: false });
+    const output = calls.join("\n");
+    expect(output).toMatch(/warning.*across all projects/i);
+  });
 });
 
 // ────────────────────────────────────────────────────────────

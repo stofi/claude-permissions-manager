@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.19] - 2026-03-31
+
+### Tests
+- **diff printStringsDiff "=" branch**: Added test verifying `diff.ts:221` `setA.has(v) && setB.has(v)` → `"= v"` (gray) display for env var names present in both projects. Previously only the "only in A" case was tested.
+- **diff printStringsDiff "only in B" branch**: Added test verifying `diff.ts:226-227` `else` → `"+ v (only in B)"` display for env var names present in B but not A. Previously never exercised.
+- **diff MCP server "only in B" branch**: Added test verifying `diff.ts:272` `"+ name (only in B)"` display when B has an MCP server A doesn't. All previous MCP diff tests had servers only in A or the same server in both.
+
 ## [1.4.18] - 2026-03-31
 
 ### Tests

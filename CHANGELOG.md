@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.42] - 2026-04-01
+
+### Tests
+- **parseClaudeJson invalid JSON stderr warning**: Added assertion for `parser.ts:201` — `process.stderr.write("Warning: ... contains invalid JSON — MCP approval states not loaded")`. Prior test only checked empty return value.
+- **parseClaudeJson unreadable file stderr warning**: Added assertion for `parser.ts:192` — `process.stderr.write("Warning: could not read ...")`. Prior EACCES test only checked empty return value.
+- **discovery non-Error rejection format**: Added `vi.doMock` test for `discovery.ts:222` — when `buildProject` rejects with a non-Error (e.g. a thrown string), the error is recorded as `String(reason)` rather than `name: message`. The ternary's false branch was previously dead code in tests.
+
 ## [1.4.41] - 2026-04-01
 
 ### Tests

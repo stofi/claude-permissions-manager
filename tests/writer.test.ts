@@ -523,5 +523,7 @@ describe("clearAllRules", () => {
     expect(data.permissions.allow).toEqual([]);
     expect(data.permissions.deny).toEqual([]);
     expect(data.permissions.ask).toEqual([]);
+    // writer.ts:186: ...data spreads root-level fields — verify they're preserved
+    expect((data as Record<string, unknown>).someOtherKey).toBe(true);
   });
 });

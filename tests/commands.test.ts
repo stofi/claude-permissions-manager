@@ -987,6 +987,24 @@ describe("listCommand — text output", () => {
     }
   });
 
+  it("outputs valid JSON with empty projects array when no projects found (--json)", async () => {
+    // list.ts:12-43 JSON path: always outputs JSON regardless of projects.length.
+    // No existing test calls listCommand with json:true on an empty directory.
+    const emptyDir = mkdtempSync(join(tmpdir(), "cpm-list-json-empty-"));
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    try {
+      await listCommand({ root: emptyDir, maxDepth: 1, json: true, includeGlobal: false });
+      const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+      expect(json).toHaveProperty("projectCount", 0);
+      expect(Array.isArray(json.projects)).toBe(true);
+      expect(json.projects).toHaveLength(0);
+      expect(Array.isArray(json.errors)).toBe(true);
+    } finally {
+      rmSync(emptyDir, { recursive: true, force: true });
+    }
+  });
+
   it("shows warning count footer when projects have warnings", async () => {
     const calls: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
@@ -1596,6 +1614,35 @@ describe("diffCommand — text output", () => {
     expect(output).toContain("locked");
     expect(output).toContain("not locked");
     expect(output).not.toMatch(/Bypass lock:.*\(same\)/);
+  });
+
+  it("shows type and args change lines for modified MCP server (diff.ts:248,252-253)", async () => {
+    // diff.ts:248: typeA !== typeB → "type: stdio → http" — never tested
+    // diff.ts:252-253: args differ → "args: [a] → [b]" — never tested (prior tests used args:[])
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-type-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-type-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      await wf(join(dirA, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { type: "stdio", command: "run", args: ["--verbose"] } }
+      }));
+      await wf(join(dirB, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { type: "http", command: "run", args: [] } }
+      }));
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+      await diffCommand(dirA, dirB, {});
+      const output = calls.map((a) => a.join("")).join("\n");
+      expect(output).toMatch(/type:.*stdio.*http/);   // diff.ts:248
+      expect(output).toMatch(/args:.*verbose.*\[\]/);  // diff.ts:252-253
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
   });
 
   it("shows env and headers change lines for modified MCP server", async () => {

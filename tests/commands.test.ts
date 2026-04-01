@@ -1676,6 +1676,33 @@ describe("diffCommand — text output", () => {
     }
   });
 
+  it("shows url change line for modified HTTP MCP server (diff.ts:255-256)", async () => {
+    // diff.ts:255-256: (sA.url ?? "") !== (sB.url ?? "") → "url: old → new" — never tested
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-url-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-url-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      await wf(join(dirA, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { type: "http", url: "https://old.example.com/mcp" } }
+      }));
+      await wf(join(dirB, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { type: "http", url: "https://new.example.com/mcp" } }
+      }));
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+      await diffCommand(dirA, dirB, {});
+      const output = calls.map((a) => a.join("")).join("\n");
+      expect(output).toMatch(/url:.*old\.example\.com.*new\.example\.com/);
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
+
   it("shows ENV VARS section when projects have different envVarNames", async () => {
     // diff.ts:232 printStringsDiff("ENV VARS", p1.envVarNames, p2.envVarNames)
     // project-a has env: {NODE_ENV: "development"} → envVarNames: ["NODE_ENV"]

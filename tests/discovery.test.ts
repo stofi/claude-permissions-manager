@@ -208,6 +208,24 @@ describe("scan — fixture directory", () => {
     }
   });
 
+  it("follows symlinks to valid directories and discovers .claude inside them", async () => {
+    // discovery.ts:73-74: successful symlink to directory — visitedInodes.add + resolvedPath = real
+    // The code then recurses into the symlinked dir (via fullPath) and discovers .claude inside.
+    const actual = await mkdtemp(join(tmpdir(), "cpm-sym-actual-"));
+    const root = await mkdtemp(join(tmpdir(), "cpm-sym-root-"));
+    try {
+      await mkdir(join(actual, ".claude"), { recursive: true });
+      await writeFile(join(actual, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      await symlink(actual, join(root, "linked-project"));
+      const result = await scan({ root, maxDepth: 2, includeGlobal: false });
+      expect(result.projects).toHaveLength(1);
+      expect(result.errors).toHaveLength(0);
+    } finally {
+      await rm(actual, { recursive: true, force: true });
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("skips symlinks that resolve to a regular file (not a directory)", async () => {
     // discovery.ts:71: if (!st.isDirectory()) continue; — after resolving symlink
     // A symlink pointing to a plain file is silently skipped (no error recorded).

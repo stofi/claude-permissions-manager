@@ -826,3 +826,21 @@ describe("mergeSettingsFiles — invalid defaultMode", () => {
     }
   });
 });
+
+describe("mergeSettingsFiles — non-string array element guards", () => {
+  it("silently skips non-string elements in allow, deny, and ask arrays (merger.ts:354,359,364)", () => {
+    // These guards protect against malformed JSON that passes Array.isArray()
+    // but contains non-string values (e.g. allow: [123, "Read", null]).
+    const f = makeFile("local", {
+      permissions: {
+        allow: [123, "Read", null] as unknown as string[],
+        deny: [true, "Bash"] as unknown as string[],
+        ask: [{}, "Write"] as unknown as string[],
+      },
+    });
+    const result = mergeSettingsFiles([f]);
+    expect(result.allow.map((r) => r.raw)).toEqual(["Read"]);
+    expect(result.deny.map((r) => r.raw)).toEqual(["Bash"]);
+    expect(result.ask.map((r) => r.raw)).toEqual(["Write"]);
+  });
+});

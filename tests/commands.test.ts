@@ -683,6 +683,22 @@ describe("resetRuleCommand", () => {
     expect(calls.some((m) => /Removed.*Read.*from/i.test(m))).toBe(true);
     expect(calls.some((m) => /allow/i.test(m))).toBe(true);
   });
+
+  it("shows comma-separated list names when rule removed from multiple lists (manage.ts:192)", async () => {
+    // manage.ts:192: result.removedFrom.join(", ") — only tested for single-list removal above.
+    // Add "Read" to both allow and deny (unusual but possible), then reset — output should
+    // show "allow, deny" (or "deny, allow" depending on iteration order).
+    await allowCommand("Read", { project: tmpDir, scope: "project" });
+    await denyCommand("Read", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await resetRuleCommand("Read", { project: tmpDir, scope: "project" });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    // Message must mention both lists
+    const removedMsg = calls.find((m) => /Removed/i.test(m));
+    expect(removedMsg).toBeDefined();
+    expect(removedMsg).toMatch(/allow/);
+    expect(removedMsg).toMatch(/deny/);
+  });
 });
 
 describe("modeCommand", () => {
@@ -710,6 +726,16 @@ describe("modeCommand", () => {
     await modeCommand("bypassPermissions", { project: tmpDir, scope: "user" });
     const calls = logSpy.mock.calls.map((c) => String(c[0]));
     expect(calls.some((m) => /user scope/i.test(m) && /ALL/i.test(m))).toBe(true);
+  });
+
+  it("prints '✓ Set defaultMode to' success message after setting mode (manage.ts:233)", async () => {
+    // manage.ts:233: console.log(`✓ Set defaultMode to ${colored}`) — never asserted in any test.
+    // All prior modeCommand tests check data.permissions.defaultMode (file state) but not the console output.
+    const logSpy = vi.spyOn(console, "log");
+    await modeCommand("acceptEdits", { project: tmpDir, scope: "project" });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /Set defaultMode to/i.test(m))).toBe(true);
+    expect(calls.some((m) => /acceptEdits/i.test(m))).toBe(true);
   });
 });
 
@@ -863,10 +889,14 @@ describe("resetAllCommand", () => {
   it("clears all rules when --yes is provided", async () => {
     await allowCommand("Read", { project: tmpDir, scope: "project" });
     await denyCommand("Bash(sudo *)", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
     await resetAllCommand({ project: tmpDir, scope: "project", yes: true });
     const data = await readSettings();
     expect(data.permissions.allow).toHaveLength(0);
     expect(data.permissions.deny).toHaveLength(0);
+    // manage.ts:278: console.log(chalk.green(`✓ Cleared all permission rules`)) — never asserted
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /Cleared all permission rules/i.test(m))).toBe(true);
   });
 
   it("--dry-run does not modify files and reports rule counts", async () => {
@@ -883,6 +913,19 @@ describe("resetAllCommand", () => {
     const output = calls.join("\n");
     expect(output).toMatch(/dry.run/i);
     expect(output).toMatch(/1 allow.*1 deny/i);
+  });
+
+  it("--dry-run includes ask count when ask list has rules (manage.ts:261)", async () => {
+    // manage.ts:261: `Would clear: ${allowCount} allow, ${denyCount} deny, ${askCount} ask rules`
+    // Existing dry-run test only adds allow+deny. This adds all three lists.
+    await allowCommand("Read", { project: tmpDir, scope: "project" });
+    await denyCommand("Bash(sudo *)", { project: tmpDir, scope: "project" });
+    await askCommand("Bash(git push *)", { project: tmpDir, scope: "project" });
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await resetAllCommand({ project: tmpDir, scope: "project", dryRun: true });
+    const output = calls.join("\n");
+    expect(output).toMatch(/1 allow.*1 deny.*1 ask/i);
   });
 
   it("--dry-run reports 'no rules to clear' when file has no rules", async () => {

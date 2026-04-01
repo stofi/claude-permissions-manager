@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.40] - 2026-04-01
+
+### Tests
+- **resetRuleCommand multi-list removal**: Added test for `manage.ts:192` — when a rule exists in both allow and deny lists, `resetRuleCommand` removes it from both and the success message lists both list names (e.g. "allow, deny").
+- **modeCommand success message**: Added assertion for `manage.ts:233` — `✓ Set defaultMode to <mode>` console output. All prior mode tests only checked the file state, never the console message.
+- **resetAllCommand --dry-run ask count**: Added test for `manage.ts:261` — dry-run output when all three lists have rules shows `1 allow, 1 deny, 1 ask rules`. Prior dry-run test only covered allow+deny.
+- **resetAllCommand --yes success message**: Strengthened existing test to also assert `manage.ts:278` — `✓ Cleared all permission rules` console message after successful clear.
+
 ## [1.4.39] - 2026-04-01
 
 ### Tests

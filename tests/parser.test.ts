@@ -181,6 +181,26 @@ describe("parseMcpFile", () => {
       rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("returns exists=true, parsed=false when .mcp.json cannot be read (parser.ts:106-115)", async () => {
+    // parser.ts:108-115: readFile catch → { exists: true, parsed: false, parseError: String(err) }
+    // No prior test exercises this branch — only the JSON-parse-error path was tested.
+    if (process.getuid?.() === 0) return; // root bypasses file permissions
+    const tmpDir = mkdtempSync(join(tmpdir(), "cpm-mcp-eacces-"));
+    const mcpPath = join(tmpDir, ".mcp.json");
+    try {
+      writeFileSync(mcpPath, JSON.stringify({ mcpServers: { foo: { command: "run" } } }));
+      chmodSync(mcpPath, 0o000);
+      const mcp = await parseMcpFile(tmpDir, "project");
+      expect(mcp.exists).toBe(true);
+      expect(mcp.parsed).toBe(false);
+      expect(mcp.parseError).toMatch(/EACCES|permission denied/i);
+      expect(mcp.servers).toHaveLength(0);
+    } finally {
+      chmodSync(mcpPath, 0o644);
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ────────────────────────────────────────────────────────────

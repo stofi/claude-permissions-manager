@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { join } from "path";
-import { existsSync } from "fs";
+import { existsSync, chmodSync } from "fs";
 import { mkdtemp, mkdir, writeFile, symlink, rm } from "fs/promises";
 import { tmpdir, homedir } from "os";
 import { fileURLToPath } from "url";
@@ -291,6 +291,35 @@ describe("scan — fixture directory", () => {
       await rm(root, { recursive: true, force: true });
       vi.doUnmock("../src/core/parser.js");
       vi.resetModules();
+    }
+  });
+});
+
+describe("scan — SKIP_DIRS and readdir errors", () => {
+  it("returns no projects when root is in SKIP_DIRS (discovery.ts:49)", async () => {
+    // SKIP_DIRS includes "/tmp" — findClaudeDirs returns immediately without reading contents.
+    // Prior tests always use temp dirs as roots and never trigger this path.
+    const result = await scan({ root: "/tmp", maxDepth: 5, includeGlobal: false });
+    expect(result.projects).toHaveLength(0);
+    // No errors — the function simply returns early without attempting to list /tmp
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("silently skips directories that cannot be listed (discovery.ts:52-57)", async () => {
+    // discovery.ts:52-57: readdir() catch → return (no error recorded)
+    // Verified by creating a chmod-000 subdirectory and confirming no error entry is emitted.
+    if (process.getuid?.() === 0) return; // root ignores file permissions
+    const root = await mkdtemp(join(tmpdir(), "cpm-readdir-err-"));
+    const locked = join(root, "locked");
+    try {
+      await mkdir(locked);
+      chmodSync(locked, 0o000);
+      const result = await scan({ root, maxDepth: 2, includeGlobal: false });
+      expect(result.errors).toHaveLength(0); // silently skipped, not recorded as error
+      expect(result.projects).toHaveLength(0);
+    } finally {
+      chmodSync(locked, 0o755);
+      await rm(root, { recursive: true, force: true });
     }
   });
 });

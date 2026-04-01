@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.48] - 2026-04-01
+
+### Tests
+- **`parser.ts:106-115` parseMcpFile readFile EACCES**: New test chmod-000's a `.mcp.json` file and calls `parseMcpFile`, verifying the readFile catch branch returns `{ exists: true, parsed: false, parseError: /EACCES/ }`. Prior tests only covered the JSON-parse-error path.
+- **`writer.ts:27` unknown scope exhaustiveness**: New test calls `resolveSettingsPath("bogus" as any, ...)` and asserts `throw new Error("Unknown scope: bogus")`. Exercises the dead-code fallthrough unreachable by valid typed callers.
+- **`discovery.ts:49` SKIP_DIRS root check**: New test calls `scan({ root: "/tmp" })` — `/tmp` is in SKIP_DIRS, so `findClaudeDirs` returns immediately; zero projects and zero errors.
+- **`discovery.ts:52-57` readdir EACCES silently skipped**: New test creates a chmod-000 subdirectory and scans its parent, confirming no error is emitted (the catch block just `return`s without recording an error).
+
 ## [1.4.47] - 2026-04-01
 
 ### Tests

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.50] - 2026-04-02
+
+### Tests
+- **`manage.ts:27` resolveScope default "local"**: New test calls `allowCommand` without a `scope` option, verifying the `scopeOpt ?? "local"` fallback writes to `settings.local.json`.
+- **`manage.ts:22` resolveProject default cwd**: New test uses `vi.spyOn(process, "cwd")` to redirect the cwd to a temp dir, then calls `allowCommand` without a `project` option, verifying the `process.cwd()` fallback resolves the project path correctly.
+- **`export.ts:160-162` stderr success message**: New test overrides the beforeEach stderr mock to capture messages, verifying `"✓ Exported N projects to FILE"` appears on stderr after a successful `--output` file write.
+
 ## [1.4.49] - 2026-04-01
 
 ### Tests

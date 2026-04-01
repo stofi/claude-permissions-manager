@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.32] - 2026-04-01
+
+### Tests
+- **list JSON output with empty projects**: Added test calling `listCommand({ json: true })` on an empty directory — asserts the JSON output has `projectCount: 0`, an empty `projects` array, and an `errors` array. No prior test exercised the `list.ts:12-43` JSON path with zero projects found.
+- **clearAllRules preserves root-level fields**: Strengthened the existing "no permissions object" clearAllRules test to also assert `someOtherKey` survives, verifying `writer.ts:186` `...data` spread preserves non-permissions root fields.
+- **diff MCP type and args change lines**: Added test with `myserver` changing from `{type: "stdio", args: ["--verbose"]}` to `{type: "http", args: []}`. Asserts both `diff.ts:248` type-change line (`"type: stdio → http"`) and `diff.ts:252-253` args-change line (`"args: [--verbose] → []"`). Both detail lines were never previously executed.
+
 ## [1.4.31] - 2026-04-01
 
 ### Tests

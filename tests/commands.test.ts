@@ -2,7 +2,7 @@
  * Integration tests for CLI commands: initCommand, exportCommand, listCommand, manage commands
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { readFile, mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -203,6 +203,66 @@ describe("initCommand", () => {
     expect(combined).toMatch(/bypassPermissions/i);
   });
 
+  it("re-throws non-ENOENT error from stat() during init (init.ts:136)", async () => {
+    // init.ts:136: if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    // Make .claude a regular file so stat(.claude/settings.json) fails with ENOTDIR instead of ENOENT.
+    writeFileSync(join(tmpDir, ".claude"), "not-a-dir");
+    await expect(initCommand({ project: tmpDir, scope: "project" })).rejects.toThrow();
+  });
+
+  it("shows 'all Claude Code projects on this machine' tip for user scope (init.ts:207)", async () => {
+    // init.ts:202-208: else branch (scope !== "project" && !== "local") prints user-scope tip.
+    // Redirects user scope to tmpDir to avoid touching the real ~/.claude/settings.json.
+    vi.doMock("../src/core/writer.js", async (importOriginal) => {
+      const original = await importOriginal<typeof import("../src/core/writer.js")>();
+      const fakePath = join(tmpDir, ".claude", "settings.user-test.json");
+      return {
+        ...original,
+        resolveSettingsPath: (scope: string, projectPath?: string) =>
+          scope === "user" ? fakePath : original.resolveSettingsPath(scope as import("../src/core/types.js").SettingsScope, projectPath),
+      };
+    });
+    vi.resetModules();
+    const { initCommand: initMocked } = await import("../src/commands/init.js");
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...args) => { logs.push(args.join(" ")); });
+    try {
+      await initMocked({ scope: "user" });
+      expect(logs.join("\n")).toMatch(/all Claude Code projects on this machine/i);
+    } finally {
+      spy.mockRestore();
+      vi.doUnmock("../src/core/writer.js");
+      vi.resetModules();
+    }
+  });
+
+  it("prints all-projects bypass warning when bypassPermissions used at user scope (init.ts:213-214)", async () => {
+    // init.ts:213-214: scope === "user" inner check adds extra warning line.
+    // Test at line 195 only covers scope: "project" — never exercises the user-scope inner condition.
+    // Redirects user scope to tmpDir to avoid touching the real ~/.claude/settings.json.
+    vi.doMock("../src/core/writer.js", async (importOriginal) => {
+      const original = await importOriginal<typeof import("../src/core/writer.js")>();
+      const fakePath = join(tmpDir, ".claude", "settings.user-bypass.json");
+      return {
+        ...original,
+        resolveSettingsPath: (scope: string, projectPath?: string) =>
+          scope === "user" ? fakePath : original.resolveSettingsPath(scope as import("../src/core/types.js").SettingsScope, projectPath),
+      };
+    });
+    vi.resetModules();
+    const { initCommand: initMocked } = await import("../src/commands/init.js");
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...args) => { logs.push(args.join(" ")); });
+    try {
+      await initMocked({ scope: "user", mode: "bypassPermissions" });
+      const combined = logs.join("\n");
+      expect(combined).toMatch(/user scope.*ALL/i);
+    } finally {
+      spy.mockRestore();
+      vi.doUnmock("../src/core/writer.js");
+      vi.resetModules();
+    }
+  });
 
 });
 
@@ -2020,6 +2080,34 @@ describe("diffCommand — text output", () => {
       await diffCommand(dirA, dirB, {});
       const output = calls.map((a) => a.join("")).join("\n");
       expect(output).toMatch(/headers:.*X-Api-Key.*X-Auth-Token/);
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
+
+  it("shows command change line for modified MCP server (diff.ts:249-250)", async () => {
+    // diff.ts:249-250: (sA.command ?? "") !== (sB.command ?? "") → "cmd: old → new"
+    // Prior tests at line 1915 use the same command "run" in both dirs — this branch never fires.
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-cmd-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-cmd-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      await wf(join(dirA, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { command: "old-cmd", args: [] } }
+      }));
+      await wf(join(dirB, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { command: "new-cmd", args: [] } }
+      }));
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+      await diffCommand(dirA, dirB, {});
+      const output = calls.map((a) => a.join("")).join("\n");
+      expect(output).toMatch(/cmd:.*old-cmd.*new-cmd/);  // diff.ts:250
     } finally {
       rmSync(dirA, { recursive: true, force: true });
       rmSync(dirB, { recursive: true, force: true });

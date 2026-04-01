@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.46] - 2026-04-01
+
+### Tests
+- **`init.ts:136` non-ENOENT re-throw**: New test creates `.claude` as a regular file (not a directory) so `stat(.claude/settings.json)` throws `ENOTDIR`, exercising the `if (err.code !== "ENOENT") throw err` branch.
+- **`init.ts:207` user-scope tip**: New test verifies the else-branch tip `"Tip: this applies to all Claude Code projects on this machine."` for `scope: "user"`. Uses `vi.doMock` to redirect user settings to a temp file.
+- **`init.ts:213-214` bypassPermissions + user scope**: New test verifies the inner `scope === "user"` conditional fires when `mode: "bypassPermissions"` + `scope: "user"`, printing the extra `"user scope — ALL Claude Code projects"` warning. Same `vi.doMock` pattern.
+- **`diff.ts:249-250` MCP command change**: New test verifies the `cmd: old-cmd → new-cmd` change line when the same MCP server has different `command` values. Prior tests always used identical commands, leaving this branch uncovered.
+
 ## [1.4.45] - 2026-04-01
 
 ### Added

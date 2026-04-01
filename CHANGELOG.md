@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.35] - 2026-04-01
+
+### Tests
+- **showCommand JSON `warnings` field**: Added test asserting `json.warnings` is a non-empty array of `{severity, message}` objects when run against `project-bypass` (bypassPermissions mode). The `warnings` field at `show.ts:71` was included in JSON output but never asserted in any test.
+- **managedSettingsPath OS branches**: Added 3 tests covering `paths.ts:36-43` — darwin (`/Library/Application Support/ClaudeCode/...`), win32 (`C:\Program Files\ClaudeCode\...`), and Linux (`/etc/claude-code/...`) branches. Uses `vi.doMock("os", factory)` + `vi.resetModules()` + dynamic import to test each OS branch in isolation.
+
 ## [1.4.34] - 2026-04-01
 
 ### Tests

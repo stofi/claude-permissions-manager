@@ -1163,6 +1163,29 @@ describe("showCommand — JSON", () => {
     expect(filesystem).toBeDefined();
     expect(filesystem!.url).toMatch(/^https?:\/\//);
   });
+
+  it("warnings field is an array of {severity,message} objects (show.ts:71)", async () => {
+    // show.ts:71: warnings: perms.warnings — full Warning objects in JSON output
+    // No existing test ever asserts json.warnings; only warningCount (number) is checked elsewhere
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+    // project-bypass has bypassPermissions mode → CRITICAL warning
+    await showCommand(join(FIXTURES, "project-bypass"), { json: true, includeGlobal: false });
+
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(json).toHaveProperty("warnings");
+    expect(Array.isArray(json.warnings)).toBe(true);
+    // project-bypass must have at least one warning (bypassPermissions → CRITICAL)
+    expect(json.warnings.length).toBeGreaterThan(0);
+    for (const w of json.warnings as Record<string, unknown>[]) {
+      expect(typeof w.severity).toBe("string");
+      expect(typeof w.message).toBe("string");
+    }
+    // Verify the CRITICAL bypass warning is present
+    const critical = (json.warnings as Record<string, unknown>[]).find((w) => w.severity === "critical");
+    expect(critical).toBeDefined();
+  });
 });
 
 // ────────────────────────────────────────────────────────────

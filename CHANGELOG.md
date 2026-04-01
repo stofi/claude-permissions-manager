@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.39] - 2026-04-01
+
+### Tests
+- **exportCommand globalSettings null branches**: Added test asserting `globalSettings.user` and `globalSettings.managed` are both `null` when `includeGlobal: false` (export.ts:119/130).
+- **exportCommand globalSettings.user field shape**: Added test verifying the serialized `globalSettings.user` object has `path`, `exists`, `parsed`, `allow`, `deny`, `ask`, and `mode` fields when present (export.ts:110-118). All prior globalSettings tests only checked `userMcpServers`.
+
 ## [1.4.38] - 2026-04-01
 
 ### Tests

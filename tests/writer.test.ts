@@ -125,6 +125,12 @@ describe("resolveSettingsPath", () => {
   it("throws when project path missing for local scope", () => {
     expect(() => resolveSettingsPath("local")).toThrow(/required/i);
   });
+
+  it("throws for unknown scope string (writer.ts:27)", () => {
+    // writer.ts:27: throw new Error(`Unknown scope: ${scope}`) — exhaustiveness check
+    // All valid scopes are tested above; this covers the dead-code fallthrough.
+    expect(() => resolveSettingsPath("bogus" as any, "/some/path")).toThrow("Unknown scope: bogus");
+  });
 });
 
 // ────────────────────────────────────────────────────────────

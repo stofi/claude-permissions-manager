@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.29] - 2026-04-01
+
+### Tests
+- **discovery symlink to valid directory**: Added test covering `discovery.ts:73-74` — the path where a symlink resolves successfully to a real directory. Creates `actual-project/.claude/settings.json`, symlinks it as `root/linked-project`, and verifies the project is discovered via the symlink (1 project found, 0 errors). Previously only broken symlinks, cycles, and symlink-to-file were tested.
+- **merger non-string array element guards**: Added test covering `merger.ts:354,359,364` — the `typeof raw === "string"` guards in the allow/deny/ask loops. Passes `[123, "Read", null]`, `[true, "Bash"]`, `[{}, "Write"]` as the respective arrays (via `unknown` cast) and asserts only the string elements survive: `["Read"]`, `["Bash"]`, `["Write"]`. These defensive guards protect against malformed JSON that passes `Array.isArray()` but contains non-string values.
+
 ## [1.4.28] - 2026-04-01
 
 ### Tests

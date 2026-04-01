@@ -115,6 +115,8 @@ describe("parseMcpFile", () => {
     expect(github!.args).toContain("-y");
     // env values must NOT be present, only the key names
     expect(github!.envVarNames).toContain("GITHUB_TOKEN");
+    // github server has no headers field — parser.ts:146: c.headers ? ... : undefined
+    expect(github!.headerNames).toBeUndefined();
 
     const fs = mcp.servers.find((s) => s.name === "filesystem");
     expect(fs).toBeDefined();
@@ -122,6 +124,8 @@ describe("parseMcpFile", () => {
     expect(fs!.url).toBe("https://mcp.example.com/fs");
     // header values must NOT be present
     expect(fs!.headerNames).toContain("Authorization");
+    // filesystem server has no env field — parser.ts:145: c.env ? ... : undefined
+    expect(fs!.envVarNames).toBeUndefined();
   });
 
   it("returns exists=false when .mcp.json is not present", async () => {

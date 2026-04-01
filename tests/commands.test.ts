@@ -564,6 +564,22 @@ describe("exportCommand — --output", () => {
       exportCommand({ root: FIXTURES, maxDepth: 3, format: "json", output: outFile })
     ).rejects.toThrow("Output directory does not exist");
   });
+
+  it("writes '✓ Exported N projects to FILE' to stderr on successful file write (export.ts:160-162)", async () => {
+    // export.ts:160-162: process.stderr.write(chalk.green(`✓ Exported ... projects to ${options.output}`))
+    // Existing tests verify the file content but never assert the stderr success message.
+    const outFile = join(tmpDir, "export.json");
+    const stderrMessages: string[] = [];
+    // Override the beforeEach stderr mock to capture calls
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      stderrMessages.push(String(chunk));
+      return true;
+    });
+    await exportCommand({ root: FIXTURES, maxDepth: 3, format: "json", output: outFile });
+    const combined = stderrMessages.join("");
+    expect(combined).toMatch(/Exported.*projects to/i);
+    expect(combined).toContain("export.json");
+  });
 });
 
 describe("exportCommand — invalid format", () => {
@@ -638,6 +654,27 @@ describe("allowCommand", () => {
     await allowCommand("Read", { project: tmpDir, scope: "project" });
     const calls = logSpy.mock.calls.map((c) => String(c[0]));
     expect(calls.some((m) => /Added to allow/i.test(m) && /Read/.test(m))).toBe(true);
+  });
+
+  it("defaults to 'local' scope when scope option is omitted (manage.ts:27)", async () => {
+    // manage.ts:27: const scope = scopeOpt ?? "local"; — fallback when no --scope flag is passed.
+    // All prior allowCommand tests pass explicit scope — this covers the undefined branch.
+    await allowCommand("Read", { project: tmpDir }); // no scope → defaults to "local"
+    const data = await readSettings("local");
+    expect(data.permissions.allow).toContain("Read");
+  });
+
+  it("defaults to process.cwd() when project option is omitted (manage.ts:22)", async () => {
+    // manage.ts:22: if (!projectOpt) return process.cwd(); — fallback when no --project flag.
+    // Spy on process.cwd() to redirect writes to tmpDir so the test is self-contained.
+    const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmpDir);
+    try {
+      await allowCommand("Read", { scope: "project" }); // no project → uses cwd (= tmpDir)
+      const data = await readSettings("project");
+      expect(data.permissions.allow).toContain("Read");
+    } finally {
+      cwdSpy.mockRestore();
+    }
   });
 });
 

@@ -50,10 +50,29 @@ describe("parseRule", () => {
 
   it("handles empty specifier parens — treats as opaque raw string (not a valid rule)", () => {
     // Regex requires .+ inside parens, so "Bash()" falls through to fallback
+    // merger.ts:15-16: if (!match) { return { tool: raw, raw }; }
     const r = parseRule("Bash()");
     expect(r.raw).toBe("Bash()");
-    // tool will be the full string since the regex didn't match a specifier group
+    expect(r.tool).toBe("Bash()"); // null-match fallback: tool = full raw string
     expect(r.specifier).toBeUndefined();
+  });
+
+  it("trims whitespace from tool name — match[1].trim() (merger.ts:19)", () => {
+    // "Bash (npm run *)" has a space before the paren; [^(]+ captures "Bash "
+    // match[1].trim() strips it to "Bash"
+    const r = parseRule("Bash (npm run *)");
+    expect(r.tool).toBe("Bash");
+    expect(r.specifier).toBe("npm run *");
+    expect(r.raw).toBe("Bash (npm run *)");
+  });
+
+  it("trims whitespace from specifier — match[2]?.trim() (merger.ts:20)", () => {
+    // Specifier with leading/trailing whitespace: "Read( **/.env )"
+    // match[2] = " **/.env ", after trim → "**/.env"
+    const r = parseRule("Read( **/.env )");
+    expect(r.tool).toBe("Read");
+    expect(r.specifier).toBe("**/.env");
+    expect(r.raw).toBe("Read( **/.env )");
   });
 });
 

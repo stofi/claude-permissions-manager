@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.38] - 2026-04-01
+
+### Tests
+- **listCommand global settings display**: Added 2 tests covering `list.ts:53-57` — the "User settings:" and "Managed settings:" header lines shown when `result.global.user/managed.exists` is true. All prior listCommand text tests used `includeGlobal:false`, bypassing these branches. Uses `vi.doMock` to inject a controlled scan result with the global settings present.
+
 ## [1.4.37] - 2026-04-01
 
 ### Tests

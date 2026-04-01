@@ -1077,6 +1077,94 @@ describe("listCommand — text output", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("shows 'User settings:' line when global user settings file exists (list.ts:53-54)", async () => {
+    // list.ts:53-54: result.global.user?.exists → show user settings path header
+    // All existing listCommand text tests use includeGlobal:false which skips this branch.
+    // Use vi.doMock to inject a scan result with global.user.exists=true.
+    const fakeProject = {
+      rootPath: tmpDir,
+      claudeDir: join(tmpDir, ".claude"),
+      settingsFiles: [],
+      claudeMdFiles: [],
+      effectivePermissions: {
+        defaultMode: "default" as const,
+        allow: [],
+        deny: [],
+        ask: [],
+        isBypassDisabled: false,
+        mcpServers: [],
+        envVarNames: [],
+        additionalDirs: [],
+        warnings: [],
+      },
+    };
+    vi.doMock("../src/core/discovery.js", () => ({
+      scan: vi.fn().mockResolvedValue({
+        projects: [fakeProject],
+        errors: [],
+        scannedAt: new Date(),
+        scanRoot: tmpDir,
+        global: {
+          user: { path: "/home/testuser/.claude/settings.json", scope: "user", exists: true, readable: true, parsed: true },
+        },
+      }),
+    }));
+    vi.resetModules();
+    const { listCommand: listCmd } = await import("../src/commands/list.js");
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await listCmd({ root: tmpDir, maxDepth: 1, json: false });
+    } finally {
+      vi.doUnmock("../src/core/discovery.js");
+      vi.resetModules();
+    }
+    expect(calls.join("\n")).toMatch(/User settings:/);
+  });
+
+  it("shows 'Managed settings:' line when global managed settings file exists (list.ts:56-57)", async () => {
+    // list.ts:56-57: result.global.managed?.exists → show managed settings path header
+    const fakeProject = {
+      rootPath: tmpDir,
+      claudeDir: join(tmpDir, ".claude"),
+      settingsFiles: [],
+      claudeMdFiles: [],
+      effectivePermissions: {
+        defaultMode: "default" as const,
+        allow: [],
+        deny: [],
+        ask: [],
+        isBypassDisabled: false,
+        mcpServers: [],
+        envVarNames: [],
+        additionalDirs: [],
+        warnings: [],
+      },
+    };
+    vi.doMock("../src/core/discovery.js", () => ({
+      scan: vi.fn().mockResolvedValue({
+        projects: [fakeProject],
+        errors: [],
+        scannedAt: new Date(),
+        scanRoot: tmpDir,
+        global: {
+          managed: { path: "/etc/claude-code/managed-settings.json", scope: "managed", exists: true, readable: true, parsed: true },
+        },
+      }),
+    }));
+    vi.resetModules();
+    const { listCommand: listCmd } = await import("../src/commands/list.js");
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await listCmd({ root: tmpDir, maxDepth: 1, json: false });
+    } finally {
+      vi.doUnmock("../src/core/discovery.js");
+      vi.resetModules();
+    }
+    expect(calls.join("\n")).toMatch(/Managed settings:/);
+  });
 });
 
 // ────────────────────────────────────────────────────────────

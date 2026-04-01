@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.33] - 2026-04-01
+
+### Tests
+- **diff MCP url change line**: Added test with two HTTP MCP servers having different URLs (`old.example.com` vs `new.example.com`). Asserts the `diff.ts:255-256` URL-change detail line (`"url: old → new"`). This branch was never previously executed.
+- **parseClaudeJson readFile EACCES**: Added test writing a `.claude.json` then chmod 000 before calling `parseClaudeJson`. Asserts empty `globalServers`/`projectServers` when `readFile` throws. Covers `parser.ts:191-194` catch block. Skipped for root environments.
+- **parseClaudeJson project entry with no mcpServers**: Added test with a `.claude.json` project entry that has `mcpServerApprovals` but no `mcpServers` field. Asserts `projectServers.get(path)` returns `[]` (the `parser.ts:231` false branch — `projectServers.set` runs unconditionally at line 255).
+
 ## [1.4.32] - 2026-04-01
 
 ### Tests

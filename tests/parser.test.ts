@@ -213,6 +213,38 @@ describe("parseClaudeJson", () => {
     expect(result.projectServers.size).toBe(0);
   });
 
+  it("returns empty results when file exists but cannot be read (EACCES) (parser.ts:191-194)", async () => {
+    // parser.ts:191-194: readFile throws → catch → return empty; warn to stderr
+    // Skip if running as root — root bypasses file permission checks
+    if (process.getuid?.() === 0) return;
+    writeFileSync(claudeJsonPath, JSON.stringify({ mcpServers: { s: { command: "x", args: [] } } }));
+    chmodSync(claudeJsonPath, 0o000);
+    try {
+      const result = await parseClaudeJson(claudeJsonPath);
+      expect(result.globalServers).toHaveLength(0);
+      expect(result.projectServers.size).toBe(0);
+    } finally {
+      chmodSync(claudeJsonPath, 0o644);
+    }
+  });
+
+  it("returns empty servers array for project entry with no mcpServers field (parser.ts:231)", async () => {
+    // parser.ts:231: if (projectData.mcpServers) false branch — project has approvals but no servers
+    const projectPath = "/home/user/some-project";
+    writeFileSync(claudeJsonPath, JSON.stringify({
+      projects: {
+        [projectPath]: {
+          mcpServerApprovals: { someServer: "approved" },
+          // no mcpServers field
+        },
+      },
+    }));
+    const result = await parseClaudeJson(claudeJsonPath);
+    // projectServers.set(projectPath, servers) runs regardless — empty array not undefined
+    expect(result.projectServers.get(projectPath)).toEqual([]);
+    expect(result.globalServers).toHaveLength(0);
+  });
+
   it("parses global MCP servers with all fields", async () => {
     writeFileSync(claudeJsonPath, JSON.stringify({
       mcpServers: {

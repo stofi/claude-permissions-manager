@@ -23,6 +23,7 @@ import {
 import { formatEffectivePermissions } from "../src/utils/format.js";
 import type { ClaudeProject } from "../src/core/types.js";
 import { completionCommand } from "../src/commands/completion.js";
+import { editCommand } from "../src/commands/edit.js";
 
 // ────────────────────────────────────────────────────────────
 // Helpers
@@ -2518,5 +2519,82 @@ describe("completionCommand", () => {
     await expect(completionCommand("fish")).rejects.toThrow("exit:1");
     expect(exitSpy).toHaveBeenCalledWith(1);
     exitSpy.mockRestore();
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// editCommand
+// ────────────────────────────────────────────────────────────
+
+describe("editCommand", () => {
+  it("creates an empty settings.local.json when file does not exist (edit.ts:25-28)", async () => {
+    // edit.ts: if (!existsSync(settingsPath)) { writeFile(stub) }
+    // Verifies the file-creation side-effect without launching a real editor.
+    // We mock spawn so no real editor is invoked.
+    vi.doMock("child_process", async (importOriginal) => {
+      const original = await importOriginal<typeof import("child_process")>();
+      return {
+        ...original,
+        spawn: (_cmd: string, _args: string[], _opts: object) => {
+          const EventEmitter = require("events");
+          const child = new EventEmitter();
+          process.nextTick(() => child.emit("exit", 0));
+          return child;
+        },
+      };
+    });
+    vi.resetModules();
+    const { editCommand: editMocked } = await import("../src/commands/edit.js");
+
+    const settingsFile = join(tmpDir, ".claude", "settings.local.json");
+    expect(settingsFile).toSatisfy((p: string) => !require("fs").existsSync(p));
+
+    await editMocked({ project: tmpDir, scope: "local" });
+
+    const content = JSON.parse(await readFile(settingsFile, "utf-8"));
+    expect(content).toEqual({});
+
+    vi.doUnmock("child_process");
+    vi.resetModules();
+  });
+
+  it("does not overwrite an existing settings file (edit.ts:25 false branch)", async () => {
+    // When the settings file already exists, editCommand should NOT recreate it.
+    vi.doMock("child_process", async (importOriginal) => {
+      const original = await importOriginal<typeof import("child_process")>();
+      return {
+        ...original,
+        spawn: (_cmd: string, _args: string[], _opts: object) => {
+          const EventEmitter = require("events");
+          const child = new EventEmitter();
+          process.nextTick(() => child.emit("exit", 0));
+          return child;
+        },
+      };
+    });
+    vi.resetModules();
+    const { editCommand: editMocked } = await import("../src/commands/edit.js");
+
+    // Pre-create the file with known content
+    await mkdir(join(tmpDir, ".claude"), { recursive: true });
+    const existing = JSON.stringify({ permissions: { allow: ["Read"] } }, null, 2) + "\n";
+    const settingsFile = join(tmpDir, ".claude", "settings.json");
+    await writeFile(settingsFile, existing, "utf-8");
+
+    await editMocked({ project: tmpDir, scope: "project" });
+
+    // Content should be unchanged
+    const afterContent = await readFile(settingsFile, "utf-8");
+    expect(afterContent).toBe(existing);
+
+    vi.doUnmock("child_process");
+    vi.resetModules();
+  });
+
+  it("throws for managed scope (edit.ts via resolveSettingsPath)", async () => {
+    // resolveSettingsPath throws for managed scope
+    await expect(
+      editCommand({ project: tmpDir, scope: "managed" })
+    ).rejects.toThrow(/managed/i);
   });
 });

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.44] - 2026-04-01
+
+### Tests
+- **`parseRule` null-match tool assertion** (`merger.ts:16`): Strengthened the `"Bash()"` test to also assert `r.tool === "Bash()"` — the null-match fallback returns `{ tool: raw, raw }`, but the prior test only asserted `raw` and `specifier`.
+- **`parseRule` tool-name whitespace trimming** (`merger.ts:19`): New test for `"Bash (npm run *)"` — a space before the paren means `[^(]+` captures `"Bash "`, and `match[1].trim()` strips it. Previously the trim on the tool name was dead code in tests.
+- **`parseRule` specifier whitespace trimming** (`merger.ts:20`): New test for `"Read( **/.env )"` — specifier `" **/.env "` trimmed to `"**/.env"` via `match[2]?.trim()`. Previously the specifier trim was untested for whitespace-padded inputs.
+- **`readSettingsOrEmpty` non-ENOENT re-throw** (`writer.ts:41`): New test that chmod-000's a settings file and calls `readSettingsOrEmpty` directly, verifying the `throw err` branch fires for EACCES. Also adds a direct test for the ENOENT-swallowed case (returns `{}`).
+
 ## [1.4.43] - 2026-04-01
 
 ### Tests

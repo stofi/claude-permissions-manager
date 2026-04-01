@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync } from "fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, chmodSync } from "fs";
 import { readFile } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -10,6 +10,7 @@ import {
   clearAllRules,
   validateRule,
   resolveSettingsPath,
+  readSettingsOrEmpty,
 } from "../src/core/writer.js";
 
 // ────────────────────────────────────────────────────────────
@@ -539,5 +540,34 @@ describe("clearAllRules", () => {
     expect(data.permissions.ask).toEqual([]);
     // writer.ts:186: ...data spreads root-level fields — verify they're preserved
     expect((data as Record<string, unknown>).someOtherKey).toBe(true);
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// readSettingsOrEmpty — error handling
+// ────────────────────────────────────────────────────────────
+
+describe("readSettingsOrEmpty", () => {
+  it("re-throws non-ENOENT errors (writer.ts:41)", async () => {
+    // writer.ts:37-42: catch block only swallows ENOENT; any other error (e.g. EACCES) is re-thrown.
+    // Prior tests only trigger ENOENT (file-not-found). This covers the `throw err` branch.
+    if (process.getuid?.() === 0) return; // root bypasses permission checks
+    const dir = mkdtempSync(join(tmpdir(), "cpm-writer-err-"));
+    const path = join(dir, "settings.json");
+    try {
+      mkdirSync(join(dir, ".claude"), { recursive: true });
+      writeFileSync(path, JSON.stringify({ permissions: {} }));
+      chmodSync(path, 0o000); // make unreadable → readFile throws EACCES
+      await expect(readSettingsOrEmpty(path)).rejects.toThrow();
+    } finally {
+      chmodSync(path, 0o644);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns empty object for missing file (ENOENT swallowed)", async () => {
+    // writer.ts:38-40: ENOENT is caught and returns {} — verify the happy-ENOENT path directly
+    const result = await readSettingsOrEmpty("/nonexistent/path/settings.json");
+    expect(result).toEqual({});
   });
 });

@@ -201,6 +201,8 @@ describe("initCommand", () => {
     expect(combined).toMatch(/WARNING/i);
     expect(combined).toMatch(/bypassPermissions/i);
   });
+
+
 });
 
 // ────────────────────────────────────────────────────────────
@@ -806,6 +808,21 @@ describe("resetAllCommand", () => {
     exitSpy.mockRestore();
   });
 
+  it("prints confirmation requirement message when called without --yes (manage.ts:267-275)", async () => {
+    // manage.ts:267-275: !opts.yes → print "This will clear ALL permission rules..." + "Use --yes" + exit 1
+    // Existing test only checks that it exits, not the message content.
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit:1"); });
+    const logSpy = vi.spyOn(console, "log");
+    try {
+      await resetAllCommand({ project: tmpDir, scope: "project" }).catch(() => {});
+    } finally {
+      exitSpy.mockRestore();
+    }
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /clear ALL permission rules/i.test(m))).toBe(true);
+    expect(calls.some((m) => /Use --yes to confirm/i.test(m))).toBe(true);
+  });
+
   it("clears all rules when --yes is provided", async () => {
     await allowCommand("Read", { project: tmpDir, scope: "project" });
     await denyCommand("Bash(sudo *)", { project: tmpDir, scope: "project" });
@@ -1023,6 +1040,20 @@ describe("listCommand — text output", () => {
     await listCommand({ root: FIXTURES, maxDepth: 3, json: false, includeGlobal: false });
     const output = calls.join("\n");
     expect(output).toMatch(/warning.*across all projects/i);
+  });
+
+  it("shows ⚠ N in table row for projects with warnings (format.ts:60-62)", async () => {
+    // format.ts:60-62: perms.warnings.length > 0 → chalk.yellow(`⚠ ${N}`) in formatProjectRow
+    // Existing tests only check the footer, not the per-row ⚠ indicator.
+    // project-bypass (bypassPermissions mode) generates at least 1 warning.
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await listCommand({ root: FIXTURES, maxDepth: 3, json: false, includeGlobal: false });
+    const output = calls.join("\n");
+    // The ⚠ indicator should appear in the table for project-bypass
+    expect(output).toContain("⚠");
+    // Should show a numeric count (1 or more)
+    expect(output).toMatch(/⚠ \d/);
   });
 
   it("shows scan errors section when scan produces errors", async () => {

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.47] - 2026-04-01
+
+### Tests
+- **`merger.ts:144-148` no-deny-rules warning**: New test exercises the `nonReadAllows.length > 0 && deny.length === 0` branch that emits `"No deny rules configured — consider denying sensitive paths"`. Prior tests always either included deny rules or only read-only allows. Companion negative test verifies the warning is suppressed when all allows are read-only tools.
+- **`export.ts:156` error message text**: Strengthened the "output dir not found" test to assert `.toThrow("Output directory does not exist")` — prior test only verified it throws without checking message content.
+- **`show.ts:11` process.cwd() fallback**: New test calls `showCommand(undefined, ...)` and mocks scan to verify that `process.cwd()` is used as the target path when no explicit path is provided. All prior tests pass explicit fixture paths.
+
 ## [1.4.46] - 2026-04-01
 
 ### Tests

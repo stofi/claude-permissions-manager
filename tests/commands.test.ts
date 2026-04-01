@@ -2279,6 +2279,58 @@ describe("diffCommand — text output", () => {
       rmSync(dirB, { recursive: true, force: true });
     }
   });
+
+  it("shows approval change line for modified MCP server (diff.ts:258-259)", async () => {
+    // diff.ts:258-259: apA !== apB → "approval: old → new" — never tested
+    // We mock scan to inject two fake projects with the same-named server at different approval states.
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-ap-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-ap-b-"));
+    try {
+      const makeResult = (root: string, approvalState: string) => ({
+        projects: [{
+          rootPath: root,
+          claudeDir: join(root, ".claude"),
+          settingsFiles: [],
+          claudeMdFiles: [],
+          effectivePermissions: {
+            defaultMode: "default" as const,
+            allow: [],
+            deny: [],
+            ask: [],
+            isBypassDisabled: false,
+            mcpServers: [{ name: "myserver", scope: "local" as const, approvalState, command: "run" }],
+            envVarNames: [],
+            additionalDirs: [],
+            warnings: [],
+          },
+        }],
+        errors: [],
+        scannedAt: new Date(),
+        scanRoot: root,
+        global: {},
+      });
+      vi.doMock("../src/core/discovery.js", () => ({
+        scan: vi.fn().mockImplementation(({ root }: { root: string }) =>
+          Promise.resolve(makeResult(root, root === dirA ? "approved" : "denied"))
+        ),
+      }));
+      vi.resetModules();
+      const { diffCommand: diffMocked } = await import("../src/commands/diff.js");
+
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+
+      await diffMocked(dirA, dirB, {});
+
+      const output = calls.map((a) => a.join("")).join("\n");
+      expect(output).toMatch(/approval:.*approved.*denied/);
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+      vi.doUnmock("../src/core/discovery.js");
+      vi.resetModules();
+    }
+  });
 });
 
 // ────────────────────────────────────────────────────────────
@@ -2293,6 +2345,22 @@ describe("diffCommand — error cases", () => {
     try {
       await expect(
         diffCommand(emptyDir, join(FIXTURES, "project-a"), { json: false })
+      ).rejects.toThrow("exit:1");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    } finally {
+      rmSync(emptyDir, { recursive: true, force: true });
+      exitSpy.mockRestore();
+    }
+  });
+
+  it("exits 1 when second path has no .claude directory (diff.ts:32-35)", async () => {
+    // diff.ts:32-35: !proj2 → console.error + process.exit(1)
+    // Symmetric with the !proj1 test above — never tested until now.
+    const emptyDir = mkdtempSync(join(tmpdir(), "cpm-diff-empty2-"));
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    try {
+      await expect(
+        diffCommand(join(FIXTURES, "project-a"), emptyDir, { json: false })
       ).rejects.toThrow("exit:1");
       expect(exitSpy).toHaveBeenCalledWith(1);
     } finally {
@@ -2760,5 +2828,120 @@ describe("editCommand", () => {
     await expect(
       editCommand({ project: tmpDir, scope: "managed" })
     ).rejects.toThrow(/managed/i);
+  });
+
+  it("uses 'local' scope when scope option is omitted (edit.ts:16)", async () => {
+    // edit.ts:16: const scope = (opts.scope ?? "local") as SettingsScope
+    // All prior edit tests pass scope explicitly; this covers the default fallback.
+    vi.doMock("child_process", async (importOriginal) => {
+      const original = await importOriginal<typeof import("child_process")>();
+      return {
+        ...original,
+        spawn: (_cmd: string, _args: string[], _opts: object) => {
+          const EventEmitter = require("events");
+          const child = new EventEmitter();
+          process.nextTick(() => child.emit("exit", 0));
+          return child;
+        },
+      };
+    });
+    vi.resetModules();
+    const { editCommand: editMocked } = await import("../src/commands/edit.js");
+
+    await editMocked({ project: tmpDir }); // no scope → should default to "local"
+
+    // Default scope "local" → file should be settings.local.json
+    const localFile = join(tmpDir, ".claude", "settings.local.json");
+    const { existsSync } = await import("fs");
+    expect(existsSync(localFile)).toBe(true);
+
+    vi.doUnmock("child_process");
+    vi.resetModules();
+  });
+
+  it("uses process.cwd() when project option is omitted (edit.ts:17-19)", async () => {
+    // edit.ts:17-19: opts.project ? resolve(expandHome(opts.project)) : process.cwd()
+    const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmpDir);
+    vi.doMock("child_process", async (importOriginal) => {
+      const original = await importOriginal<typeof import("child_process")>();
+      return {
+        ...original,
+        spawn: (_cmd: string, _args: string[], _opts: object) => {
+          const EventEmitter = require("events");
+          const child = new EventEmitter();
+          process.nextTick(() => child.emit("exit", 0));
+          return child;
+        },
+      };
+    });
+    vi.resetModules();
+    const { editCommand: editMocked } = await import("../src/commands/edit.js");
+
+    try {
+      await editMocked({ scope: "local" }); // no project → falls back to process.cwd() = tmpDir
+      const localFile = join(tmpDir, ".claude", "settings.local.json");
+      const { existsSync } = await import("fs");
+      expect(existsSync(localFile)).toBe(true);
+    } finally {
+      cwdSpy.mockRestore();
+      vi.doUnmock("child_process");
+      vi.resetModules();
+    }
+  });
+
+  it("propagates spawn error (edit.ts:44 — child.on('error', rej))", async () => {
+    // edit.ts:44: child.on("error", rej) — spawn failure rejects the promise
+    vi.doMock("child_process", async (importOriginal) => {
+      const original = await importOriginal<typeof import("child_process")>();
+      return {
+        ...original,
+        spawn: (_cmd: string, _args: string[], _opts: object) => {
+          const EventEmitter = require("events");
+          const child = new EventEmitter();
+          process.nextTick(() => child.emit("error", new Error("SPAWN_FAILED")));
+          return child;
+        },
+      };
+    });
+    vi.resetModules();
+    const { editCommand: editMocked } = await import("../src/commands/edit.js");
+
+    // Pre-create the file so the error path (not file-creation) is hit
+    await mkdir(join(tmpDir, ".claude"), { recursive: true });
+    await writeFile(join(tmpDir, ".claude", "settings.json"), JSON.stringify({ permissions: {} }), "utf-8");
+
+    await expect(editMocked({ project: tmpDir, scope: "project" })).rejects.toThrow("SPAWN_FAILED");
+
+    vi.doUnmock("child_process");
+    vi.resetModules();
+  });
+
+  it("logs 'Created empty settings file' message when creating a new file (edit.ts:30)", async () => {
+    // edit.ts:30: console.log(chalk.gray(`Created empty settings file: ...`))
+    // Prior tests do not assert on this message — they only check file content.
+    vi.doMock("child_process", async (importOriginal) => {
+      const original = await importOriginal<typeof import("child_process")>();
+      return {
+        ...original,
+        spawn: (_cmd: string, _args: string[], _opts: object) => {
+          const EventEmitter = require("events");
+          const child = new EventEmitter();
+          process.nextTick(() => child.emit("exit", 0));
+          return child;
+        },
+      };
+    });
+    vi.resetModules();
+    const { editCommand: editMocked } = await import("../src/commands/edit.js");
+
+    const logCalls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { logCalls.push(args.join("")); });
+
+    await editMocked({ project: tmpDir, scope: "local" }); // file does not exist → created
+
+    expect(logCalls.join("")).toMatch(/Created empty settings file/i);
+
+    vi.doUnmock("child_process");
+    vi.resetModules();
   });
 });

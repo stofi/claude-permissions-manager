@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.51] - 2026-04-02
+
+### Tests
+- **`diff.ts:32-35` !proj2 exits 1**: New test passes a valid project as path1 and an empty dir as path2, verifying `process.exit(1)` fires when the second project has no `.claude` directory.
+- **`diff.ts:258-259` approval state change**: New test mocks `scan` to return two fake projects with the same-named MCP server but different `approvalState` values (`"approved"` vs `"denied"`), verifying the `approval: old → new` line appears in text output.
+- **`edit.ts:16` default scope "local"**: New test calls `editCommand` without a `scope` option and asserts `settings.local.json` is created, covering the `opts.scope ?? "local"` fallback.
+- **`edit.ts:17-19` default project cwd**: New test spies on `process.cwd()` and calls `editCommand` without a `project` option, verifying the cwd fallback writes the file to the correct directory.
+- **`edit.ts:44` spawn error**: New test emits an `"error"` event from the mocked child process, verifying the promise rejects with the spawn error.
+- **`edit.ts:30` created-file log**: New test verifies `"Created empty settings file"` is logged when the target settings file does not exist before editing.
+
 ## [1.4.50] - 2026-04-02
 
 ### Tests

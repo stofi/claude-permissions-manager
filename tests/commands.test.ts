@@ -969,6 +969,8 @@ describe("listCommand — text output", () => {
       await listCommand({ root: emptyDir, maxDepth: 1, json: false, includeGlobal: false });
       const output = calls.join("\n");
       expect(output).toMatch(/No Claude projects found/i);
+      // list.ts:48: "Tip: Create a .claude/settings.json file in your project."
+      expect(output).toMatch(/Create.*\.claude\/settings\.json/i);
     } finally {
       rmSync(emptyDir, { recursive: true, force: true });
     }
@@ -1471,6 +1473,8 @@ describe("diffCommand — text output", () => {
     // project-a has allow rules that project-b doesn't — should show as "only in A"
     expect(output).toMatch(/ALLOW/);
     expect(output).toMatch(/-.*only in A/);
+    // project-b has Bash(git *) which project-a doesn't — diff.ts:203 "only in B" branch
+    expect(output).toMatch(/\+.*only in B/);
   });
 
   it("shows identical banner when both projects are the same", async () => {
@@ -1498,6 +1502,16 @@ describe("diffCommand — text output", () => {
     expect(output).toMatch(/Mode:.*\(same\)/);
     expect(output).toMatch(/Bypass lock:.*\(same\)/);
     expect(output).toContain("= github");  // unchanged MCP server in both
+  });
+
+  it("shows 'locked (same)' for bypass when both projects have bypass disabled", async () => {
+    // diff.ts:179: p1.isBypassDisabled === p2.isBypassDisabled === true → sameStr = "locked"
+    // project-a vs project-a only covers "not locked (same)"; this covers the "locked" variant.
+    const calls: string[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+    await diffCommand(join(FIXTURES, "project-bypass-locked"), join(FIXTURES, "project-bypass-locked"), { includeGlobal: false });
+    const output = calls.map((a) => a.join("")).join("\n");
+    expect(output).toMatch(/Bypass lock:.*locked.*\(same\)/);
   });
 
   it("shows ~ indicator in text output for modified same-named MCP server", async () => {
@@ -2018,6 +2032,19 @@ describe("formatEffectivePermissions — MCP approval state display", () => {
     // Must NOT contain "approved" or "pending" for this server
     expect(output).not.toContain("approved");
     expect(output).not.toContain("pending");
+  });
+
+  it("shows command without args when MCP server has command but no args", () => {
+    // format.ts:145-147: s.args && s.args.length > 0 false branch — command shown alone
+    // All existing tests use servers with args (e.g. "npx -y @modelcontextprotocol/...").
+    // This covers the path where a server has command but args is undefined or empty.
+    const project = makeProject([
+      { name: "bare-server", scope: "local", command: "my-tool", args: [] },
+    ]);
+    const output = formatEffectivePermissions(project);
+    expect(output).toContain("cmd: my-tool");
+    // Should not append a space or extra tokens after "my-tool"
+    expect(output).not.toMatch(/cmd: my-tool\s+\S/);
   });
 });
 

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.30] - 2026-04-01
+
+### Tests
+- **diff `+` rule indicator (only in B)**: Added assertion to existing `project-a vs project-b` test: project-b has `Bash(git *)` that project-a lacks, so `diff.ts:203` `+ rule (only in B)` branch is now explicitly asserted via `expect(output).toMatch(/\+.*only in B/)`.
+- **diff bypass "locked (same)"**: Added test diffing `project-bypass-locked` against itself — both have `isBypassDisabled: true` — asserting `"Bypass lock: locked (same)"`. The existing (same) test used project-a (both `false`), so the `sameStr = "locked"` branch was never executed.
+- **list empty-dir "Tip" message**: Strengthened existing empty-dir test to also assert `list.ts:48` tip text: `"Tip: Create a .claude/settings.json file in your project."` — only `"No Claude projects found"` was previously asserted.
+- **format MCP command without args**: Added test using `makeProject` helper with a server that has `command: "my-tool", args: []` — asserts `cmd: my-tool` appears and no extra tokens follow. Covers `format.ts:145-147` when `s.args.length === 0` (falls back to just `s.command`).
+- **parser envVarNames/headerNames undefined**: Strengthened the `parseMcpFile` "parses a valid .mcp.json" test to assert cross-field absence: `github!.headerNames` is `undefined` (github has env but no headers), `fs!.envVarNames` is `undefined` (filesystem has headers but no env). Covers `parser.ts:145-146` `c.env ? ... : undefined` / `c.headers ? ... : undefined` false branches.
+
 ## [1.4.29] - 2026-04-01
 
 ### Tests

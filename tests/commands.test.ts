@@ -1471,6 +1471,19 @@ describe("diffCommand — text output", () => {
     expect(output).toMatch(/identical effective permissions/);
   });
 
+  it("shows '(same)' for mode/bypass and '= name' for unchanged MCP servers", async () => {
+    // diff.ts:169: p1.defaultMode === p2.defaultMode → "Mode:  default (same)"
+    // diff.ts:178-179: p1.isBypassDisabled === p2.isBypassDisabled → "Bypass lock:  not locked (same)"
+    // diff.ts:267: !mcpServerChanged(sA, sB) → "  = github" for identical server in both
+    const calls: string[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+    await diffCommand(join(FIXTURES, "project-a"), join(FIXTURES, "project-a"), { includeGlobal: false });
+    const output = calls.map((a) => a.join("")).join("\n");
+    expect(output).toMatch(/Mode:.*\(same\)/);
+    expect(output).toMatch(/Bypass lock:.*\(same\)/);
+    expect(output).toContain("= github");  // unchanged MCP server in both
+  });
+
   it("shows ~ indicator in text output for modified same-named MCP server", async () => {
     const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-txt-a-"));
     const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-txt-b-"));

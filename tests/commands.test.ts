@@ -560,6 +560,15 @@ describe("allowCommand", () => {
     await expect(allowCommand("Read", { project: tmpDir, scope: "bogus" })).rejects.toThrow();
     exitSpy.mockRestore();
   });
+
+  it("prints '✓ Added to allow:' success message (manage.ts:83)", async () => {
+    // manage.ts:83: console.log(chalk.green(`✓ Added to allow: ${chalk.bold(rule)}`))
+    // All prior allowCommand tests only check data.permissions — the console message is never asserted.
+    const logSpy = vi.spyOn(console, "log");
+    await allowCommand("Read", { project: tmpDir, scope: "project" });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /Added to allow/i.test(m) && /Read/.test(m))).toBe(true);
+  });
 });
 
 describe("denyCommand", () => {
@@ -596,6 +605,15 @@ describe("denyCommand", () => {
     const data = await readSettings();
     expect(data.permissions.deny.filter((r: string) => r === "Bash(sudo *)")).toHaveLength(1);
   });
+
+  it("prints '✓ Added to deny:' success message (manage.ts:120)", async () => {
+    // manage.ts:120: console.log(chalk.red(`✓ Added to deny: ${chalk.bold(rule)}`))
+    // All prior denyCommand tests only check data.permissions — the console message is never asserted.
+    const logSpy = vi.spyOn(console, "log");
+    await denyCommand("Bash(sudo *)", { project: tmpDir, scope: "project" });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /Added to deny/i.test(m) && /Bash/.test(m))).toBe(true);
+  });
 });
 
 describe("askCommand", () => {
@@ -630,6 +648,15 @@ describe("askCommand", () => {
     expect(calls.some((m) => /already in ask/i.test(m))).toBe(true);
     const data = await readSettings();
     expect(data.permissions.ask.filter((r: string) => r === "Bash(git push *)")).toHaveLength(1);
+  });
+
+  it("prints '✓ Added to ask:' success message (manage.ts:154)", async () => {
+    // manage.ts:154: console.log(chalk.yellow(`✓ Added to ask: ${chalk.bold(rule)}`))
+    // All prior askCommand tests only check data.permissions — the console message is never asserted.
+    const logSpy = vi.spyOn(console, "log");
+    await askCommand("Bash(git push *)", { project: tmpDir, scope: "project" });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /Added to ask/i.test(m) && /Bash/.test(m))).toBe(true);
   });
 });
 
@@ -858,6 +885,8 @@ describe("--dry-run flag", () => {
     await modeCommand("auto", { project: tmpDir, scope: "project", dryRun: true });
     const calls = logSpy.mock.calls.map((c) => String(c[0]));
     expect(calls.some((m) => /plan/.test(m) && /auto/.test(m))).toBe(true);
+    // manage.ts:217: `Would set defaultMode: ${current} → ${mode}` — arrow format never asserted
+    expect(calls.some((m) => /Would set defaultMode/.test(m) && /→/.test(m))).toBe(true);
     // File should still have "plan"
     const data = await readSettings();
     expect(data.permissions.defaultMode).toBe("plan");

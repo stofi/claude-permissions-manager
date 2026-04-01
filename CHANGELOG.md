@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.41] - 2026-04-01
+
+### Tests
+- **allowCommand success message**: Added assertion for `manage.ts:83` — `✓ Added to allow: <rule>` console output. All prior allowCommand tests only checked file state.
+- **denyCommand success message**: Added assertion for `manage.ts:120` — `✓ Added to deny: <rule>` console output. All prior denyCommand tests only checked file state.
+- **askCommand success message**: Added assertion for `manage.ts:154` — `✓ Added to ask: <rule>` console output. All prior askCommand tests only checked file state.
+- **modeCommand dry-run arrow format**: Strengthened dry-run test to also assert the `→` arrow in `manage.ts:217` output (`Would set defaultMode: <current> → <mode>`).
+
 ## [1.4.40] - 2026-04-01
 
 ### Tests

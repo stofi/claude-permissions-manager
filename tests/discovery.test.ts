@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { join } from "path";
 import { existsSync } from "fs";
 import { mkdtemp, mkdir, writeFile, symlink, rm } from "fs/promises";
@@ -257,5 +257,40 @@ describe("scan — fixture directory", () => {
     expect(rawAllow).toContain("Read");
     const rawDeny = perms.deny.map((r) => r.raw);
     expect(rawDeny).toContain("Read(**/.env)");
+  });
+
+  it("formats non-Error buildProject rejection as String(reason) (discovery.ts:222)", async () => {
+    // discovery.ts:220-222: result.reason instanceof Error ? `${name}: ${message}` : String(result.reason)
+    // The `: String(result.reason)` branch is never exercised — all real rejections use Error objects.
+    vi.doMock("../src/core/parser.js", async (importOriginal) => {
+      const original = await importOriginal<typeof import("../src/core/parser.js")>();
+      let callCount = 0;
+      return {
+        ...original,
+        parseSettingsFile: async (path: string, scope: string) => {
+          // Throw a non-Error on the first project-scoped call to trigger the String() branch
+          if (scope === "project" && callCount++ === 0) {
+            throw "non-error string rejection";
+          }
+          return original.parseSettingsFile(path, scope);
+        },
+      };
+    });
+    vi.resetModules();
+    const { scan: scanMocked } = await import("../src/core/discovery.js");
+
+    const root = await mkdtemp(join(tmpdir(), "cpm-non-error-"));
+    try {
+      await mkdir(join(root, "proj", ".claude"), { recursive: true });
+      const result = await scanMocked({ root, maxDepth: 2, includeGlobal: false });
+      expect(result.errors.length).toBeGreaterThan(0);
+      // String("non-error string rejection") === "non-error string rejection"
+      const err = result.errors.find((e) => e.error === "non-error string rejection");
+      expect(err).toBeDefined();
+    } finally {
+      await rm(root, { recursive: true, force: true });
+      vi.doUnmock("../src/core/parser.js");
+      vi.resetModules();
+    }
   });
 });

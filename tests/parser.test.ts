@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, chmodSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -355,6 +355,38 @@ describe("parseClaudeJson", () => {
     const result = await parseClaudeJson(claudeJsonPath);
     expect(result.globalServers).toHaveLength(0);
     expect(result.projectServers.size).toBe(1);
+  });
+
+  it("writes warning to stderr for invalid JSON (parser.ts:201)", async () => {
+    // parser.ts:201: process.stderr.write(`Warning: ${claudeJsonPath} contains invalid JSON — ...`)
+    // Prior test only checks that results are empty; stderr message is never asserted.
+    writeFileSync(claudeJsonPath, "not json {{{");
+    const stderrSpy = vi.spyOn(process.stderr, "write");
+    try {
+      await parseClaudeJson(claudeJsonPath);
+      const output = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+      expect(output).toMatch(/contains invalid JSON/);
+      expect(output).toMatch(/MCP approval states not loaded/);
+    } finally {
+      stderrSpy.mockRestore();
+    }
+  });
+
+  it("writes warning to stderr when file cannot be read (parser.ts:192)", async () => {
+    // parser.ts:192: process.stderr.write(`Warning: could not read ${claudeJsonPath}: ${err.message}`)
+    // Prior EACCES test only checks return value; stderr message is never asserted.
+    if (process.getuid?.() === 0) return; // root bypasses permission checks
+    writeFileSync(claudeJsonPath, JSON.stringify({ mcpServers: {} }));
+    chmodSync(claudeJsonPath, 0o000);
+    const stderrSpy = vi.spyOn(process.stderr, "write");
+    try {
+      await parseClaudeJson(claudeJsonPath);
+      const output = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+      expect(output).toMatch(/could not read/);
+    } finally {
+      chmodSync(claudeJsonPath, 0o644);
+      stderrSpy.mockRestore();
+    }
   });
 });
 

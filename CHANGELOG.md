@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.36] - 2026-04-01
+
+### Tests
+- **resetAllCommand confirmation message**: Added test for `manage.ts:267-275` — `resetAllCommand` without `--yes` prints "clear ALL permission rules" and "Use --yes to confirm". Previously only the `--yes` happy-path was tested.
+- **formatProjectRow warning indicator**: Added test asserting `format.ts:60-62` emits `⚠ N` in the table row for projects with warnings. The warnings count indicator was rendered but never explicitly asserted.
+- **addRule root field preservation with no permissions key**: Added test for `writer.ts:103-104` null-coalescing branch — when settings file has no `permissions` key, `addRule` creates the key and preserves other root-level fields.
+
 ## [1.4.35] - 2026-04-01
 
 ### Tests

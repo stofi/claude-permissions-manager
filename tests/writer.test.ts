@@ -195,6 +195,20 @@ describe("addRule", () => {
     await expect(addRule("", "allow", path)).rejects.toThrow();
   });
 
+  it("creates permissions object and preserves root fields when file has no permissions key (writer.ts:103-104)", async () => {
+    // writer.ts:103-104: `const perms = data.permissions ?? {}` — null-coalescing branch when
+    // file exists but has no permissions field; root fields must be preserved via `...data` spread.
+    const path = settingsPath();
+    const { mkdir, writeFile } = await import("fs/promises");
+    await mkdir(join(tmpDir, ".claude"), { recursive: true });
+    await writeFile(path, JSON.stringify({ extraKey: "preserved" }), "utf-8");
+    await addRule("Read", "allow", path);
+    const data = await readSettings();
+    expect(data.permissions.allow).toContain("Read");
+    // Root-level field must survive the write
+    expect((data as Record<string, unknown>).extraKey).toBe("preserved");
+  });
+
   it("throws for whitespace-only rule", async () => {
     const path = settingsPath();
     await expect(addRule("   ", "allow", path)).rejects.toThrow(/empty/i);

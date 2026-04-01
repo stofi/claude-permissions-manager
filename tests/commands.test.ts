@@ -389,6 +389,43 @@ describe("exportCommand — JSON", () => {
       expect(typeof s.scope).toBe("string");
     }
   });
+
+  it("globalSettings.user is null when includeGlobal is false (export.ts:119)", async () => {
+    // export.ts:119: result.global.user ? {...} : null — null branch when includeGlobal=false
+    const lines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      lines.push(String(chunk));
+      return true;
+    });
+    await exportCommand({ root: FIXTURES, maxDepth: 3, format: "json", includeGlobal: false });
+    const json = JSON.parse(lines.join(""));
+    expect(json.globalSettings.user).toBeNull();
+    expect(json.globalSettings.managed).toBeNull();
+  });
+
+  it("globalSettings.user has path/exists/parsed/allow/deny/ask/mode fields when present (export.ts:110-118)", async () => {
+    // export.ts:110-118: result.global.user is defined → serialize its fields
+    // All prior globalSettings tests only check userMcpServers. This explicitly checks the user object shape.
+    const lines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      lines.push(String(chunk));
+      return true;
+    });
+    await exportCommand({ root: FIXTURES, maxDepth: 3, format: "json" });
+    const json = JSON.parse(lines.join(""));
+    // globalSettings.user is non-null when includeGlobal=true (default) and settings file exists
+    if (json.globalSettings.user !== null) {
+      const u = json.globalSettings.user as Record<string, unknown>;
+      expect(typeof u.path).toBe("string");
+      expect(typeof u.exists).toBe("boolean");
+      expect(typeof u.parsed).toBe("boolean");
+      expect(Array.isArray(u.allow)).toBe(true);
+      expect(Array.isArray(u.deny)).toBe(true);
+      expect(Array.isArray(u.ask)).toBe(true);
+      // mode may be undefined if not set, so just check key is present
+      expect(u).toHaveProperty("mode");
+    }
+  });
 });
 
 // ────────────────────────────────────────────────────────────

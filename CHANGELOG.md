@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.28] - 2026-04-01
+
+### Tests
+- **init scope-specific tip branches**: Added two tests covering `init.ts:203-208` — the tip messages printed after `initCommand` completes:
+  - `scope === "project"` → "Tip: commit this file to share permissions with your team." (`init.ts:203-204`): verified with `preset: "safe", scope: "project"`
+  - `scope === "local"` → "Tip: add .claude/settings.local.json to .gitignore." (`init.ts:205-206`): verified with `preset: "safe", scope: "local"`
+  - The `else` branch (user scope) was intentionally skipped as it would write to the real `~/.claude/settings.json`.
+
 ## [1.4.27] - 2026-04-01
 
 ### Tests

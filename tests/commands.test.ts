@@ -175,6 +175,22 @@ describe("initCommand", () => {
     expect(content.permissions?.defaultMode ?? "default").toBe("default");
   });
 
+  it("shows 'commit this file' tip for project scope", async () => {
+    // init.ts:203-204: scope === "project" → "Tip: commit this file to share permissions with your team."
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { logs.push(args.join(" ")); });
+    await initCommand({ project: tmpDir, preset: "safe", scope: "project" });
+    expect(logs.join("\n")).toMatch(/commit.*team/i);
+  });
+
+  it("shows 'gitignore' tip for local scope", async () => {
+    // init.ts:205-206: scope === "local" → "Tip: add .claude/settings.local.json to .gitignore."
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { logs.push(args.join(" ")); });
+    await initCommand({ project: tmpDir, preset: "safe", scope: "local" });
+    expect(logs.join("\n")).toMatch(/gitignore/i);
+  });
+
   it("prints bypassPermissions warning when mode=bypassPermissions", async () => {
     // init.ts:210-212: `if (mode === "bypassPermissions") { ... }` block
     // Never reached in other tests — all use default/plan/acceptEdits modes

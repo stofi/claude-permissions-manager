@@ -706,6 +706,17 @@ describe("--dry-run flag", () => {
     expect(calls.some((m) => /deny takes precedence/i.test(m))).toBe(true);
   });
 
+  it("allowCommand --dry-run shows 'also in ask' when rule exists in ask list (manage.ts:50)", async () => {
+    // manage.ts:50: conflictsWith !== "deny" → `also in ${result.conflictsWith}` (the false branch)
+    // conflictsWith === "ask" → "also in ask"
+    await askCommand("Read", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await allowCommand("Read", { project: tmpDir, scope: "project", dryRun: true });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /dry.run/i.test(m))).toBe(true);
+    expect(calls.some((m) => /also in ask/i.test(m))).toBe(true);
+  });
+
   it("denyCommand --dry-run does not write to file", async () => {
     await denyCommand("Bash(sudo *)", { project: tmpDir, scope: "project", dryRun: true });
     await expect(readFile(settingsPath(), "utf-8")).rejects.toThrow();
@@ -1531,6 +1542,8 @@ describe("diffCommand — text output", () => {
     expect(output).toMatch(/Mode:.*\(same\)/);
     expect(output).toMatch(/Bypass lock:.*\(same\)/);
     expect(output).toContain("= github");  // unchanged MCP server in both
+    // diff.ts:16-18: same root → "Note: comparing a project with itself" — never asserted
+    expect(output).toMatch(/comparing a project with itself/);
   });
 
   it("shows 'locked (same)' for bypass when both projects have bypass disabled", async () => {
@@ -1697,6 +1710,33 @@ describe("diffCommand — text output", () => {
       await diffCommand(dirA, dirB, {});
       const output = calls.map((a) => a.join("")).join("\n");
       expect(output).toMatch(/url:.*old\.example\.com.*new\.example\.com/);
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
+
+  it("shows headers change line for modified MCP server (diff.ts:263-264)", async () => {
+    // diff.ts:263-264: sortStr(sA.headerNames) !== sortStr(sB.headerNames) → "headers: [...] → [...]"
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-hdr-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-hdr-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      await wf(join(dirA, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { type: "http", url: "https://x.com", headers: { "X-Api-Key": "old" } } }
+      }));
+      await wf(join(dirB, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { type: "http", url: "https://x.com", headers: { "X-Auth-Token": "new" } } }
+      }));
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+      await diffCommand(dirA, dirB, {});
+      const output = calls.map((a) => a.join("")).join("\n");
+      expect(output).toMatch(/headers:.*X-Api-Key.*X-Auth-Token/);
     } finally {
       rmSync(dirA, { recursive: true, force: true });
       rmSync(dirB, { recursive: true, force: true });

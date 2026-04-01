@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.34] - 2026-04-01
+
+### Tests
+- **diff "Note: comparing with itself" assertion**: Strengthened the existing same-project diff text test to also assert `diff.ts:16-18` outputs "comparing a project with itself". The message was being emitted but never asserted.
+- **allowCommand --dry-run "also in ask" conflict**: Added test for `manage.ts:50` false branch — `allowCommand` with `--dry-run` when the rule is in the `ask` list produces "also in ask". Previously only the deny-conflict dry-run path was tested.
+- **diff MCP headers change line**: Added test with two HTTP MCP servers having different `headers` fields. Asserts `diff.ts:263-264` headers-change detail line (`"headers: [X-Api-Key] → [X-Auth-Token]"`). This branch was never previously executed.
+
 ## [1.4.33] - 2026-04-01
 
 ### Tests

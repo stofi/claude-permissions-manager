@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.45] - 2026-04-01
+
+### Added
+- **`cpm edit` command**: Opens a project settings file in `$EDITOR` (or `$VISUAL`, falling back to `vi`). Creates an empty settings file if it does not already exist. Supports `--scope` (default: `local`) and `--project` options.
+
+### Tests
+- **`editCommand` — file created when missing** (`edit.ts:25-28`): Verifies that `editCommand` writes an empty `{}` stub and logs "Created empty settings file" when the target settings file does not exist.
+- **`editCommand` — no overwrite when file exists** (`edit.ts:25` false branch): Verifies that if the settings file already exists, `editCommand` does not overwrite it (no "Created" log line).
+- **`editCommand` — managed scope throws** (`edit.ts` via `resolveSettingsPath`): Verifies that `--scope managed` throws "Cannot modify managed settings".
+
 ## [1.4.44] - 2026-04-01
 
 ### Tests

@@ -212,6 +212,16 @@ program
   });
 
 program
+  .command("edit")
+  .description("Open a project settings file in $EDITOR (creates the file if missing)")
+  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
+  .option("--project <path>", "Project path (default: cwd)")
+  .action(async (opts) => {
+    const { editCommand } = await import("./commands/edit.js");
+    await editCommand({ project: opts.project, scope: opts.scope });
+  });
+
+program
   .command("completion <shell>")
   .description("Print shell completion script (bash or zsh). Add to shell profile:")
   .addHelpText("after", "\n  eval \"$(cpm completion bash)\"  # ~/.bashrc\n  eval \"$(cpm completion zsh)\"   # ~/.zshrc")

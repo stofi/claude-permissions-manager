@@ -443,4 +443,21 @@ describe("parseClaudeMdFile", () => {
     expect(result.path).toBe(filePath);
     expect(result.lineCount).toBeUndefined();
   });
+
+  it("returns lineCount=0 when file exists but cannot be read (parser.ts:29-30)", async () => {
+    // parser.ts:29-30: countLines() catch block returns 0 on readFile error.
+    // fileExists() uses access(F_OK) which succeeds for chmod-000 files (file exists).
+    // countLines readFile then fails with EACCES → catch returns 0 instead of undefined.
+    if (process.getuid?.() === 0) return; // root bypasses file permissions
+    const filePath = join(mdTmpDir, "CLAUDE.md");
+    writeFileSync(filePath, "Line one\nLine two\n");
+    chmodSync(filePath, 0o000);
+    try {
+      const result = await parseClaudeMdFile(filePath, "project");
+      expect(result.exists).toBe(true);
+      expect(result.lineCount).toBe(0); // catch block returns 0
+    } finally {
+      chmodSync(filePath, 0o644);
+    }
+  });
 });

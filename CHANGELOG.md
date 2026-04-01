@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.49] - 2026-04-01
+
+### Tests
+- **`parser.ts:29-30` countLines catch block**: New test creates a CLAUDE.md, chmod-000's it so `readFile` throws, and calls `parseClaudeMdFile`. Verifies the catch block returns `lineCount === 0` (not undefined) when the file exists but cannot be read.
+- **`writer.ts:58-62` writeSettingsAtomic catch + cleanup**: New test mocks `fs/promises.rename` to throw on first call and invokes `addRule`. Verifies the error propagates (`"rename FAIL"`) and no `.tmp.` files are left in the `.claude` directory (cleanup in catch block ran).
+
 ## [1.4.48] - 2026-04-01
 
 ### Tests

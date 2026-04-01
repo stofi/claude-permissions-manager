@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, chmodSync } from "fs";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, chmodSync, readdirSync } from "fs";
 import { readFile } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -575,5 +575,40 @@ describe("readSettingsOrEmpty", () => {
     // writer.ts:38-40: ENOENT is caught and returns {} — verify the happy-ENOENT path directly
     const result = await readSettingsOrEmpty("/nonexistent/path/settings.json");
     expect(result).toEqual({});
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// writeSettingsAtomic — error handling (internal via addRule)
+// ────────────────────────────────────────────────────────────
+
+describe("writeSettingsAtomic — error handling", () => {
+  it("re-throws rename errors and cleans up temp file (writer.ts:58-62)", async () => {
+    // writer.ts:58-62: catch block unlinkSync temp + re-throws on writeFile/rename failure.
+    // Triggered by mocking fs/promises.rename to throw on first call.
+    const path = settingsPath();
+    vi.doMock("fs/promises", async (importOriginal) => {
+      const original = await importOriginal<typeof import("fs/promises")>();
+      let callCount = 0;
+      return {
+        ...original,
+        rename: async (...args: Parameters<typeof original.rename>) => {
+          if (callCount++ === 0) throw new Error("rename FAIL");
+          return original.rename(...args);
+        },
+      };
+    });
+    vi.resetModules();
+    const { addRule: addRuleMocked } = await import("../src/core/writer.js");
+    try {
+      await expect(addRuleMocked("Read", "allow", path)).rejects.toThrow("rename FAIL");
+      // Verify temp file was cleaned up — no *.tmp.* files in .claude dir
+      const claudeDir = path.replace(/\/settings\.json$/, "");
+      const files = readdirSync(claudeDir);
+      expect(files.some((f) => f.includes(".tmp."))).toBe(false);
+    } finally {
+      vi.doUnmock("fs/promises");
+      vi.resetModules();
+    }
   });
 });

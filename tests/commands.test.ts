@@ -555,6 +555,15 @@ describe("exportCommand — --output", () => {
       exportCommand({ root: FIXTURES, maxDepth: 3, format: "json", output: outFile })
     ).rejects.toThrow();
   });
+
+  it("throws with 'Output directory does not exist' message for missing parent dir (export.ts:156)", async () => {
+    // export.ts:156: throw new Error(`Output directory does not exist: ${dir}`)
+    // Prior test only checked rejects.toThrow() without verifying the message text.
+    const outFile = join(tmpDir, "nonexistent-subdir", "export.json");
+    await expect(
+      exportCommand({ root: FIXTURES, maxDepth: 3, format: "json", output: outFile })
+    ).rejects.toThrow("Output directory does not exist");
+  });
 });
 
 describe("exportCommand — invalid format", () => {
@@ -1709,6 +1718,36 @@ describe("showCommand — error cases", () => {
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
     await expect(showCommand(tmpDir, {})).rejects.toThrow();
     exitSpy.mockRestore();
+  });
+
+  it("uses process.cwd() when projectPath is undefined (show.ts:11)", async () => {
+    // show.ts:11: resolve(projectPath ? expandHome(projectPath) : process.cwd())
+    // All tests pass an explicit path; the process.cwd() fallback is never exercised.
+    // Mock scan to return no-project result and verify error message contains cwd.
+    vi.doMock("../src/core/discovery.js", () => ({
+      scan: vi.fn().mockResolvedValue({
+        projects: [],
+        errors: [],
+        scannedAt: new Date(),
+        scanRoot: process.cwd(),
+        global: {},
+      }),
+    }));
+    vi.resetModules();
+    const { showCommand: showMocked } = await import("../src/commands/show.js");
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit:1"); });
+    const errSpy = vi.spyOn(console, "error");
+    try {
+      await expect(showMocked(undefined, { includeGlobal: false })).rejects.toThrow("exit:1");
+      const messages = errSpy.mock.calls.map((c) => String(c[0]));
+      // The error message must mention the resolved cwd (not an explicit path we passed in)
+      expect(messages.some((m) => m.includes(process.cwd()))).toBe(true);
+    } finally {
+      exitSpy.mockRestore();
+      errSpy.mockRestore();
+      vi.doUnmock("../src/core/discovery.js");
+      vi.resetModules();
+    }
   });
 
   it("prints 'Failed to load project' when scan returns an error for the project path (show.ts:23-25)", async () => {

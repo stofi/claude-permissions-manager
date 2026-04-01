@@ -571,6 +571,37 @@ describe("mergeSettingsFiles — warning detection", () => {
     expect(result.warnings).toHaveLength(0);
   });
 
+  it("emits low warning when non-read-only allows exist but deny list is empty (merger.ts:144-148)", () => {
+    // merger.ts:144: nonReadAllows.length > 0 && permissions.deny.length === 0
+    // → "No deny rules configured — consider denying sensitive paths"
+    // Prior tests either have deny rules (no warning) or only read-only tools — this positive case was untested.
+    const f = makeFile("project", {
+      permissions: {
+        allow: ["Bash(npm run *)", "Read"],
+        // intentionally no deny rules
+      },
+    });
+    const result = mergeSettingsFiles([f]);
+    const warn = result.warnings.find(
+      (w) => w.severity === "low" && w.message.includes("No deny rules configured")
+    );
+    expect(warn).toBeDefined();
+  });
+
+  it("does NOT emit no-deny-rules warning when all allows are read-only tools (merger.ts:140-143)", () => {
+    // The READ_ONLY_TOOLS filter — if allow only contains Read/Glob/Grep/WebFetch/WebSearch,
+    // nonReadAllows is empty, so no warning even without deny rules.
+    const f = makeFile("project", {
+      permissions: {
+        allow: ["Read", "Glob", "Grep"],
+        // no deny rules, but all allows are read-only
+      },
+    });
+    const result = mergeSettingsFiles([f]);
+    const warn = result.warnings.find((w) => w.message.includes("No deny rules configured"));
+    expect(warn).toBeUndefined();
+  });
+
   it("emits low warning when same rule appears in both allow and deny", () => {
     const f = makeFile("project", {
       permissions: { allow: ["Read"], deny: ["Read"] },

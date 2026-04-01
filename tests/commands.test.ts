@@ -1452,6 +1452,37 @@ describe("showCommand — error cases", () => {
     await expect(showCommand(tmpDir, {})).rejects.toThrow();
     exitSpy.mockRestore();
   });
+
+  it("prints 'Failed to load project' when scan returns an error for the project path (show.ts:23-25)", async () => {
+    // show.ts:23-25: loadError branch — project not found but result.errors has an entry whose
+    // path starts with targetPath+"/". Use vi.doMock to inject a scan that returns such an error.
+    vi.doMock("../src/core/discovery.js", () => ({
+      scan: vi.fn().mockResolvedValue({
+        projects: [],
+        errors: [{ path: join(tmpDir, ".claude"), error: "TestError: forced load failure" }],
+        scannedAt: new Date(),
+        scanRoot: tmpDir,
+        global: {},
+      }),
+    }));
+    vi.resetModules();
+    const { showCommand: showCmd } = await import("../src/commands/show.js");
+
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit:1"); });
+    const errSpy = vi.spyOn(console, "error");
+    let messages: string[] = [];
+    try {
+      await expect(showCmd(tmpDir, { includeGlobal: false })).rejects.toThrow("exit:1");
+      messages = errSpy.mock.calls.map((c) => String(c[0]));
+    } finally {
+      exitSpy.mockRestore();
+      errSpy.mockRestore();
+      vi.doUnmock("../src/core/discovery.js");
+      vi.resetModules();
+    }
+
+    expect(messages.join("\n")).toMatch(/Failed to load project/i);
+  });
 });
 
 describe("diffCommand — identical projects", () => {

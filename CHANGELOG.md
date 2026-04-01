@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.43] - 2026-04-01
+
+### Tests
+- **New test file `tests/format.test.ts`**: First dedicated unit tests for `src/utils/format.ts` (previously only tested indirectly through integration tests). 53 new tests covering:
+  - `formatMode`: all 6 known modes + unknown-mode fallback path (`MODE_LABELS[mode] ?? mode`, `MODE_COLORS[mode] ?? chalk.white`)
+  - `formatWarning`: all 4 severity levels (critical/high/medium/low) with uppercase prefix assertion
+  - `formatProjectRow`: deny/ask zero vs non-zero branches (gray vs colored), `isBypassDisabled` branch, warning-indicator branch, `truncatePath` short vs long path branches
+  - `formatProjectTable`: header + divider + rows; empty project list (header+divider only)
+  - `formatEffectivePermissions`: all 5 settings file status branches (not-present / unreadable / parse-error / schema-warning / valid); allow/deny/ask show-vs-omit branches; bypass-locked display; MCP server approved/denied/pending states; cmd+args / cmd-only / url / envVarNames / headerNames display; envVarNames / additionalDirs / warnings section show-vs-omit branches
+
 ## [1.4.42] - 2026-04-01
 
 ### Tests

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.27] - 2026-04-01
+
+### Tests
+- **diff text output same-mode/bypass/MCP branches**: Added test comparing `project-a` to itself (`includeGlobal: false`) and asserting three previously unverified `else` branches in diff.ts text output:
+  - `diff.ts:169`: mode same → `"Mode:  default (same)"` display
+  - `diff.ts:178-179`: bypass lock same → `"Bypass lock:  not locked (same)"` display
+  - `diff.ts:267`: MCP server unchanged in both → `"  = github"` display (the `!mcpServerChanged()` branch). All three were executed by the existing identical-project test but never explicitly asserted.
+
 ## [1.4.26] - 2026-04-01
 
 ### Tests

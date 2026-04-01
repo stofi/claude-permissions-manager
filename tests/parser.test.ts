@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, chmodSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
@@ -46,6 +46,25 @@ describe("parseSettingsFile", () => {
     expect(f.readable).toBe(false);
     expect(f.parsed).toBe(false);
     expect(f.data).toBeUndefined();
+  });
+
+  it("returns readable=false when file exists but cannot be read (EACCES)", async () => {
+    // parser.ts:44-54: readFile throws → { exists: true, readable: false, parsed: false }
+    // Skip if running as root — root bypasses file permission checks
+    if (process.getuid?.() === 0) return;
+    const tmpDir = mkdtempSync(join(tmpdir(), "cpm-unreadable-"));
+    const path = join(tmpDir, "settings.json");
+    try {
+      writeFileSync(path, "{}");
+      chmodSync(path, 0o000); // remove all permissions
+      const f = await parseSettingsFile(path, "local");
+      expect(f.exists).toBe(true);
+      expect(f.readable).toBe(false);
+      expect(f.parsed).toBe(false);
+    } finally {
+      chmodSync(path, 0o644); // restore before cleanup
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   it("returns parsed=false for invalid JSON", async () => {

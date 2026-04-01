@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.31] - 2026-04-01
+
+### Tests
+- **writer non-array guard for deny/ask in addRule**: Added two tests covering `writer.ts:148` `Array.isArray(perms[list]) ? perms[list] : []` for the `deny` and `ask` lists. The only existing test for this guard used `allow`. New tests write `deny: 42` / `ask: "bad"` and verify `addRule` succeeds without crashing.
+- **writer non-array guard for deny in removeRule**: Added test for the same guard in `removeRule` — writes `deny: "corrupted"`, calls `removeRule("Bash(sudo *)", path, "deny")`, verifies `{ removed: false, removedFrom: [] }` (no crash, no false removal).
+- **allowCommand --dry-run conflict message**: Added test for `manage.ts:49-52` `previewRuleAdd` conflict branch — add "Read" to deny first, then `allowCommand("Read", { dryRun: true })`, verify both `[dry-run]` and `"deny takes precedence"` appear. No existing dry-run test covered a conflicting allow.
+- **format `!f.readable` → "✗ unreadable"**: Added test constructing a `ClaudeProject` with `settingsFiles: [{ exists: true, readable: false, parsed: false }]`, calling `formatEffectivePermissions`, asserting `"unreadable"` appears. Covers `format.ts:99-100` never previously tested.
+- **parser `readable: false` via chmod**: Added test that writes a settings file, `chmod 000`s it, calls `parseSettingsFile`, and asserts `{ exists: true, readable: false, parsed: false }`. Covers `parser.ts:44-54` when `readFile` throws EACCES. Test skips if running as root.
+
 ## [1.4.30] - 2026-04-01
 
 ### Tests

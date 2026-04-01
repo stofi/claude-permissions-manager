@@ -695,6 +695,17 @@ describe("--dry-run flag", () => {
     expect(data.permissions.allow).toHaveLength(1);
   });
 
+  it("allowCommand --dry-run shows 'deny takes precedence' when rule exists in deny list", async () => {
+    // manage.ts:49-52 previewRuleAdd: conflictsWith === "deny" → "deny takes precedence"
+    // No existing test covers allowCommand --dry-run with a conflict.
+    await denyCommand("Read", { project: tmpDir, scope: "project" });
+    const logSpy = vi.spyOn(console, "log");
+    await allowCommand("Read", { project: tmpDir, scope: "project", dryRun: true });
+    const calls = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((m) => /dry.run/i.test(m))).toBe(true);
+    expect(calls.some((m) => /deny takes precedence/i.test(m))).toBe(true);
+  });
+
   it("denyCommand --dry-run does not write to file", async () => {
     await denyCommand("Bash(sudo *)", { project: tmpDir, scope: "project", dryRun: true });
     await expect(readFile(settingsPath(), "utf-8")).rejects.toThrow();
@@ -2045,6 +2056,36 @@ describe("formatEffectivePermissions — MCP approval state display", () => {
     expect(output).toContain("cmd: my-tool");
     // Should not append a space or extra tokens after "my-tool"
     expect(output).not.toMatch(/cmd: my-tool\s+\S/);
+  });
+
+  it("shows '✗ unreadable' status for settings file that exists but cannot be read", () => {
+    // format.ts:99-100: !f.readable → chalk.red("✗ unreadable") — never tested
+    // Construct a project with a settings file that has readable=false (stat succeeds, readFile fails).
+    const project: ClaudeProject = {
+      rootPath: "/tmp/test-unreadable",
+      claudeDir: "/tmp/test-unreadable/.claude",
+      settingsFiles: [{
+        path: "/tmp/test-unreadable/.claude/settings.json",
+        scope: "project",
+        exists: true,
+        readable: false,
+        parsed: false,
+      }],
+      claudeMdFiles: [],
+      effectivePermissions: {
+        defaultMode: "default",
+        allow: [],
+        deny: [],
+        ask: [],
+        isBypassDisabled: false,
+        mcpServers: [],
+        envVarNames: [],
+        additionalDirs: [],
+        warnings: [],
+      },
+    };
+    const output = formatEffectivePermissions(project);
+    expect(output).toMatch(/unreadable/i);
   });
 });
 

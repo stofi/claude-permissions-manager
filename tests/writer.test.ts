@@ -225,6 +225,29 @@ describe("addRule", () => {
     expect(data.permissions.allow).toContain("Read");
   });
 
+  it("handles corrupt settings file where deny is not an array (non-array guard)", async () => {
+    // writer.ts:148: same Array.isArray guard covers deny and ask lists too
+    const path = settingsPath();
+    const { mkdir, writeFile } = await import("fs/promises");
+    await mkdir(join(tmpDir, ".claude"), { recursive: true });
+    await writeFile(path, JSON.stringify({ permissions: { deny: 42 } }), "utf-8");
+    const result = await addRule("Read", "deny", path);
+    expect(result.added).toBe(true);
+    const data = await readSettings();
+    expect(data.permissions.deny).toContain("Read");
+  });
+
+  it("handles corrupt settings file where ask is not an array (non-array guard)", async () => {
+    const path = settingsPath();
+    const { mkdir, writeFile } = await import("fs/promises");
+    await mkdir(join(tmpDir, ".claude"), { recursive: true });
+    await writeFile(path, JSON.stringify({ permissions: { ask: "bad" } }), "utf-8");
+    const result = await addRule("Bash(git push *)", "ask", path);
+    expect(result.added).toBe(true);
+    const data = await readSettings();
+    expect(data.permissions.ask).toContain("Bash(git push *)");
+  });
+
   it("writes valid JSON (parseable output)", async () => {
     const path = settingsPath();
     await addRule("Read", "allow", path);
@@ -399,6 +422,19 @@ describe("removeRule", () => {
     const data = await readSettings();
     expect(data.permissions.allow).not.toContain("Read");
     expect(data.permissions.deny).toContain("Read");
+  });
+
+  it("handles corrupt settings file where deny is not an array (non-array guard in removeRule)", async () => {
+    // writer.ts:148: const existing = Array.isArray(perms[list]) ? perms[list] : [];
+    // The only existing test for this guard uses addRule (allow list). This covers removeRule + deny.
+    const path = settingsPath();
+    const { mkdir, writeFile } = await import("fs/promises");
+    await mkdir(join(tmpDir, ".claude"), { recursive: true });
+    await writeFile(path, JSON.stringify({ permissions: { deny: "corrupted" } }), "utf-8");
+    // removeRule should treat the corrupt deny as empty → nothing to remove, no crash
+    const result = await removeRule("Bash(sudo *)", path, "deny");
+    expect(result.removed).toBe(false);
+    expect(result.removedFrom).toHaveLength(0);
   });
 });
 

@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.37] - 2026-04-01
+
+### Tests
+- **showCommand loadError branch**: Added test for `show.ts:23-25` — when `scan()` returns an error entry whose path starts with `targetPath + "/"`, `showCommand` prints "Failed to load project" instead of "No .claude directory found". Uses `vi.doMock` to inject a scan result with a forced error for the project path.
+
 ## [1.4.36] - 2026-04-01
 
 ### Tests

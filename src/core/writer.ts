@@ -180,6 +180,11 @@ export async function setMode(
   await writeSettingsAtomic(settingsPath, updated);
 }
 
+/** Write (replace) a full settings file atomically */
+export async function writeSettings(data: SettingsData, path: string): Promise<void> {
+  await writeSettingsAtomic(path, data);
+}
+
 /** Clear all permission rules from the target settings file */
 export async function clearAllRules(settingsPath: string): Promise<void> {
   const data = await readSettingsOrEmpty(settingsPath);

@@ -3620,3 +3620,160 @@ describe("editCommand", () => {
     }
   });
 });
+
+// ────────────────────────────────────────────────────────────
+// copyCommand
+// ────────────────────────────────────────────────────────────
+
+import { copyCommand } from "../src/commands/copy.js";
+
+describe("copyCommand", () => {
+  let srcDir: string;
+  let dstDir: string;
+
+  // Create a source project with allow/deny rules and a mode
+  beforeEach(async () => {
+    srcDir = mkdtempSync(join(tmpdir(), "cpm-copy-src-"));
+    dstDir = mkdtempSync(join(tmpdir(), "cpm-copy-dst-"));
+    await mkdir(join(srcDir, ".claude"), { recursive: true });
+    await writeFile(
+      join(srcDir, ".claude", "settings.json"),
+      JSON.stringify({
+        permissions: {
+          defaultMode: "acceptEdits",
+          allow: ["Bash(npm run *)", "Read"],
+          deny: ["Bash(rm -rf *)"],
+        },
+      }),
+      "utf-8"
+    );
+  });
+
+  afterEach(() => {
+    rmSync(srcDir, { recursive: true, force: true });
+    rmSync(dstDir, { recursive: true, force: true });
+  });
+
+  it("copies rules and mode to target --yes (default local scope)", async () => {
+    await copyCommand(srcDir, dstDir, { yes: true });
+
+    const content = await readFile(join(dstDir, ".claude", "settings.local.json"), "utf-8");
+    const data = JSON.parse(content);
+    expect(data.permissions.allow).toContain("Bash(npm run *)");
+    expect(data.permissions.allow).toContain("Read");
+    expect(data.permissions.deny).toContain("Bash(rm -rf *)");
+    expect(data.permissions.defaultMode).toBe("acceptEdits");
+  });
+
+  it("--dry-run does not create any files", async () => {
+    await copyCommand(srcDir, dstDir, { dryRun: true });
+
+    const { stat } = await import("fs/promises");
+    await expect(stat(join(dstDir, ".claude"))).rejects.toThrow();
+  });
+
+  it("exits 1 without --yes (and not --dry-run)", async () => {
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((_code) => {
+      throw new Error(`process.exit(${_code})`);
+    });
+    try {
+      await expect(copyCommand(srcDir, dstDir, {})).rejects.toThrow("process.exit(1)");
+    } finally {
+      mockExit.mockRestore();
+    }
+  });
+
+  it("copies into project scope when --scope=project", async () => {
+    await copyCommand(srcDir, dstDir, { scope: "project", yes: true });
+
+    const content = await readFile(join(dstDir, ".claude", "settings.json"), "utf-8");
+    const data = JSON.parse(content);
+    expect(data.permissions.allow).toContain("Read");
+  });
+
+  it("exits 1 when source and target are the same path", async () => {
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((_code) => {
+      throw new Error(`process.exit(${_code})`);
+    });
+    try {
+      await expect(copyCommand(srcDir, srcDir, { yes: true })).rejects.toThrow("process.exit(1)");
+    } finally {
+      mockExit.mockRestore();
+    }
+  });
+
+  it("exits 1 on invalid scope", async () => {
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((_code) => {
+      throw new Error(`process.exit(${_code})`);
+    });
+    try {
+      await expect(
+        copyCommand(srcDir, dstDir, { scope: "managed", yes: true })
+      ).rejects.toThrow("process.exit(1)");
+    } finally {
+      mockExit.mockRestore();
+    }
+  });
+
+  it("exits 1 when source has no .claude directory", async () => {
+    const noClaudeDir = mkdtempSync(join(tmpdir(), "cpm-copy-no-claude-"));
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((_code) => {
+      throw new Error(`process.exit(${_code})`);
+    });
+    try {
+      await expect(
+        copyCommand(noClaudeDir, dstDir, { yes: true })
+      ).rejects.toThrow("process.exit(1)");
+    } finally {
+      mockExit.mockRestore();
+      rmSync(noClaudeDir, { recursive: true, force: true });
+    }
+  });
+
+  it("reports 'Nothing to copy' when source has no project-level rules or mode", async () => {
+    const emptySrc = mkdtempSync(join(tmpdir(), "cpm-copy-empty-"));
+    await mkdir(join(emptySrc, ".claude"), { recursive: true });
+    await writeFile(
+      join(emptySrc, ".claude", "settings.json"),
+      JSON.stringify({ permissions: {} }),
+      "utf-8"
+    );
+    const logCalls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((msg: string) => logCalls.push(String(msg)));
+    try {
+      await copyCommand(emptySrc, dstDir, { yes: true });
+      expect(logCalls.some((m) => m.includes("Nothing to copy"))).toBe(true);
+    } finally {
+      rmSync(emptySrc, { recursive: true, force: true });
+    }
+  });
+
+  it("merges with existing target rules (deduplicates)", async () => {
+    await mkdir(join(dstDir, ".claude"), { recursive: true });
+    await writeFile(
+      join(dstDir, ".claude", "settings.local.json"),
+      JSON.stringify({ permissions: { allow: ["Read", "Glob"] } }),
+      "utf-8"
+    );
+
+    await copyCommand(srcDir, dstDir, { yes: true });
+
+    const content = await readFile(join(dstDir, ".claude", "settings.local.json"), "utf-8");
+    const data = JSON.parse(content);
+    // "Read" is in both source and target — should appear exactly once
+    expect(data.permissions.allow.filter((r: string) => r === "Read")).toHaveLength(1);
+    expect(data.permissions.allow).toContain("Bash(npm run *)");
+    expect(data.permissions.allow).toContain("Glob");
+  });
+
+  it("only copies project/local scope rules (not user/managed)", async () => {
+    // Source has allow: ["Bash(npm run *)", "Read"] at project scope.
+    // copyCommand uses includeGlobal: false, so user/managed scope rules are excluded.
+    await copyCommand(srcDir, dstDir, { yes: true });
+
+    const content = await readFile(join(dstDir, ".claude", "settings.local.json"), "utf-8");
+    const data = JSON.parse(content);
+    // Only the 2 project-scope allow rules should be present (no global leakage)
+    expect(data.permissions.allow).toHaveLength(2);
+  });
+});

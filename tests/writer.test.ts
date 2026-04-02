@@ -94,6 +94,13 @@ describe("validateRule", () => {
   it("accepts mcp__ with server name only", () => {
     expect(validateRule("mcp__github").valid).toBe(true);
   });
+
+  it("rejects rule starting with '(' (invalid tool name)", () => {
+    // regex fails to match → tool = "(foo)" → fails VALID_TOOL_NAME_RE
+    const r = validateRule("(foo)");
+    expect(r.valid).toBe(false);
+    expect(r.error).toMatch(/invalid tool name/i);
+  });
 });
 
 // ────────────────────────────────────────────────────────────

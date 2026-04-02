@@ -20,10 +20,10 @@ const CLI = join(ROOT, "dist", "cli.js");
 const FIXTURES = join(__dirname, "fixtures");
 
 /** Spawn `node dist/cli.js ...args` and return stdout/stderr/status */
-function run(args: string[], opts: { cwd?: string } = {}) {
+function run(args: string[], opts: { cwd?: string; env?: Record<string, string> } = {}) {
   return spawnSync("node", [CLI, ...args], {
     cwd: opts.cwd ?? ROOT,
-    env: { ...process.env },
+    env: { ...process.env, ...opts.env },
     encoding: "utf-8",
     timeout: 15000,
   });
@@ -313,6 +313,84 @@ describe("CLI — error handling", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // init command
 // ─────────────────────────────────────────────────────────────────────────────
+
+describe("CLI — ask command", () => {
+  it("ask adds rule to ask list (cli.ts:124-132)", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "cpm-cli-ask-"));
+    try {
+      const r = run(["ask", "Bash(git push *)", "--project", tmpDir, "--scope", "project"]);
+      expect(r.status).toBe(0);
+      const settings = JSON.parse(readFileSync(join(tmpDir, ".claude", "settings.json"), "utf-8"));
+      expect(settings.permissions.ask).toContain("Bash(git push *)");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("ask --dry-run does not write file (cli.ts:124-132 dryRun forwarding)", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "cpm-cli-ask-dry-"));
+    try {
+      const r = run(["ask", "Bash(git push *)", "--project", tmpDir, "--scope", "project", "--dry-run"]);
+      expect(r.status).toBe(0);
+      expect(() => readFileSync(join(tmpDir, ".claude", "settings.json"))).toThrow();
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("CLI — reset --all command", () => {
+  it("reset --all --yes clears all rules from settings (cli.ts:144-145)", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "cpm-cli-reset-all-"));
+    try {
+      // Add rules first
+      run(["allow", "Read", "--project", tmpDir, "--scope", "project"]);
+      run(["deny", "Bash", "--project", tmpDir, "--scope", "project"]);
+      // Clear all rules
+      const r = run(["reset", "--all", "--yes", "--project", tmpDir, "--scope", "project"]);
+      expect(r.status).toBe(0);
+      const settings = JSON.parse(readFileSync(join(tmpDir, ".claude", "settings.json"), "utf-8"));
+      expect(settings.permissions?.allow ?? []).toHaveLength(0);
+      expect(settings.permissions?.deny ?? []).toHaveLength(0);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("reset --all --dry-run does not modify file (cli.ts:145 dryRun forwarding)", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "cpm-cli-reset-all-dry-"));
+    try {
+      // Add a rule first
+      run(["allow", "Read", "--project", tmpDir, "--scope", "project"]);
+      // Dry-run reset --all
+      const r = run(["reset", "--all", "--yes", "--dry-run", "--project", tmpDir, "--scope", "project"]);
+      expect(r.status).toBe(0);
+      // File should still contain the rule
+      const settings = JSON.parse(readFileSync(join(tmpDir, ".claude", "settings.json"), "utf-8"));
+      expect(settings.permissions?.allow ?? []).toContain("Read");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("CLI — edit command", () => {
+  it("edit creates stub settings file when none exists (cli.ts:198-205)", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "cpm-cli-edit-"));
+    try {
+      // Use a no-op editor so the command doesn't block
+      const r = run(["edit", "--project", tmpDir, "--scope", "project"], {
+        env: { VISUAL: "true" },
+      });
+      expect(r.status).toBe(0);
+      // The stub settings file should have been created
+      const content = readFileSync(join(tmpDir, ".claude", "settings.json"), "utf-8");
+      expect(() => JSON.parse(content)).not.toThrow();
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("CLI — init command", () => {
   it("init creates settings.json from safe preset (cli.ts:209-212)", () => {

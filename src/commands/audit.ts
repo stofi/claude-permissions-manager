@@ -2,10 +2,18 @@ import chalk from "chalk";
 import { scan } from "../core/discovery.js";
 import { collapseHome } from "../utils/paths.js";
 import type { ScanOptions } from "../core/discovery.js";
+import type { WarningSeverity } from "../core/types.js";
 
-export async function auditCommand(options: ScanOptions & { json?: boolean; exitCode?: boolean }): Promise<void> {
+const SEVERITY_ORDER: WarningSeverity[] = ["critical", "high", "medium", "low"];
+
+export async function auditCommand(options: ScanOptions & { json?: boolean; exitCode?: boolean; minSeverity?: string }): Promise<void> {
   process.stderr.write(chalk.gray("Scanning for Claude projects...\n"));
   const result = await scan(options);
+
+  const minIdx = options.minSeverity
+    ? SEVERITY_ORDER.indexOf(options.minSeverity as WarningSeverity)
+    : SEVERITY_ORDER.length - 1;
+  const effectiveMinIdx = minIdx === -1 ? SEVERITY_ORDER.length - 1 : minIdx;
 
   const allIssues: Array<{
     project: string;
@@ -16,12 +24,14 @@ export async function auditCommand(options: ScanOptions & { json?: boolean; exit
 
   for (const project of result.projects) {
     for (const w of project.effectivePermissions.warnings) {
-      allIssues.push({
-        project: project.rootPath,
-        severity: w.severity,
-        message: w.message,
-        rule: w.rule,
-      });
+      if (SEVERITY_ORDER.indexOf(w.severity) <= effectiveMinIdx) {
+        allIssues.push({
+          project: project.rootPath,
+          severity: w.severity,
+          message: w.message,
+          rule: w.rule,
+        });
+      }
     }
   }
 

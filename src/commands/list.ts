@@ -4,17 +4,21 @@ import { formatProjectTable } from "../utils/format.js";
 import { collapseHome } from "../utils/paths.js";
 import type { ScanOptions } from "../core/discovery.js";
 
-export async function listCommand(options: ScanOptions & { json?: boolean }): Promise<void> {
+export async function listCommand(options: ScanOptions & { json?: boolean; warningsOnly?: boolean }): Promise<void> {
   process.stderr.write(chalk.gray("Scanning for Claude projects...\n"));
 
   const result = await scan(options);
+
+  const projects = options.warningsOnly
+    ? result.projects.filter((p) => p.effectivePermissions.warnings.length > 0)
+    : result.projects;
 
   if (options.json) {
     const output = {
       generatedAt: result.scannedAt.toISOString(),
       scanRoot: result.scanRoot,
-      projectCount: result.projects.length,
-      projects: result.projects.map((p) => ({
+      projectCount: projects.length,
+      projects: projects.map((p) => ({
         path: p.rootPath,
         mode: p.effectivePermissions.defaultMode,
         isBypassDisabled: p.effectivePermissions.isBypassDisabled,
@@ -49,6 +53,11 @@ export async function listCommand(options: ScanOptions & { json?: boolean }): Pr
     return;
   }
 
+  if (options.warningsOnly && projects.length === 0) {
+    console.log(chalk.green(`\n✓ No warnings found across ${result.projects.length} project(s).`));
+    return;
+  }
+
   // Show global settings if present
   if (result.global.user?.exists) {
     console.log(chalk.dim(`\nUser settings: ${collapseHome(result.global.user.path)}`));
@@ -57,14 +66,17 @@ export async function listCommand(options: ScanOptions & { json?: boolean }): Pr
     console.log(chalk.dim(`Managed settings: ${collapseHome(result.global.managed.path)}`));
   }
 
-  console.log(`\nFound ${chalk.bold(result.projects.length)} project(s)\n`);
-  console.log(formatProjectTable(result.projects));
+  const countLabel = options.warningsOnly
+    ? `${chalk.bold(projects.length)} of ${result.projects.length} project(s) have warnings`
+    : `${chalk.bold(projects.length)} project(s)`;
+  console.log(`\nFound ${countLabel}\n`);
+  console.log(formatProjectTable(projects));
 
-  const totalWarnings = result.projects.reduce(
+  const totalWarnings = projects.reduce(
     (sum, p) => sum + p.effectivePermissions.warnings.length,
     0
   );
-  if (totalWarnings > 0) {
+  if (!options.warningsOnly && totalWarnings > 0) {
     console.log(chalk.yellow(`\n⚠ ${totalWarnings} warning(s) across all projects. Run 'cpm audit' for details.`));
   }
 

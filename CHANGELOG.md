@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.66] - 2026-04-02
+
+### Tests
+- **496 → 501 tests** (+5). Added tests for `copyCommand` edge cases: source with `ask` rules (lines 51-52, 79 coverage), local-scope mode wins over project-scope mode (sort branch coverage). Added 3 CLI integration tests for `cpm copy --yes`, `--dry-run`, and missing `--yes` guard.
+
 ## [1.4.65] - 2026-04-02
 
 ### Added

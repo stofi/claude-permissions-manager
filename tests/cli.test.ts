@@ -416,3 +416,62 @@ describe("CLI — init command", () => {
     }
   });
 });
+
+describe("CLI — copy command", () => {
+  it("copy --yes copies rules from source to target", () => {
+    const srcDir = mkdtempSync(join(tmpdir(), "cpm-cli-copy-src-"));
+    const dstDir = mkdtempSync(join(tmpdir(), "cpm-cli-copy-dst-"));
+    try {
+      mkdirSync(join(srcDir, ".claude"), { recursive: true });
+      writeFileSync(
+        join(srcDir, ".claude", "settings.json"),
+        JSON.stringify({ permissions: { allow: ["Read", "Glob"], deny: ["Bash(rm *)"] } })
+      );
+      const r = run(["copy", srcDir, dstDir, "--yes"]);
+      expect(r.status).toBe(0);
+      const written = JSON.parse(readFileSync(join(dstDir, ".claude", "settings.local.json"), "utf-8"));
+      expect(written.permissions.allow).toContain("Read");
+      expect(written.permissions.deny).toContain("Bash(rm *)");
+    } finally {
+      rmSync(srcDir, { recursive: true, force: true });
+      rmSync(dstDir, { recursive: true, force: true });
+    }
+  });
+
+  it("copy --dry-run does not create target file", () => {
+    const srcDir = mkdtempSync(join(tmpdir(), "cpm-cli-copy-src-dry-"));
+    const dstDir = mkdtempSync(join(tmpdir(), "cpm-cli-copy-dst-dry-"));
+    try {
+      mkdirSync(join(srcDir, ".claude"), { recursive: true });
+      writeFileSync(
+        join(srcDir, ".claude", "settings.json"),
+        JSON.stringify({ permissions: { allow: ["Read"] } })
+      );
+      const r = run(["copy", srcDir, dstDir, "--dry-run"]);
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain("[dry-run]");
+      expect(() => readFileSync(join(dstDir, ".claude", "settings.local.json"))).toThrow();
+    } finally {
+      rmSync(srcDir, { recursive: true, force: true });
+      rmSync(dstDir, { recursive: true, force: true });
+    }
+  });
+
+  it("copy without --yes exits 1 and shows confirmation message", () => {
+    const srcDir = mkdtempSync(join(tmpdir(), "cpm-cli-copy-nyes-"));
+    const dstDir = mkdtempSync(join(tmpdir(), "cpm-cli-copy-nyes-dst-"));
+    try {
+      mkdirSync(join(srcDir, ".claude"), { recursive: true });
+      writeFileSync(
+        join(srcDir, ".claude", "settings.json"),
+        JSON.stringify({ permissions: { allow: ["Read"] } })
+      );
+      const r = run(["copy", srcDir, dstDir]);
+      expect(r.status).toBe(1);
+      expect(r.stdout).toContain("--yes");
+    } finally {
+      rmSync(srcDir, { recursive: true, force: true });
+      rmSync(dstDir, { recursive: true, force: true });
+    }
+  });
+});

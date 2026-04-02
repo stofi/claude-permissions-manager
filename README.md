@@ -23,6 +23,7 @@ cpm show                    # Show permissions for current project (cwd)
 cpm show ~/my-project       # Show detailed permissions for a specific project
 cpm audit                   # Report risky permissions across all projects
 cpm diff <path1> <path2>    # Compare two projects side by side
+cpm copy <source> <target>  # Copy project-level permissions to another project
 cpm export                  # Dump all permissions as JSON (stdout)
 cpm export --format csv     # Dump as CSV
 cpm export --output out.json  # Write to file
@@ -59,6 +60,32 @@ cpm reset --all --yes --project ~/my-project --scope project
 cpm mode acceptEdits --project ~/my-project --scope project
 ```
 
+### Copy permissions between projects
+
+```bash
+# Copy project-level rules and mode from one project to another
+cpm copy ~/template-project ~/new-project --yes
+
+# Preview without writing
+cpm copy ~/template-project ~/new-project --dry-run
+
+# Copy into a project-scope (shared) settings file instead of local
+cpm copy ~/template-project ~/new-project --scope project --yes
+```
+
+`cpm copy` reads allow/deny/ask rules and `defaultMode` from the **source project's `project` and `local` scope settings files only** (global user/managed rules are excluded — they already apply everywhere). It then merges those rules into the target's settings file, deduplicating any rules already present.
+
+### Open settings in your editor
+
+```bash
+cpm edit                                  # Open cwd local settings in $EDITOR
+cpm edit --project ~/my-project           # Open a specific project's local settings
+cpm edit --scope project                  # Open the project-scope settings.json
+cpm edit --scope project --project ~/p   # Both options together
+```
+
+Creates the file (empty `{}`) if it doesn't already exist, then opens it in `$VISUAL`, `$EDITOR`, or `vi` as a fallback.
+
 ### Scope options
 
 | Scope | File | Applies to |
@@ -75,7 +102,7 @@ cpm mode acceptEdits --project ~/my-project --scope project
 --json             Output as JSON (list, show, audit, diff, export)
 --no-global        Skip user/managed global settings (list, show, audit, diff, export, ui)
 --exit-code        Exit 1 if issues found, 2 if critical issues (audit only — useful in CI)
---dry-run          Preview what would be written without modifying files (allow, deny, ask, reset, mode, init)
+--dry-run          Preview what would be written without modifying files (allow, deny, ask, reset, mode, init, copy)
 --format <fmt>     Output format: json|csv (export only, default: json)
 --output <file>    Write output to file instead of stdout (export only)
 ```

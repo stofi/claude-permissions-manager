@@ -323,3 +323,27 @@ describe("scan — SKIP_DIRS and readdir errors", () => {
     }
   });
 });
+
+describe("scan — global settings absent", () => {
+  it("global.user is undefined when user settings file does not exist (discovery.ts:186 — false branch)", async () => {
+    // BRDA:186,17,1,0 — the branch where userFile.exists=false is never hit because
+    // ~/.claude/settings.json always exists on this machine.
+    // Temporarily redirect HOME to a fresh temp dir (os.homedir() respects $HOME on POSIX)
+    // so that userSettingsPath() returns a path that does not exist.
+    const fakeHome = await mkdtemp(join(tmpdir(), "cpm-fake-home-"));
+    const origHome = process.env.HOME;
+    process.env.HOME = fakeHome;
+    try {
+      const result = await scan({ root: fakeHome, maxDepth: 1, includeGlobal: true });
+      // No ~/.claude/settings.json in fakeHome → userFile.exists=false → global.user stays undefined
+      expect(result.global.user).toBeUndefined();
+    } finally {
+      if (origHome !== undefined) {
+        process.env.HOME = origHome;
+      } else {
+        delete process.env.HOME;
+      }
+      await rm(fakeHome, { recursive: true, force: true });
+    }
+  });
+});

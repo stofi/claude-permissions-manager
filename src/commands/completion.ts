@@ -19,6 +19,7 @@ const COMMANDS = [
   "ask",
   "reset",
   "mode",
+  "copy",
   "export",
   "init",
   "edit",
@@ -149,6 +150,10 @@ _cpm_completions() {
       COMPREPLY=( \$(compgen -W "--scope --project" -- "\${cur}") )
       return 0
       ;;
+    copy)
+      COMPREPLY=( \$(compgen -W "--scope --yes --dry-run" -- "\${cur}") )
+      return 0
+      ;;
   esac
 
   # Default: complete flags
@@ -173,6 +178,7 @@ function zshScript(): string {
       ask: "Add ask rule",
       reset: "Remove rule(s)",
       mode: "Set default mode",
+      copy: "Copy permissions to another project",
       export: "Export permissions data",
       init: "Create starter settings",
       edit: "Open settings file in $EDITOR",
@@ -287,6 +293,14 @@ ${commandDefs}
           _arguments \\
             '--scope[Settings scope]:scope:(${scopeList})' \\
             '--project[Project path]:project:_directories'
+          ;;
+        copy)
+          _arguments \\
+            '1:source:_directories' \\
+            '2:target:_directories' \\
+            '--scope[Target scope]:scope:(${scopeList})' \\
+            '--yes[Skip confirmation]' \\
+            '--dry-run[Preview without writing]'
           ;;
         completion)
           _arguments '1:shell:(bash zsh)'

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.65] - 2026-04-02
+
+### Added
+- **`cpm copy <source> <target>`** (`src/commands/copy.ts`): Copy project-level permissions from one project to another. Reads allow/deny/ask rules and mode from the source's project/local scope settings files and merges them (deduplicating) into the target's settings file. Requires `--yes` to confirm, or use `--dry-run` to preview. `--scope` controls which target settings file is written (default: `local`). Global (user/managed) rules are intentionally excluded — they already apply to all projects and don't need copying.
+- Shell completion entries for `copy` in both bash and zsh scripts.
+- **Tests**: 485 → 496 (+11). 9 unit tests for `copyCommand` covering: basic copy, `--dry-run`, missing `--yes`, `--scope=project`, same-path error, invalid scope, missing source, "Nothing to copy" message, merge+dedup, project-scope-only filtering.
+
+### Tests
+- Added `validateRule("(foo)")` test — verifies that a rule starting with `(` is rejected with an "invalid tool name" error.
+
 ## [1.4.64] - 2026-04-02
 
 ### Changed

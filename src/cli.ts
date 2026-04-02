@@ -164,6 +164,17 @@ program
   });
 
 program
+  .command("copy <source> <target>")
+  .description("Copy project-level permissions from one project to another (merges into target)")
+  .addOption(new Option("--scope <scope>", "Target scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
+  .option("--dry-run", "Show what would be copied without making changes")
+  .option("--yes", "Skip confirmation prompt")
+  .action(async (source: string, target: string, opts: { scope?: string; dryRun?: boolean; yes?: boolean }) => {
+    const { copyCommand } = await import("./commands/copy.js");
+    await copyCommand(source, target, { ...opts, dryRun: opts.dryRun });
+  });
+
+program
   .command("export")
   .description("Export all permissions data (JSON or CSV)")
   .option("--format <fmt>", "Output format: json|csv", "json")

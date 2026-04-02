@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.63] - 2026-04-02
+
+### Added
+- **TUI project list `/` filter** (`src/tui/screens/ProjectList.tsx`): Press `/` in the project list to enter filter mode. Type any substring of a project path to narrow the visible list in real time. Arrow keys and `j`/`k` navigate the filtered results. `Esc` clears the filter and returns to full view. The header updates to show `N of M project(s)` while a filter is active. The key-hint line at the bottom of the screen also updates to reflect filter-mode bindings. This was a planned feature from PLAN.md §2.2 ("Search/filter bar") that was not yet implemented.
+
 ## [1.4.62] - 2026-04-02
 
 ### Tests

@@ -236,6 +236,7 @@ Run `cpm` (or `cpm ui`) for the interactive terminal UI:
 
 - `↑↓` / `j`/`k` — navigate projects
 - `Enter` — view project details
+- `/` — filter projects by path (type to narrow, `Esc` to clear)
 - `a` — audit view (security issues)
 - `d` — diff two projects
 - `q` / `Ctrl+C` — quit

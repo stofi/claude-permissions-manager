@@ -49,10 +49,25 @@ export function ProjectList({
   // Reserve extra row for filter bar when active
   const visibleRows = Math.max(5, termHeight - (filterMode ? 13 : 12));
 
-  const totalWarnings = projects.reduce(
-    (sum, p) => sum + p.effectivePermissions.warnings.length,
-    0
+  const totalWarnings = useMemo(
+    () => projects.reduce((sum, p) => sum + p.effectivePermissions.warnings.length, 0),
+    [projects]
   );
+
+  // Shared up/down/enter navigation — used in both filter and normal mode
+  function handleNavigate(input: string, key: { downArrow?: boolean; upArrow?: boolean; return?: boolean }) {
+    if (key.downArrow || input === "j") {
+      const next = Math.min(cursor + 1, filteredProjects.length - 1);
+      setCursor(next);
+      if (next >= scrollOffset + visibleRows) setScrollOffset(next - visibleRows + 1);
+    } else if (key.upArrow || input === "k") {
+      const prev = Math.max(cursor - 1, 0);
+      setCursor(prev);
+      if (prev < scrollOffset) setScrollOffset(prev);
+    } else if (key.return) {
+      if (filteredProjects[cursor]) onSelectProject(filteredProjects[cursor]);
+    }
+  }
 
   useInput((input, key) => {
     if (filterMode) {
@@ -62,57 +77,27 @@ export function ProjectList({
         setCursor(0);
         setScrollOffset(0);
       } else if (key.backspace || key.delete) {
-        setFilter((f) => {
-          const next = f.slice(0, -1);
-          setCursor(0);
-          setScrollOffset(0);
-          return next;
-        });
-      } else if (key.downArrow || input === "j") {
-        const next = Math.min(cursor + 1, filteredProjects.length - 1);
-        setCursor(next);
-        if (next >= scrollOffset + visibleRows) {
-          setScrollOffset(next - visibleRows + 1);
-        }
-      } else if (key.upArrow || input === "k") {
-        const prev = Math.max(cursor - 1, 0);
-        setCursor(prev);
-        if (prev < scrollOffset) {
-          setScrollOffset(prev);
-        }
-      } else if (key.return) {
-        if (filteredProjects[cursor]) onSelectProject(filteredProjects[cursor]);
+        setFilter((f) => f.slice(0, -1));
+        setCursor(0);
+        setScrollOffset(0);
+      } else if (key.downArrow || input === "j" || key.upArrow || input === "k" || key.return) {
+        handleNavigate(input, key);
       } else if (input && !key.ctrl && !key.meta) {
-        setFilter((f) => {
-          const next = f + input;
-          setCursor(0);
-          setScrollOffset(0);
-          return next;
-        });
+        setFilter((f) => f + input);
+        setCursor(0);
+        setScrollOffset(0);
       }
       return;
     }
 
     // Normal (non-filter) mode
-    if (key.downArrow || input === "j") {
-      const next = Math.min(cursor + 1, filteredProjects.length - 1);
-      setCursor(next);
-      if (next >= scrollOffset + visibleRows) {
-        setScrollOffset(next - visibleRows + 1);
-      }
-    } else if (key.upArrow || input === "k") {
-      const prev = Math.max(cursor - 1, 0);
-      setCursor(prev);
-      if (prev < scrollOffset) {
-        setScrollOffset(prev);
-      }
-    } else if (key.return) {
-      if (filteredProjects[cursor]) onSelectProject(filteredProjects[cursor]);
+    if (key.downArrow || input === "j" || key.upArrow || input === "k" || key.return) {
+      handleNavigate(input, key);
     } else if (input === "a") {
       onAudit();
     } else if (input === "d") {
       onDiff();
-    } else if (input === "/" ) {
+    } else if (input === "/") {
       setFilterMode(true);
       setFilter("");
       setCursor(0);
@@ -135,20 +120,13 @@ export function ProjectList({
         }
       />
 
-      {/* Filter bar */}
+      {/* Filter bar — only shown while in filter mode */}
       {filterMode && (
         <Box marginBottom={0}>
           <Text color="cyan" bold>Filter: </Text>
           <Text>{filter}</Text>
           <Text color="cyan">█</Text>
           <Text color="gray">  (Esc to clear)</Text>
-        </Box>
-      )}
-      {!filterMode && filter && (
-        <Box marginBottom={0}>
-          <Text color="cyan">Filter: </Text>
-          <Text color="cyan" bold>{filter}</Text>
-          <Text color="gray">  (/ to edit, Esc clears on next /)</Text>
         </Box>
       )}
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
 import { Header } from "../components/Header.js";
 import { SeverityBadge } from "../components/Badge.js";
@@ -26,22 +26,21 @@ export function Audit({ scanResult, onBack, onSelectProject }: AuditProps) {
   const [cursor, setCursor] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
 
-  // Collect all warnings grouped by severity
-  const byseverity: Record<WarningSeverity, AuditItem[]> = {
-    critical: [],
-    high: [],
-    medium: [],
-    low: [],
-  };
-
-  for (const project of scanResult.projects) {
-    for (const w of project.effectivePermissions.warnings) {
-      byseverity[w.severity].push({ project, warning: w });
+  // Collect all warnings grouped by severity, then flatten in severity order
+  const items: AuditItem[] = useMemo(() => {
+    const byseverity: Record<WarningSeverity, AuditItem[]> = {
+      critical: [],
+      high: [],
+      medium: [],
+      low: [],
+    };
+    for (const project of scanResult.projects) {
+      for (const w of project.effectivePermissions.warnings) {
+        byseverity[w.severity].push({ project, warning: w });
+      }
     }
-  }
-
-  // Flatten in severity order
-  const items: AuditItem[] = SEVERITY_ORDER.flatMap((s) => byseverity[s]);
+    return SEVERITY_ORDER.flatMap((s) => byseverity[s]);
+  }, [scanResult.projects]);
 
   useInput((input, key) => {
     if (key.escape || input === "q" || key.leftArrow) {

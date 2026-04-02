@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.58] - 2026-04-02
+
+### Fixed
+- **`edit` missing from shell completion**: The `edit` command was registered in `cli.ts` but omitted from the `COMMANDS` list in `completion.ts`. Shell completion (`cpm completion bash|zsh`) now includes `edit` with its `--scope` and `--project` options for both bash and zsh.
+
+### Tests
+- Two regression tests verify `edit` appears in both bash and zsh completion output with the correct options.
+
 ## [1.4.57] - 2026-04-02
 
 ### Tests

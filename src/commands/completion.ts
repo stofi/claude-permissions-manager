@@ -21,6 +21,7 @@ const COMMANDS = [
   "mode",
   "export",
   "init",
+  "edit",
   "completion",
 ];
 
@@ -144,6 +145,10 @@ _cpm_completions() {
       COMPREPLY=( \$(compgen -W "--project --scope --preset --mode --yes --dry-run" -- "\${cur}") )
       return 0
       ;;
+    edit)
+      COMPREPLY=( \$(compgen -W "--scope --project" -- "\${cur}") )
+      return 0
+      ;;
   esac
 
   # Default: complete flags
@@ -170,6 +175,7 @@ function zshScript(): string {
       mode: "Set default mode",
       export: "Export permissions data",
       init: "Create starter settings",
+      edit: "Open settings file in $EDITOR",
       completion: "Print shell completion script",
     };
     return `    '${c}:${desc[c] ?? c}'`;
@@ -276,6 +282,11 @@ ${commandDefs}
             '--format[Output format]:format:(${formatList})' \\
             '--output[Output file]:output:_files' \\
             '--no-global[Skip user and managed global settings]'
+          ;;
+        edit)
+          _arguments \\
+            '--scope[Settings scope]:scope:(${scopeList})' \\
+            '--project[Project path]:project:_directories'
           ;;
         completion)
           _arguments '1:shell:(bash zsh)'

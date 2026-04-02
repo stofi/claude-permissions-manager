@@ -3149,6 +3149,26 @@ describe("completionCommand", () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
     exitSpy.mockRestore();
   });
+
+  it("bash script includes 'edit' command and its --scope/--project options", async () => {
+    // Regression: 'edit' was missing from COMMANDS list, so it never appeared in completions.
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await completionCommand("bash");
+    const output = lines.join("\n");
+    expect(output).toContain("edit");
+    expect(output).toMatch(/edit\)[\s\S]*--scope.*--project/);
+  });
+
+  it("zsh script includes 'edit' command with description and --scope/--project options", async () => {
+    // Regression: 'edit' was missing from COMMANDS list, so it never appeared in zsh completions.
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await completionCommand("zsh");
+    const output = lines.join("\n");
+    expect(output).toContain("edit");
+    expect(output).toMatch(/edit\)[\s\S]*--scope\[Settings scope\]/);
+  });
 });
 
 // ────────────────────────────────────────────────────────────

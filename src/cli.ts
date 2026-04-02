@@ -48,57 +48,42 @@ program.action(async () => {
 program
   .command("ui")
   .description("Launch interactive TUI")
-  .option("--root <dir>", "Root directory to scan from", homeDir())
-  .option("--depth <n>", "Max scan depth", "8")
-  .option("--no-global", "Skip user and managed global settings")
-  .action(async (opts) => {
+  .action(async () => {
+    const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
     const { uiCommand } = await import("./commands/ui.js");
-    await uiCommand({
-      root: opts.root,
-      maxDepth: parseDepth(opts.depth),
-      includeGlobal: opts.global !== false,
-    });
+    await uiCommand({ root, maxDepth: parseDepth(depth), includeGlobal: g !== false });
   });
 
 program
   .command("list")
   .description("List all discovered Claude projects and their permissions")
-  .option("--root <dir>", "Root directory to scan from", homeDir())
-  .option("--depth <n>", "Max scan depth", "8")
   .option("--json", "Output as JSON")
-  .option("--no-global", "Skip user and managed global settings")
   .action(async (opts) => {
-    await listCommand({
-      root: opts.root,
-      maxDepth: parseDepth(opts.depth),
-      json: opts.json,
-      includeGlobal: opts.global !== false,
-    });
+    const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
+    await listCommand({ root, maxDepth: parseDepth(depth), json: opts.json, includeGlobal: g !== false });
   });
 
 program
   .command("show [path]")
   .description("Show detailed permissions for a project (default: cwd)")
   .option("--json", "Output as JSON")
-  .option("--no-global", "Skip user and managed global settings")
   .action(async (path, opts) => {
-    await showCommand(path, { json: opts.json, includeGlobal: opts.global !== false });
+    const { global: g } = program.opts() as { global: boolean };
+    await showCommand(path, { json: opts.json, includeGlobal: g !== false });
   });
 
 program
   .command("audit")
   .description("Report risky or suspicious permissions across all projects")
-  .option("--root <dir>", "Root directory to scan from", homeDir())
-  .option("--depth <n>", "Max scan depth", "8")
   .option("--json", "Output as JSON")
-  .option("--no-global", "Skip user and managed global settings")
   .option("--exit-code", "Exit with code 1 (issues found) or 2 (critical issues) for CI use")
   .action(async (opts) => {
+    const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
     await auditCommand({
-      root: opts.root,
-      maxDepth: parseDepth(opts.depth),
+      root,
+      maxDepth: parseDepth(depth),
       json: opts.json,
-      includeGlobal: opts.global !== false,
+      includeGlobal: g !== false,
       exitCode: opts.exitCode,
     });
   });
@@ -107,10 +92,10 @@ program
   .command("diff <path1> <path2>")
   .description("Compare effective permissions between two projects")
   .option("--json", "Output as JSON")
-  .option("--no-global", "Skip user and managed global settings")
   .action(async (path1, path2, opts) => {
+    const { global: g } = program.opts() as { global: boolean };
     const { diffCommand } = await import("./commands/diff.js");
-    await diffCommand(path1, path2, { json: opts.json, includeGlobal: opts.global !== false });
+    await diffCommand(path1, path2, { json: opts.json, includeGlobal: g !== false });
   });
 
 program
@@ -181,19 +166,17 @@ program
 program
   .command("export")
   .description("Export all permissions data (JSON or CSV)")
-  .option("--root <dir>", "Root directory to scan from", homeDir())
-  .option("--depth <n>", "Max scan depth", "8")
   .option("--format <fmt>", "Output format: json|csv", "json")
   .option("--output <file>", "Write to file instead of stdout")
-  .option("--no-global", "Skip user and managed global settings")
   .action(async (opts) => {
+    const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
     const { exportCommand } = await import("./commands/export.js");
     await exportCommand({
-      root: opts.root,
-      maxDepth: parseDepth(opts.depth),
+      root,
+      maxDepth: parseDepth(depth),
       format: opts.format,
       output: opts.output,
-      includeGlobal: opts.global !== false,
+      includeGlobal: g !== false,
     });
   });
 

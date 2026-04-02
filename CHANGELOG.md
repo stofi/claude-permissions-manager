@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.61] - 2026-04-02
+
+### Fixed
+- **Commander.js `--root`/`--depth`/`--no-global` option-shadowing bug**: When the parent `program` and a subcommand both define the same option name, Commander assigns the user-provided value to the *parent's* option, leaving the subcommand's copy at its default. This caused `cpm list --root /some/path`, `cpm audit --root ...`, `cpm diff ...`, `cpm export ...`, and `cpm ui ...` to always scan from `homeDir()` regardless of the `--root` flag passed by the user. Fix: removed the duplicate `--root`, `--depth`, and `--no-global` option declarations from the `ui`, `list`, `show`, `audit`, `diff`, and `export` subcommands. Each action callback now reads `program.opts()` directly to obtain these global flags.
+
+### Tests
+- **CLI integration test suite** (`tests/cli.test.ts`): Added 26 integration tests that spawn the compiled `dist/cli.js` binary via `spawnSync`. Covers: `--version`, `--help`, `list --json`, `list --no-global`, `list --depth invalid` (parseDepth fallback), default non-TTY action, `show --json` output shape, `audit --json`/`--exit-code`, `diff --json` output shape, `export --format json/csv`, `completion bash/zsh`, `allow`/`deny`/`reset`/`mode`/`init` write operations, `reset` with no args (exit 1 guard), unknown command (exit 1), invalid export format (exit 1). These tests catch CLI-level regressions (Commander wiring, option defaults, exit codes) that unit tests cannot detect.
+
 ## [1.4.60] - 2026-04-02
 
 ### Tests

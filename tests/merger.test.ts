@@ -179,6 +179,25 @@ describe("mergeSettingsFiles — basic merging", () => {
     const result = mergeSettingsFiles([missing, project]);
     expect(result.allow.length).toBe(1);
   });
+
+  it("skips file that exists but has no data — parse-failure scenario (merger.ts:340 — !file.data branch)", () => {
+    // merger.ts:340: if (!file.exists || !file.data) continue;
+    // A file with exists=true but data=undefined (e.g. JSON parse failed) should be skipped.
+    // The !file.exists case is covered above; this covers the !file.data (true) branch independently.
+    const unparsed: SettingsFile = {
+      path: "/unparsed",
+      scope: "local",
+      exists: true,
+      readable: true,
+      parsed: false,
+      parseError: "unexpected token",
+      // data intentionally absent
+    };
+    const project = makeFile("project", { permissions: { allow: ["Read"] } });
+    const result = mergeSettingsFiles([unparsed, project]);
+    expect(result.allow.length).toBe(1);
+    expect(result.allow[0].raw).toBe("Read");
+  });
 });
 
 // ────────────────────────────────────────────────────────────

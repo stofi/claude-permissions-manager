@@ -51,6 +51,7 @@ export interface ClaudeMdFile {
 }
 
 export type WarningSeverity = "critical" | "high" | "medium" | "low";
+export const SEVERITY_ORDER: WarningSeverity[] = ["critical", "high", "medium", "low"];
 
 export interface Warning {
   severity: WarningSeverity;

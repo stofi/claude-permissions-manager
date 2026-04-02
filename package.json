@@ -1,6 +1,6 @@
 {
   "name": "claude-permissions-manager",
-  "version": "1.4.56",
+  "version": "1.4.57",
   "description": "Discover, analyze, and manage Claude Code permissions across all your projects",
   "license": "MIT",
   "author": "stofi",
@@ -39,6 +39,7 @@
     "start": "node dist/cli.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -52,6 +53,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.3",
+    "@vitest/coverage-v8": "^4.1.2",
     "tsx": "^4.19.0",
     "typescript": "^5.5.4",
     "vitest": "^4.1.2"

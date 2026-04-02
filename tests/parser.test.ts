@@ -367,6 +367,44 @@ describe("parseClaudeJson", () => {
     expect(denied!.args).toEqual(["-y", "some-server"]);
   });
 
+  it("parses per-project server with headers (parser.ts:248 — c.headers truthy branch)", async () => {
+    // parser.ts:248: headerNames: c.headers ? Object.keys(c.headers as object) : undefined
+    // All existing per-project server tests use stdio servers (command/args only) with no headers.
+    // An http per-project server with a headers map exercises the truthy branch.
+    const projectPath = "/home/user/http-project";
+    writeFileSync(claudeJsonPath, JSON.stringify({
+      projects: {
+        [projectPath]: {
+          mcpServers: {
+            webservice: {
+              type: "http",
+              url: "https://mcp.example.com",
+              headers: { Authorization: "Bearer secret", "X-Tenant": "org" },
+            },
+            nohdr: {
+              command: "npx",
+              args: ["-y", "plain-server"],
+            },
+          },
+          mcpServerApprovals: { webservice: "approved" },
+        },
+      },
+    }));
+
+    const result = await parseClaudeJson(claudeJsonPath);
+    const servers = result.projectServers.get(projectPath);
+    expect(servers).toBeDefined();
+
+    const ws = servers!.find((s) => s.name === "webservice");
+    expect(ws!.headerNames).toBeDefined();
+    expect(ws!.headerNames).toContain("Authorization");
+    expect(ws!.headerNames).toContain("X-Tenant");
+    expect(ws!.envVarNames).toBeUndefined(); // no env field
+
+    const plain = servers!.find((s) => s.name === "nohdr");
+    expect(plain!.headerNames).toBeUndefined(); // falsy branch
+  });
+
   it("assigns scope=user to global servers and scope=local to project servers", async () => {
     const projectPath = "/home/user/my-project";
     writeFileSync(claudeJsonPath, JSON.stringify({

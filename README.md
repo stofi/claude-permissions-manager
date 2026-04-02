@@ -224,13 +224,16 @@ All `--json` outputs share these conventions:
 `cpm audit --json` output structure:
 ```json
 {
-  "generatedAt": "...", "scanRoot": "...", "projectCount": 3, "issueCount": 2,
+  "generatedAt": "...", "scanRoot": "...",
+  "projectCount": 3, "affectedProjectCount": 2, "cleanProjectCount": 1,
+  "issueCount": 4, "minSeverity": "low",
   "issues": [
     { "project": "/path/to/project", "severity": "high", "message": "...", "rule": "Bash" }
   ],
   "errors": []
 }
 ```
+`affectedProjectCount` is the number of projects that have at least one issue. `cleanProjectCount` is projects with no issues. `minSeverity` reflects the `--min-severity` option used (default `"low"`).
 
 `cpm diff --json` structure:
 ```json
@@ -264,7 +267,7 @@ eval "$(cpm completion bash)"
 eval "$(cpm completion zsh)"
 ```
 
-Tab-completes: commands, `--scope` values, `--format`, `--preset`, mode names, and directory paths.
+Tab-completes: commands, `--scope` values, `--format`, `--preset`, mode names, directory paths, and built-in tool names for `allow`/`deny`/`ask`/`reset` rules (e.g. `Bash`, `Read`, `WebFetch`).
 
 ## Interactive TUI
 

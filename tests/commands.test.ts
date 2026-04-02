@@ -264,6 +264,15 @@ describe("initCommand", () => {
     }
   });
 
+  it("exits 1 on unknown preset (init.ts:111-118)", async () => {
+    // init.ts:111-118: `if (!PRESETS[preset]) { ... process.exit(1); }`
+    // Neither "exits 1 on invalid scope" nor "exits 1 on invalid mode" exercise this branch.
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    await expect(initCommand({ project: tmpDir, preset: "bogus" })).rejects.toThrow("exit:1");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
+  });
+
 });
 
 // ────────────────────────────────────────────────────────────

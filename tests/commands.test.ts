@@ -3821,3 +3821,136 @@ describe("copyCommand", () => {
     expect(data.permissions.defaultMode).toBe("acceptEdits");
   });
 });
+
+// ────────────────────────────────────────────────────────────
+// auditCommand — --min-severity filter
+// ────────────────────────────────────────────────────────────
+describe("auditCommand — --min-severity", () => {
+  let root: string;
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), "cpm-audit-sev-"));
+    // Create two projects: one with a critical (bypass) warning, one with a low warning
+    const bypassDir = join(root, "bypass-proj", ".claude");
+    const safeDir = join(root, "safe-proj", ".claude");
+    await mkdir(bypassDir, { recursive: true });
+    await mkdir(safeDir, { recursive: true });
+    await writeFile(
+      join(bypassDir, "settings.json"),
+      JSON.stringify({ permissions: { defaultMode: "bypassPermissions" } })
+    );
+    // low-severity: wildcard allow rule
+    await writeFile(
+      join(safeDir, "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(*)", "WebFetch"] } })
+    );
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it("minSeverity=critical omits low/medium/high, keeps critical", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await auditCommand({ root, maxDepth: 2, json: true, includeGlobal: false, minSeverity: "critical" });
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(json.issues.every((i: { severity: string }) => i.severity === "critical")).toBe(true);
+    // must include bypass warning
+    expect(json.issueCount).toBeGreaterThan(0);
+  });
+
+  it("minSeverity=low includes all severities (default behavior)", async () => {
+    const allCalls: unknown[][] = [];
+    const lowCalls: unknown[][] = [];
+    vi.spyOn(console, "log")
+      .mockImplementationOnce((...args) => { allCalls.push(args); })
+      .mockImplementation((...args) => { lowCalls.push(args); });
+    await auditCommand({ root, maxDepth: 2, json: true, includeGlobal: false });
+    await auditCommand({ root, maxDepth: 2, json: true, includeGlobal: false, minSeverity: "low" });
+    const all = JSON.parse(allCalls.map((a) => a.join("")).join(""));
+    const low = JSON.parse(lowCalls.map((a) => a.join("")).join(""));
+    expect(all.issueCount).toBe(low.issueCount);
+  });
+
+  it("minSeverity=high only shows high and critical", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await auditCommand({ root, maxDepth: 2, json: true, includeGlobal: false, minSeverity: "high" });
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    const ALLOWED = new Set(["critical", "high"]);
+    expect(json.issues.every((i: { severity: string }) => ALLOWED.has(i.severity))).toBe(true);
+  });
+
+  it("--exit-code only fires when filtered issues exist", async () => {
+    // With minSeverity=critical and only a bypassPermissions project: exit 2
+    await expect(
+      auditCommand({ root, maxDepth: 2, includeGlobal: false, exitCode: true, minSeverity: "critical" })
+    ).rejects.toThrow();
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// listCommand — --warnings filter
+// ────────────────────────────────────────────────────────────
+describe("listCommand — --warningsOnly", () => {
+  let root: string;
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), "cpm-list-warn-"));
+    // Project with a warning (bypass)
+    const warnDir = join(root, "warn-proj", ".claude");
+    await mkdir(warnDir, { recursive: true });
+    await writeFile(
+      join(warnDir, "settings.json"),
+      JSON.stringify({ permissions: { defaultMode: "bypassPermissions" } })
+    );
+    // Clean project (no warnings)
+    const cleanDir = join(root, "clean-proj", ".claude");
+    await mkdir(cleanDir, { recursive: true });
+    await writeFile(
+      join(cleanDir, "settings.json"),
+      JSON.stringify({ permissions: { defaultMode: "default" } })
+    );
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it("--warnings JSON only includes projects with warnings", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await listCommand({ root, maxDepth: 2, json: true, includeGlobal: false, warningsOnly: true });
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(json.projects.every((p: { warningCount: number }) => p.warningCount > 0)).toBe(true);
+    // Should NOT include the clean project
+    expect(json.projects.some((p: { path: string }) => p.path.includes("clean-proj"))).toBe(false);
+    expect(json.projects.some((p: { path: string }) => p.path.includes("warn-proj"))).toBe(true);
+  });
+
+  it("--warnings without warningsOnly includes all projects", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await listCommand({ root, maxDepth: 2, json: true, includeGlobal: false });
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(json.projectCount).toBe(2);
+  });
+
+  it("--warnings text output shows filtered count", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await listCommand({ root, maxDepth: 2, json: false, includeGlobal: false, warningsOnly: true });
+    const output = lines.join("\n");
+    expect(output).toMatch(/1 of 2 project/);
+  });
+
+  it("--warnings text output shows no-warnings message when all clean", async () => {
+    // Create a root with only clean projects
+    const cleanRoot = mkdtempSync(join(tmpdir(), "cpm-list-clean-"));
+    try {
+      const dir = join(cleanRoot, "clean", ".claude");
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "settings.json"), JSON.stringify({ permissions: {} }));
+      const lines: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+      await listCommand({ root: cleanRoot, maxDepth: 2, json: false, includeGlobal: false, warningsOnly: true });
+      const output = lines.join("\n");
+      expect(output).toMatch(/No warnings found/);
+    } finally {
+      rmSync(cleanRoot, { recursive: true, force: true });
+    }
+  });
+});

@@ -58,9 +58,10 @@ program
   .command("list")
   .description("List all discovered Claude projects and their permissions")
   .option("--json", "Output as JSON")
+  .option("--warnings", "Only show projects that have permission warnings")
   .action(async (opts) => {
     const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
-    await listCommand({ root, maxDepth: parseDepth(depth), json: opts.json, includeGlobal: g !== false });
+    await listCommand({ root, maxDepth: parseDepth(depth), json: opts.json, includeGlobal: g !== false, warningsOnly: opts.warnings });
   });
 
 program
@@ -77,6 +78,7 @@ program
   .description("Report risky or suspicious permissions across all projects")
   .option("--json", "Output as JSON")
   .option("--exit-code", "Exit with code 1 (issues found) or 2 (critical issues) for CI use")
+  .addOption(new Option("--min-severity <level>", "Only report issues at or above this severity").choices(["critical", "high", "medium", "low"]).default("low"))
   .action(async (opts) => {
     const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
     await auditCommand({
@@ -85,6 +87,7 @@ program
       json: opts.json,
       includeGlobal: g !== false,
       exitCode: opts.exitCode,
+      minSeverity: opts.minSeverity,
     });
   });
 

@@ -119,7 +119,7 @@ _cpm_completions() {
       return 0
       ;;
     list)
-      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --warnings" -- "\${cur}") )
       return 0
       ;;
     ui)
@@ -127,7 +127,7 @@ _cpm_completions() {
       return 0
       ;;
     audit)
-      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --exit-code" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --exit-code --min-severity" -- "\${cur}") )
       return 0
       ;;
     export)
@@ -265,7 +265,8 @@ ${commandDefs}
             '--root[Root directory]:root:_directories' \\
             '--depth[Max scan depth]:depth:' \\
             '--json[Output as JSON]' \\
-            '--no-global[Skip user and managed global settings]'
+            '--no-global[Skip user and managed global settings]' \\
+            '--warnings[Only show projects with warnings]'
           ;;
         ui)
           _arguments \\
@@ -279,7 +280,8 @@ ${commandDefs}
             '--depth[Max scan depth]:depth:' \\
             '--json[Output as JSON]' \\
             '--no-global[Skip user and managed global settings]' \\
-            '--exit-code[Exit 1 if issues, 2 if critical (for CI)]'
+            '--exit-code[Exit 1 if issues, 2 if critical (for CI)]' \\
+            '--min-severity[Minimum severity to report]:severity:(critical high medium low)'
           ;;
         export)
           _arguments \\

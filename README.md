@@ -19,9 +19,11 @@ npx claude-permissions-manager
 ```bash
 cpm                         # Launch interactive TUI (when stdout is a TTY)
 cpm list                    # List all projects with their permission modes
+cpm list --warnings         # Only show projects that have permission warnings
 cpm show                    # Show permissions for current project (cwd)
 cpm show ~/my-project       # Show detailed permissions for a specific project
 cpm audit                   # Report risky permissions across all projects
+cpm audit --min-severity high  # Only report high and critical issues
 cpm diff <path1> <path2>    # Compare two projects side by side
 cpm copy <source> <target>  # Copy project-level permissions to another project
 cpm export                  # Dump all permissions as JSON (stdout)
@@ -118,6 +120,13 @@ All commands exit `0` on success and `1` on error (missing `.claude` directory, 
 | `0`  | No issues found |
 | `1`  | Issues found (any severity below critical) |
 | `2`  | Critical issues found |
+
+Combine with `--min-severity` to only trigger on specific severity levels:
+
+```bash
+cpm audit --exit-code --min-severity high   # exit non-zero only for high/critical
+cpm audit --exit-code --min-severity critical  # exit non-zero only for critical
+```
 
 #### Path arguments
 

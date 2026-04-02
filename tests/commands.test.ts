@@ -1884,6 +1884,39 @@ describe("diffCommand — identical projects", () => {
     expect(json.envVarNames).toHaveProperty("inBoth");
   });
 
+  it("reports shared additionalDirs in inBoth (diff.ts:150 — inBoth filter)", async () => {
+    // diff.ts:150: inBoth: p1.additionalDirs.filter((d) => dirNamesB.has(d))
+    // All prior tests compare project-a vs project-b where neither has additionalDirectories,
+    // so inBoth is always []. Two projects sharing the same entry exercises the filter result.
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-adddir-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-adddir-b-"));
+    try {
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      await writeFile(join(dirA, ".claude", "settings.json"), JSON.stringify({
+        permissions: {},
+        additionalDirectories: ["/shared/path", "/only-in-a"],
+      }));
+      await writeFile(join(dirB, ".claude", "settings.json"), JSON.stringify({
+        permissions: {},
+        additionalDirectories: ["/shared/path", "/only-in-b"],
+      }));
+
+      const calls: unknown[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+
+      await diffCommand(dirA, dirB, { json: true, includeGlobal: false });
+
+      const json = JSON.parse(calls.map((a) => (a as string[]).join("")).join(""));
+      expect(json.additionalDirs.inBoth).toContain("/shared/path");
+      expect(json.additionalDirs.onlyInA).toContain("/only-in-a");
+      expect(json.additionalDirs.onlyInB).toContain("/only-in-b");
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
+
   it("mcpServers.modified is present in JSON output", async () => {
     const calls: unknown[][] = [];
     vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
@@ -2075,6 +2108,29 @@ describe("diffCommand — text output", () => {
     expect(output).not.toMatch(/Bypass lock:.*\(same\)/);
   });
 
+  it("shows 'not locked → locked' when p1 unlocked and p2 locked (diff.ts:174 branch-1, 175 branch-0)", async () => {
+    // diff.ts:174: p1.isBypassDisabled ? "locked" : "not locked" — branch 1 (falsy, p1 unlocked)
+    // diff.ts:175: p2.isBypassDisabled ? "locked" : "not locked" — branch 0 (truthy, p2 locked)
+    // All prior tests use p1=bypass-locked, p2=unlocked, covering only truthy@174 and falsy@175.
+    // Reversing the order covers the remaining branches.
+    const calls: string[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+
+    await diffCommand(
+      join(FIXTURES, "project-b"),
+      join(FIXTURES, "project-bypass-locked"),
+      { includeGlobal: false }
+    );
+
+    const output = calls.map((a) => a.join("")).join("\n");
+    expect(output).toMatch(/Bypass lock:/);
+    // p1 is unlocked, p2 is locked — arrow goes not locked → locked
+    expect(output).toMatch(/not locked.*locked/);
+    const bypassLine = output.split("\n").find((l) => l.includes("Bypass lock:"));
+    expect(bypassLine).toBeDefined();
+    expect(bypassLine).not.toMatch(/\(same\)/);
+  });
+
   it("shows type and args change lines for modified MCP server (diff.ts:248,252-253)", async () => {
     // diff.ts:248: typeA !== typeB → "type: stdio → http" — never tested
     // diff.ts:252-253: args differ → "args: [a] → [b]" — never tested (prior tests used args:[])
@@ -2098,6 +2154,39 @@ describe("diffCommand — text output", () => {
       const output = calls.map((a) => a.join("")).join("\n");
       expect(output).toMatch(/type:.*stdio.*http/);   // diff.ts:248
       expect(output).toMatch(/args:.*verbose.*\[\]/);  // diff.ts:252-253
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
+
+  it("detects args difference when type and command are identical (diff.ts:50 — args-differ branch)", async () => {
+    // diff.ts:50: JSON.stringify(a.args ?? []) !== JSON.stringify(b.args ?? []) → return true
+    // Prior tests either differ on type (returns at line 48) or command (returns at line 49),
+    // so the args-differ branch on line 50 was never reached.
+    // This test uses same type (both default stdio) and same command, but different args.
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-args-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-args-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      await wf(join(dirA, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { command: "npx", args: ["--verbose"] } }
+      }));
+      await wf(join(dirB, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { command: "npx", args: ["--quiet"] } }
+      }));
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+      await diffCommand(dirA, dirB, { includeGlobal: false });
+      const output = calls.map((a) => a.join("")).join("\n");
+      // servers are considered modified (args differ) → ~ indicator
+      expect(output).toMatch(/~.*myserver.*modified/);
+      // args change line should show both arg values
+      expect(output).toMatch(/args:.*verbose.*quiet/);
     } finally {
       rmSync(dirA, { recursive: true, force: true });
       rmSync(dirB, { recursive: true, force: true });
@@ -2211,6 +2300,287 @@ describe("diffCommand — text output", () => {
       await diffCommand(dirA, dirB, {});
       const output = calls.map((a) => a.join("")).join("\n");
       expect(output).toMatch(/cmd:.*old-cmd.*new-cmd/);  // diff.ts:250
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
+
+  it("shows '(none)' for command and empty [] for args when server B has neither (diff.ts:250 br-54, 253 br-59)", async () => {
+    // diff.ts:250: `${sB.command ?? "(none)"}` — branch when sB.command is undefined
+    // diff.ts:253: `[${(sB.args ?? []).join(", ")}]` — branch when sB.args is undefined
+    // Existing tests always compare servers where BOTH sides have command defined.
+    // A server with command+args in A vs no command/args in B exercises these ?? fallbacks.
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-nocmd-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-nocmd-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      await wf(join(dirA, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { command: "npx", args: ["--pkg"] } }
+      }));
+      // B has no command and no args (minimal stdio-like)
+      await wf(join(dirB, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { type: "stdio", url: "https://x.com" } }
+      }));
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+      await diffCommand(dirA, dirB, { includeGlobal: false });
+      const output = calls.map((a) => a.join("")).join("\n");
+      expect(output).toMatch(/~.*myserver.*modified/);
+      // cmd line: "npx → (none)"
+      expect(output).toMatch(/cmd:.*npx.*\(none\)/);
+      // args line: "[--pkg] → []"
+      expect(output).toMatch(/args:.*--pkg/);
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
+
+  it("shows '(none)' for url when one server lacks a url (diff.ts:256 br-64)", async () => {
+    // diff.ts:256: `${sB.url ?? "(none)"}` — branch when sB.url is undefined
+    // Existing url test compares old.example.com vs new.example.com (both defined).
+    // An http server with url in A vs http server without url in B exercises the ?? fallback.
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-nourl-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-nourl-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      await wf(join(dirA, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { type: "http", url: "https://old.example.com/mcp" } }
+      }));
+      // B has same type but no url
+      await wf(join(dirB, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { type: "http", command: "fallback-cmd" } }
+      }));
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+      await diffCommand(dirA, dirB, { includeGlobal: false });
+      const output = calls.map((a) => a.join("")).join("\n");
+      // url diff: old.example.com → (none)
+      expect(output).toMatch(/url:.*old\.example\.com.*\(none\)/);
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
+
+  it("shows envVarNames '[]' when server goes from no-env to with-env (diff.ts:261 br-69)", async () => {
+    // diff.ts:261: `[${(sA.envVarNames ?? []).join(", ")}]` — branch when sA.envVarNames is undefined
+    // Existing env test uses servers where BOTH have envVarNames defined (both have env field).
+    // A server with no env in A vs env in B exercises the ?? [] fallback for sA.
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-noenv-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-noenv-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      // A has no env; B has env → envVarNames differs (undefined vs ["TOKEN"])
+      await wf(join(dirA, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { command: "npx", args: [] } }
+      }));
+      await wf(join(dirB, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { command: "npx", args: [], env: { TOKEN: "x" } } }
+      }));
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+      await diffCommand(dirA, dirB, { includeGlobal: false });
+      const output = calls.map((a) => a.join("")).join("\n");
+      // env line shows "[] → [TOKEN]" (sA.envVarNames ?? [] = [])
+      expect(output).toMatch(/env:.*\[\].*TOKEN/);
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
+
+  it("shows headerNames '[]' when server goes from no-headers to with-headers (diff.ts:264 br-72)", async () => {
+    // diff.ts:264: `[${(sA.headerNames ?? []).join(", ")}]` — branch when sA.headerNames is undefined
+    // Existing header test compares two servers both with headers defined.
+    // A server with no headers in A vs headers in B exercises the ?? [] fallback for sA.
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-nohdr-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-nohdr-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      // A has same-url http server, no headers; B has headers
+      await wf(join(dirA, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { type: "http", url: "https://x.com" } }
+      }));
+      await wf(join(dirB, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { type: "http", url: "https://x.com", headers: { Authorization: "Bearer token" } } }
+      }));
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+      await diffCommand(dirA, dirB, { includeGlobal: false });
+      const output = calls.map((a) => a.join("")).join("\n");
+      // headers line shows "[] → [Authorization]"
+      expect(output).toMatch(/headers:.*\[\].*Authorization/);
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
+
+  it("setsEqual returns false for same-size rule sets with different content (diff.ts:282 br-0)", async () => {
+    // diff.ts:282: for (const v of sa) if (!sb.has(v)) return false;
+    // Prior rule-diff tests compare projects with DIFFERENT-sized allow arrays (early return at 281).
+    // Same-size but different-content arrays exercise the for-loop return-false at line 282.
+    // Also exercises setsOfStringsEqual with same-size different additionalDirs (line 288).
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-samelen-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-samelen-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({
+        permissions: { allow: ["Bash(tool-x)"] },  // size 1
+        additionalDirectories: ["/path/alpha"],     // size 1
+      }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({
+        permissions: { allow: ["Bash(tool-y)"] },  // size 1, different content
+        additionalDirectories: ["/path/beta"],      // size 1, different content
+      }));
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+      await diffCommand(dirA, dirB, { includeGlobal: false });
+      const output = calls.map((a) => a.join("")).join("\n");
+      // Both differ → projects are not identical
+      expect(output).not.toMatch(/identical effective permissions/);
+      expect(output).toMatch(/ALLOW/);
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
+
+  it("setsOfStringsEqual returns false for same-size different additionalDirs (diff.ts:288 br-78)", async () => {
+    // diff.ts:288: for (const v of a) if (!b.has(v)) return false;
+    // setsOfStringsEqual is called for additionalDirs at line 305, but the || chain short-circuits
+    // when any earlier condition is true (allow differ → short-circuit, skipping line 305).
+    // Two projects with IDENTICAL permissions but SAME-SIZE different additionalDirs force the
+    // evaluation to reach line 305 and exercise the for-loop return-false at line 288.
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-addrsz-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-addrsz-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      // Identical permissions/mcp/env so earlier || conditions are all false
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({
+        permissions: {},
+        additionalDirectories: ["/only-alpha"],   // size 1
+      }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({
+        permissions: {},
+        additionalDirectories: ["/only-beta"],    // size 1, different content
+      }));
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+      await diffCommand(dirA, dirB, { includeGlobal: false });
+      const output = calls.map((a) => a.join("")).join("\n");
+      expect(output).toMatch(/ADDITIONAL DIRS/);
+      expect(output).not.toMatch(/identical effective permissions/);
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
+
+  it("shows '[]' for sA.args when server A has no args but B does (diff.ts:253 br-58)", async () => {
+    // diff.ts:253: `[${(sA.args ?? []).join(", ")}]` — branch when sA.args is undefined
+    // Existing test covers sB.args undefined (A has args, B doesn't). This covers the reverse.
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-noarg-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-noarg-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      // A has no args; B has args
+      await wf(join(dirA, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { command: "npx" } }
+      }));
+      await wf(join(dirB, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { command: "npx", args: ["--pkg"] } }
+      }));
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+      await diffCommand(dirA, dirB, { includeGlobal: false });
+      const output = calls.map((a) => a.join("")).join("\n");
+      // args line shows "[] → [--pkg]" (sA.args ?? [] = [])
+      expect(output).toMatch(/args:.*\[\].*--pkg/);
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
+
+  it("shows envVarNames '[TOKEN]→[]' when server A has env but B does not (diff.ts:261 br-70)", async () => {
+    // diff.ts:261: `[${(sB.envVarNames ?? []).join(", ")}]` — branch when sB.envVarNames undefined
+    // Existing test covers sA.envVarNames undefined (A no env, B has env). This covers reverse.
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-envrev-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-envrev-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      await wf(join(dirA, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { command: "npx", args: [], env: { TOKEN: "x" } } }
+      }));
+      await wf(join(dirB, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { command: "npx", args: [] } }
+      }));
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+      await diffCommand(dirA, dirB, { includeGlobal: false });
+      const output = calls.map((a) => a.join("")).join("\n");
+      // env line shows "[TOKEN] → []" (sB.envVarNames ?? [] = [])
+      expect(output).toMatch(/env:.*TOKEN.*\[\]/);
+    } finally {
+      rmSync(dirA, { recursive: true, force: true });
+      rmSync(dirB, { recursive: true, force: true });
+    }
+  });
+
+  it("shows headerNames '[Auth]→[]' when server A has headers but B does not (diff.ts:264 br-73)", async () => {
+    // diff.ts:264: `[${(sB.headerNames ?? []).join(", ")}]` — branch when sB.headerNames undefined
+    // Existing test covers sA.headerNames undefined (A no headers, B has headers). This covers reverse.
+    const dirA = mkdtempSync(join(tmpdir(), "cpm-diff-hdrrev-a-"));
+    const dirB = mkdtempSync(join(tmpdir(), "cpm-diff-hdrrev-b-"));
+    try {
+      const { writeFile: wf } = await import("fs/promises");
+      await mkdir(join(dirA, ".claude"), { recursive: true });
+      await mkdir(join(dirB, ".claude"), { recursive: true });
+      await wf(join(dirA, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { type: "http", url: "https://x.com", headers: { Authorization: "Bearer t" } } }
+      }));
+      await wf(join(dirB, ".mcp.json"), JSON.stringify({
+        mcpServers: { myserver: { type: "http", url: "https://x.com" } }
+      }));
+      await wf(join(dirA, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      await wf(join(dirB, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+      const calls: string[][] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.map(String)); });
+      await diffCommand(dirA, dirB, { includeGlobal: false });
+      const output = calls.map((a) => a.join("")).join("\n");
+      // headers line shows "[Authorization] → []" (sB.headerNames ?? [] = [])
+      expect(output).toMatch(/headers:.*Authorization.*\[\]/);
     } finally {
       rmSync(dirA, { recursive: true, force: true });
       rmSync(dirB, { recursive: true, force: true });

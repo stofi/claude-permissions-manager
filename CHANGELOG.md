@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.57] - 2026-04-02
+
+### Tests
+- **Coverage: 91.48% → 93.57% branch coverage** (+2.09%), 433 → 446 tests (+13). All additions target previously uncovered branches confirmed via lcov.
+- **`parser.ts:248` per-project server with headers**: New `parseClaudeJson` test exercises the `c.headers ? Object.keys(...) : undefined` truthy branch for project-scoped servers (all prior project server tests used stdio-only servers with no headers field).
+- **`diff.ts:150` `additionalDirs.inBoth`**: New `diffCommand --json` test with two projects sharing a common `additionalDirectories` entry exercises the non-empty `inBoth` filter result (all prior tests compared fixtures with no `additionalDirectories`).
+- **`diff.ts:50` `mcpServerChanged` args-differ branch**: New text-mode diff test uses same type + same command but different args, reaching `JSON.stringify(a.args ?? []) !== JSON.stringify(b.args ?? [])` at line 50 (prior tests returned early at line 48 due to type difference).
+- **`diff.ts:174,175` reversed bypass-lock comparison**: New test passes `(project-b, project-bypass-locked)` (unlocked→locked) covering the falsy branch at line 174 and truthy at line 175. Prior test only covered locked→unlocked.
+- **`diff.ts:250,253,256` null command/args/url `??` fallbacks**: Three new tests cover cases where one MCP server has `command`, `args`, or `url` as `undefined` — exercising the `"(none)"` and `[]` null-coalescing branches in the text diff output.
+- **`diff.ts:261,264` null envVarNames/headerNames `??` fallbacks**: Two new tests cover the `sB.envVarNames ?? []` and `sB.headerNames ?? []` branches (reverse direction: A has env/headers, B doesn't).
+- **`diff.ts:282` `setsEqual` same-size different-content**: New test with single allow rule in A (`Bash(tool-x)`) and different single rule in B (`Bash(tool-y)`) forces the `for...of` loop in `setsEqual` to find a mismatch and `return false` (prior tests had different-sized arrays, triggering early return at line 281).
+- **`diff.ts:288` `setsOfStringsEqual` same-size different `additionalDirs`**: New test with identical permissions but different single-entry `additionalDirectories` in each project. All earlier `||` conditions evaluate to false, so the chain reaches `setsOfStringsEqual` at line 305 where same-size-different-content causes the for-loop to `return false` at line 288.
+
 ## [1.4.56] - 2026-04-02
 
 ### Tests

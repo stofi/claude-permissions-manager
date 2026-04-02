@@ -3839,6 +3839,91 @@ describe("copyCommand", () => {
     // local scope mode wins
     expect(data.permissions.defaultMode).toBe("acceptEdits");
   });
+
+  it("copies only mode when source has no rules — success message mentions mode (line 116 false)", async () => {
+    // Source has only a mode, no allow/deny/ask rules
+    await writeFile(
+      join(srcDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { defaultMode: "plan" } }),
+      "utf-8"
+    );
+    const logCalls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => logCalls.push(args.join("")));
+    await copyCommand(srcDir, dstDir, { yes: true });
+    const content = await readFile(join(dstDir, ".claude", "settings.local.json"), "utf-8");
+    const data = JSON.parse(content);
+    expect(data.permissions.defaultMode).toBe("plan");
+    // Success message should mention mode but NOT rules
+    expect(logCalls.some((m) => /mode.*"plan"/i.test(m))).toBe(true);
+  });
+
+  it("does not print Allow line when source has no allow rules (line 72 false)", async () => {
+    // Source has only deny rules, no allow
+    await writeFile(
+      join(srcDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { deny: ["Bash(rm -rf *)"] } }),
+      "utf-8"
+    );
+    const logCalls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => logCalls.push(args.join("")));
+    await copyCommand(srcDir, dstDir, { yes: true });
+    // Allow line should NOT be printed
+    expect(logCalls.every((m) => !/Allow \(/i.test(m))).toBe(true);
+    // Deny line SHOULD be printed (copy.ts uses "Deny  (" with two spaces)
+    expect(logCalls.some((m) => /Deny\s+\(/i.test(m))).toBe(true);
+  });
+
+  it("handles non-array existing target permissions gracefully (lines 102-103 false)", async () => {
+    // Target settings has allow/deny as strings (malformed) — should use [] fallback
+    await mkdir(join(dstDir, ".claude"), { recursive: true });
+    await writeFile(
+      join(dstDir, ".claude", "settings.local.json"),
+      JSON.stringify({ permissions: { allow: "OldAllow", deny: "OldDeny" } }),
+      "utf-8"
+    );
+    await copyCommand(srcDir, dstDir, { yes: true });
+    const content = await readFile(join(dstDir, ".claude", "settings.local.json"), "utf-8");
+    const data = JSON.parse(content);
+    // Source allow rules should be present (non-array existing target treated as empty)
+    expect(Array.isArray(data.permissions.allow)).toBe(true);
+    expect(data.permissions.allow).toContain("Bash(npm run *)");
+  });
+
+  it("merges with target that has existing deny/ask arrays (lines 102-103 true)", async () => {
+    // Target already has deny/ask rule arrays — should merge (dedup) with source rules
+    await mkdir(join(dstDir, ".claude"), { recursive: true });
+    await writeFile(
+      join(dstDir, ".claude", "settings.local.json"),
+      JSON.stringify({ permissions: { deny: ["Read(**/.env)"], ask: ["Grep"] } }),
+      "utf-8"
+    );
+    await copyCommand(srcDir, dstDir, { yes: true });
+    const content = await readFile(join(dstDir, ".claude", "settings.local.json"), "utf-8");
+    const data = JSON.parse(content);
+    // Existing deny rule should be preserved, source deny rule added
+    expect(data.permissions.deny).toContain("Read(**/.env)");
+    expect(data.permissions.deny).toContain("Bash(rm -rf *)");
+    // Existing ask rule preserved
+    expect(data.permissions.ask).toContain("Grep");
+  });
+
+  it("includes local-scope source rules in copy (lines 45-51 local branch)", async () => {
+    // Source has rules in BOTH project scope (settings.json) AND local scope (settings.local.json)
+    // Local-scope rules should also be copied to target (covers the `|| r.scope === "local"` branch)
+    await writeFile(
+      join(srcDir, ".claude", "settings.local.json"),
+      JSON.stringify({ permissions: { allow: ["Glob"], deny: ["Write"], ask: ["Bash(git *)"] } }),
+      "utf-8"
+    );
+    await copyCommand(srcDir, dstDir, { yes: true });
+    const content = await readFile(join(dstDir, ".claude", "settings.local.json"), "utf-8");
+    const data = JSON.parse(content);
+    // Both project-scope and local-scope allow rules from source should be present
+    expect(data.permissions.allow).toContain("Bash(npm run *)"); // project scope
+    expect(data.permissions.allow).toContain("Glob");            // local scope
+    expect(data.permissions.deny).toContain("Write");            // local scope deny
+    expect(data.permissions.ask).toContain("Bash(git *)");       // local scope ask
+  });
 });
 
 // ────────────────────────────────────────────────────────────

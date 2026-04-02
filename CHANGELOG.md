@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.52] - 2026-04-02
+
+### Tests
+- **`manage.ts:101-105` denyCommand invalid rule**: New test passes an empty rule string to `denyCommand`, verifying `process.exit(1)` is called — the same guard tested for `allowCommand` but previously missing for `deny`.
+- **`manage.ts:135-139` askCommand invalid rule**: New test passes an empty rule string to `askCommand`, verifying `process.exit(1)` is called — same pattern, previously untested for `ask`.
+
 ## [1.4.51] - 2026-04-02
 
 ### Tests

@@ -721,6 +721,15 @@ describe("denyCommand", () => {
     const calls = logSpy.mock.calls.map((c) => String(c[0]));
     expect(calls.some((m) => /Added to deny/i.test(m) && /Bash/.test(m))).toBe(true);
   });
+
+  it("rejects invalid rule and exits (manage.ts:101-105)", async () => {
+    // manage.ts:101-105: validateRule fails → console.error + process.exit(1)
+    // Only allowCommand has this test; denyCommand and askCommand have the same guard but no test.
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    await expect(denyCommand("", { project: tmpDir, scope: "project" })).rejects.toThrow("exit:1");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
+  });
 });
 
 describe("askCommand", () => {
@@ -764,6 +773,15 @@ describe("askCommand", () => {
     await askCommand("Bash(git push *)", { project: tmpDir, scope: "project" });
     const calls = logSpy.mock.calls.map((c) => String(c[0]));
     expect(calls.some((m) => /Added to ask/i.test(m) && /Bash/.test(m))).toBe(true);
+  });
+
+  it("rejects invalid rule and exits (manage.ts:135-139)", async () => {
+    // manage.ts:135-139: validateRule fails → console.error + process.exit(1)
+    // Only allowCommand has this test; askCommand has the same guard but no test.
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    await expect(askCommand("", { project: tmpDir, scope: "project" })).rejects.toThrow("exit:1");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
   });
 });
 

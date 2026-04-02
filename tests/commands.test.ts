@@ -2942,6 +2942,25 @@ describe("auditCommand", () => {
     expect(json.issueCount).toBeGreaterThan(0);
   });
 
+  it("JSON includes affectedProjectCount, cleanProjectCount, and minSeverity fields", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await auditCommand({ root: FIXTURES, maxDepth: 3, json: true });
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(typeof json.affectedProjectCount).toBe("number");
+    expect(typeof json.cleanProjectCount).toBe("number");
+    expect(json.affectedProjectCount + json.cleanProjectCount).toBe(json.projectCount);
+    expect(json.minSeverity).toBe("low"); // default when not specified
+  });
+
+  it("JSON minSeverity reflects the option when provided", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await auditCommand({ root: FIXTURES, maxDepth: 3, json: true, minSeverity: "high" });
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(json.minSeverity).toBe("high");
+  });
+
   it("--json + --exit-code exits 2 when critical issues found in JSON mode", async () => {
     // audit.ts:44: exitWithCode() is called in the json branch too, but all existing exitCode
     // tests use json:false. This covers the json:true + exitCode:true + critical path.
@@ -3883,6 +3902,73 @@ describe("auditCommand — --min-severity", () => {
     await expect(
       auditCommand({ root, maxDepth: 2, includeGlobal: false, exitCode: true, minSeverity: "critical" })
     ).rejects.toThrow();
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// auditCommand — affected/clean project summary
+// ────────────────────────────────────────────────────────────
+describe("auditCommand — affected/clean summary", () => {
+  let root: string;
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), "cpm-audit-mixed-"));
+    // Project with a critical warning (bypassPermissions mode)
+    const bypassDir = join(root, "bypass-proj", ".claude");
+    await mkdir(bypassDir, { recursive: true });
+    await writeFile(
+      join(bypassDir, "settings.json"),
+      JSON.stringify({ permissions: { defaultMode: "bypassPermissions" } })
+    );
+    // Clean project — narrow rules, bypass disabled → no warnings
+    const cleanDir = join(root, "clean-proj", ".claude");
+    await mkdir(cleanDir, { recursive: true });
+    await writeFile(
+      join(cleanDir, "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(npm run *)"], deny: ["Read(**/.env)"], disableBypassPermissionsMode: "disable" } })
+    );
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it("JSON affectedProjectCount=1 and cleanProjectCount=1 with 1 of 2 affected", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await auditCommand({ root, maxDepth: 2, json: true, includeGlobal: false });
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(json.projectCount).toBe(2);
+    expect(json.affectedProjectCount).toBe(1);
+    expect(json.cleanProjectCount).toBe(1);
+  });
+
+  it("text output header shows 'in N of M project(s)' when issues are found", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await auditCommand({ root, maxDepth: 2, includeGlobal: false });
+    const output = lines.join("\n");
+    expect(output).toMatch(/in 1 of 2 project/);
+  });
+
+  it("text output shows clean-project summary line when some projects have no issues", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await auditCommand({ root, maxDepth: 2, includeGlobal: false });
+    const output = lines.join("\n");
+    expect(output).toMatch(/1 project.*no issues/i);
+  });
+
+  it("text output shows filter note when minSeverity is not 'low'", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await auditCommand({ root, maxDepth: 2, includeGlobal: false, minSeverity: "high" });
+    const output = lines.join("\n");
+    expect(output).toMatch(/showing high\+/i);
+  });
+
+  it("text output has no filter note when minSeverity is 'low' (default)", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await auditCommand({ root, maxDepth: 2, includeGlobal: false, minSeverity: "low" });
+    const output = lines.join("\n");
+    expect(output).not.toMatch(/showing.*\+/i);
   });
 });
 

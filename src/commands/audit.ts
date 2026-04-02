@@ -44,12 +44,18 @@ export async function auditCommand(options: ScanOptions & { json?: boolean; exit
     }
   };
 
+  const affectedProjects = new Set(allIssues.map((i) => i.project)).size;
+  const cleanCount = result.projects.length - affectedProjects;
+
   if (options.json) {
     console.log(JSON.stringify({
       generatedAt: result.scannedAt.toISOString(),
       scanRoot: result.scanRoot,
       projectCount: result.projects.length,
+      affectedProjectCount: affectedProjects,
+      cleanProjectCount: cleanCount,
       issueCount: allIssues.length,
+      minSeverity: options.minSeverity ?? "low",
       issues: allIssues,
       errors: result.errors,
     }, null, 2));
@@ -75,7 +81,10 @@ export async function auditCommand(options: ScanOptions & { json?: boolean; exit
     low: allIssues.filter((i) => i.severity === "low"),
   };
 
-  console.log(`\nFound ${chalk.bold(allIssues.length)} issue(s) across ${result.projects.length} project(s):\n`);
+  const filterNote = options.minSeverity && options.minSeverity !== "low"
+    ? chalk.gray(` (showing ${options.minSeverity}+ only)`)
+    : "";
+  console.log(`\nFound ${chalk.bold(allIssues.length)} issue(s) in ${chalk.bold(affectedProjects)} of ${result.projects.length} project(s)${filterNote}:\n`);
 
   for (const [severity, issues] of Object.entries(bySeverity)) {
     if (issues.length === 0) continue;
@@ -88,8 +97,12 @@ export async function auditCommand(options: ScanOptions & { json?: boolean; exit
     console.log("");
   }
 
+  if (cleanCount > 0) {
+    console.log(chalk.green(`✓ ${cleanCount} project(s) have no issues${filterNote}.`));
+  }
+
   if (result.errors.length > 0) {
-    console.log(chalk.red(`${result.errors.length} scan error(s) — some projects could not be checked:`));
+    console.log(chalk.red(`\n${result.errors.length} scan error(s) — some projects could not be checked:`));
     for (const e of result.errors) {
       console.log(chalk.red(`  ${collapseHome(e.path)}: ${e.error}`));
     }

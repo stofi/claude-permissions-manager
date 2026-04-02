@@ -57,12 +57,18 @@ export function App({ scanOptions }: AppProps) {
     );
   }
 
+  // Shared cancellable scan: increments the cancel-ref, scans, returns null if superseded
+  const performScan = async (): Promise<ScanResult | null> => {
+    const id = ++refreshCancelRef.current;
+    const updated = await scan({ ...scanOptions, root: scanResult.scanRoot });
+    if (id !== refreshCancelRef.current) return null;
+    return updated;
+  };
+
   if (screen.name === "list") {
     const handleListRefresh = async () => {
-      const id = ++refreshCancelRef.current;
-      const updated = await scan({ ...scanOptions, root: scanResult.scanRoot });
-      if (id !== refreshCancelRef.current) return;
-      setScanResult(updated);
+      const updated = await performScan();
+      if (updated) setScanResult(updated);
     };
     return (
       <ProjectList
@@ -78,9 +84,8 @@ export function App({ scanOptions }: AppProps) {
 
   if (screen.name === "detail") {
     const refresh = async () => {
-      const id = ++refreshCancelRef.current;
-      const updated = await scan({ ...scanOptions, root: scanResult.scanRoot });
-      if (id !== refreshCancelRef.current) return; // navigation happened while scanning
+      const updated = await performScan();
+      if (!updated) return; // navigation happened while scanning
       const refreshed = updated.projects.find(
         (p) => p.rootPath === screen.project.rootPath
       );

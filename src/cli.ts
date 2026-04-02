@@ -87,7 +87,7 @@ program
       json: opts.json,
       includeGlobal: g !== false,
       exitCode: opts.exitCode,
-      minSeverity: opts.minSeverity,
+      minSeverity: opts.minSeverity as import("./core/types.js").WarningSeverity | undefined,
     });
   });
 

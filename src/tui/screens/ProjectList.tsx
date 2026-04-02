@@ -1,17 +1,9 @@
 import React, { useState, useMemo } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
 import { Header } from "../components/Header.js";
-import type { ScanResult, ClaudeProject, PermissionMode } from "../../core/types.js";
+import { MODE_COLORS } from "../components/Badge.js";
+import type { ScanResult, ClaudeProject } from "../../core/types.js";
 import { collapseHome } from "../../utils/paths.js";
-
-const MODE_COLORS: Record<PermissionMode, string> = {
-  default: "gray",
-  acceptEdits: "blue",
-  plan: "cyan",
-  auto: "yellow",
-  dontAsk: "magenta",
-  bypassPermissions: "red",
-};
 
 interface ProjectListProps {
   scanResult: ScanResult;

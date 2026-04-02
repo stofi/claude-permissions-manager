@@ -5,6 +5,7 @@ import { ModeBadge, SeverityBadge } from "../components/Badge.js";
 import { TextInput } from "../components/TextInput.js";
 import { ScopePicker } from "../components/ScopePicker.js";
 import { addRule, removeRule, resolveSettingsPath, setMode as setPermMode } from "../../core/writer.js";
+import { MODE_COLORS } from "../components/Badge.js";
 import type {
   ClaudeProject,
   PermissionRule,
@@ -518,15 +519,6 @@ function ConfirmInput({ onConfirm }: { onConfirm: (yes: boolean) => void }) {
   );
   return null;
 }
-
-const MODE_COLORS: Record<PermissionMode, string> = {
-  default: "gray",
-  acceptEdits: "blue",
-  plan: "cyan",
-  auto: "yellow",
-  dontAsk: "magenta",
-  bypassPermissions: "red",
-};
 
 const MODE_DESC: Record<PermissionMode, string> = {
   default: "prompt for every permission",

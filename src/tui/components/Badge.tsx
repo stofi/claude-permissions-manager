@@ -2,7 +2,7 @@ import React from "react";
 import { Text } from "ink";
 import type { PermissionMode, WarningSeverity } from "../../core/types.js";
 
-const MODE_COLORS: Record<PermissionMode, string> = {
+export const MODE_COLORS: Record<PermissionMode, string> = {
   default: "gray",
   acceptEdits: "blue",
   plan: "cyan",

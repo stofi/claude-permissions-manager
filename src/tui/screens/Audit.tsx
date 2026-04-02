@@ -2,10 +2,9 @@ import React, { useState, useMemo } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
 import { Header } from "../components/Header.js";
 import { SeverityBadge } from "../components/Badge.js";
+import { SEVERITY_ORDER } from "../../core/types.js";
 import type { ScanResult, Warning, WarningSeverity, ClaudeProject } from "../../core/types.js";
 import { collapseHome } from "../../utils/paths.js";
-
-const SEVERITY_ORDER: WarningSeverity[] = ["critical", "high", "medium", "low"];
 
 interface AuditItem {
   project: ClaudeProject;

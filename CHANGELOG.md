@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.67] - 2026-04-02
+
+### Docs
+- **README**: Added `cpm copy` documentation — usage examples, behavior description (project/local scope only, merge+dedup, global rules excluded), and `--dry-run`/`--scope`/`--yes` flag notes.
+- **README**: Added `cpm edit` documentation — usage examples including `--scope project` and combined `--project`/`--scope` flags; notes on `$VISUAL`/`$EDITOR`/`vi` fallback and empty-stub creation.
+- **README**: Added `cpm copy` and `cpm edit` usage examples in the top-level Usage section and quick-reference list.
+- **README**: Updated `--dry-run` flag description to include `copy`.
+
 ## [1.4.66] - 2026-04-02
 
 ### Tests

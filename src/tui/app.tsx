@@ -58,6 +58,12 @@ export function App({ scanOptions }: AppProps) {
   }
 
   if (screen.name === "list") {
+    const handleListRefresh = async () => {
+      const id = ++refreshCancelRef.current;
+      const updated = await scan({ ...scanOptions, root: scanResult.scanRoot });
+      if (id !== refreshCancelRef.current) return;
+      setScanResult(updated);
+    };
     return (
       <ProjectList
         scanResult={scanResult}
@@ -65,6 +71,7 @@ export function App({ scanOptions }: AppProps) {
         onAudit={() => setScreen({ name: "audit" })}
         onDiff={() => setScreen({ name: "diff" })}
         onQuit={() => exit()}
+        onRefresh={handleListRefresh}
       />
     );
   }

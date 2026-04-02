@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.55] - 2026-04-02
+
+### Tests
+- **`edit.ts:33-34` editor env var chain**: Three new tests cover the `process.env.VISUAL ?? process.env.EDITOR ?? "vi"` fallback chain in `editCommand`. All prior tests mocked `spawn` but never captured which editor command was passed. The new tests verify: VISUAL takes priority, EDITOR is used when VISUAL is unset, and "vi" is the final fallback when both are unset.
+
 ## [1.4.54] - 2026-04-02
 
 ### Tests

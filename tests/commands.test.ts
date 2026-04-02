@@ -2971,4 +2971,118 @@ describe("editCommand", () => {
     vi.doUnmock("child_process");
     vi.resetModules();
   });
+
+  it("uses VISUAL env var as editor (edit.ts:33 — VISUAL branch)", async () => {
+    // edit.ts:33-34: const editor = process.env.VISUAL ?? process.env.EDITOR ?? "vi"
+    // VISUAL takes priority when set.
+    let capturedCmd = "";
+    vi.doMock("child_process", async (importOriginal) => {
+      const original = await importOriginal<typeof import("child_process")>();
+      return {
+        ...original,
+        spawn: (cmd: string, _args: string[], _opts: object) => {
+          capturedCmd = cmd;
+          const EventEmitter = require("events");
+          const child = new EventEmitter();
+          process.nextTick(() => child.emit("exit", 0));
+          return child;
+        },
+      };
+    });
+    vi.resetModules();
+    const { editCommand: editMocked } = await import("../src/commands/edit.js");
+
+    await mkdir(join(tmpDir, ".claude"), { recursive: true });
+    await writeFile(join(tmpDir, ".claude", "settings.json"), JSON.stringify({}), "utf-8");
+
+    const origVISUAL = process.env.VISUAL;
+    const origEDITOR = process.env.EDITOR;
+    process.env.VISUAL = "myvisualeditor";
+    process.env.EDITOR = "myeditor";
+    try {
+      await editMocked({ project: tmpDir, scope: "project" });
+      expect(capturedCmd).toBe("myvisualeditor");
+    } finally {
+      if (origVISUAL === undefined) delete process.env.VISUAL; else process.env.VISUAL = origVISUAL;
+      if (origEDITOR === undefined) delete process.env.EDITOR; else process.env.EDITOR = origEDITOR;
+      vi.doUnmock("child_process");
+      vi.resetModules();
+    }
+  });
+
+  it("uses EDITOR env var when VISUAL is not set (edit.ts:33 — EDITOR branch)", async () => {
+    // edit.ts:33-34: const editor = process.env.VISUAL ?? process.env.EDITOR ?? "vi"
+    // Falls through to EDITOR when VISUAL is undefined.
+    let capturedCmd = "";
+    vi.doMock("child_process", async (importOriginal) => {
+      const original = await importOriginal<typeof import("child_process")>();
+      return {
+        ...original,
+        spawn: (cmd: string, _args: string[], _opts: object) => {
+          capturedCmd = cmd;
+          const EventEmitter = require("events");
+          const child = new EventEmitter();
+          process.nextTick(() => child.emit("exit", 0));
+          return child;
+        },
+      };
+    });
+    vi.resetModules();
+    const { editCommand: editMocked } = await import("../src/commands/edit.js");
+
+    await mkdir(join(tmpDir, ".claude"), { recursive: true });
+    await writeFile(join(tmpDir, ".claude", "settings.json"), JSON.stringify({}), "utf-8");
+
+    const origVISUAL = process.env.VISUAL;
+    const origEDITOR = process.env.EDITOR;
+    delete process.env.VISUAL;
+    process.env.EDITOR = "myeditor";
+    try {
+      await editMocked({ project: tmpDir, scope: "project" });
+      expect(capturedCmd).toBe("myeditor");
+    } finally {
+      if (origVISUAL !== undefined) process.env.VISUAL = origVISUAL;
+      if (origEDITOR === undefined) delete process.env.EDITOR; else process.env.EDITOR = origEDITOR;
+      vi.doUnmock("child_process");
+      vi.resetModules();
+    }
+  });
+
+  it("falls back to 'vi' when VISUAL and EDITOR are not set (edit.ts:34 — vi fallback)", async () => {
+    // edit.ts:33-34: const editor = process.env.VISUAL ?? process.env.EDITOR ?? "vi"
+    // Falls through to literal "vi" when neither env var is set.
+    let capturedCmd = "";
+    vi.doMock("child_process", async (importOriginal) => {
+      const original = await importOriginal<typeof import("child_process")>();
+      return {
+        ...original,
+        spawn: (cmd: string, _args: string[], _opts: object) => {
+          capturedCmd = cmd;
+          const EventEmitter = require("events");
+          const child = new EventEmitter();
+          process.nextTick(() => child.emit("exit", 0));
+          return child;
+        },
+      };
+    });
+    vi.resetModules();
+    const { editCommand: editMocked } = await import("../src/commands/edit.js");
+
+    await mkdir(join(tmpDir, ".claude"), { recursive: true });
+    await writeFile(join(tmpDir, ".claude", "settings.json"), JSON.stringify({}), "utf-8");
+
+    const origVISUAL = process.env.VISUAL;
+    const origEDITOR = process.env.EDITOR;
+    delete process.env.VISUAL;
+    delete process.env.EDITOR;
+    try {
+      await editMocked({ project: tmpDir, scope: "project" });
+      expect(capturedCmd).toBe("vi");
+    } finally {
+      if (origVISUAL !== undefined) process.env.VISUAL = origVISUAL;
+      if (origEDITOR !== undefined) process.env.EDITOR = origEDITOR;
+      vi.doUnmock("child_process");
+      vi.resetModules();
+    }
+  });
 });

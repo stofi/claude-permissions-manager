@@ -3776,4 +3776,48 @@ describe("copyCommand", () => {
     // Only the 2 project-scope allow rules should be present (no global leakage)
     expect(data.permissions.allow).toHaveLength(2);
   });
+
+  it("copies ask rules from source (lines 51-52, 79)", async () => {
+    // Add ask rules to source settings (srcDir uses project scope settings.json)
+    await writeFile(
+      join(srcDir, ".claude", "settings.json"),
+      JSON.stringify({
+        permissions: {
+          allow: ["Read"],
+          deny: [],
+          ask: ["WebFetch", "Bash"],
+        },
+      }),
+      "utf-8"
+    );
+
+    await copyCommand(srcDir, dstDir, { yes: true });
+
+    const content = await readFile(join(dstDir, ".claude", "settings.local.json"), "utf-8");
+    const data = JSON.parse(content);
+    expect(data.permissions.ask).toContain("WebFetch");
+    expect(data.permissions.ask).toContain("Bash");
+  });
+
+  it("local scope mode takes precedence over project scope mode (line 57 sort)", async () => {
+    // Create source with both project-scope and local-scope settings, each with a mode.
+    // Local scope mode (bypassPermissions) should win over project scope mode (auto).
+    await writeFile(
+      join(srcDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { defaultMode: "auto", allow: ["Read"] } }),
+      "utf-8"
+    );
+    await writeFile(
+      join(srcDir, ".claude", "settings.local.json"),
+      JSON.stringify({ permissions: { defaultMode: "acceptEdits" } }),
+      "utf-8"
+    );
+
+    await copyCommand(srcDir, dstDir, { yes: true });
+
+    const content = await readFile(join(dstDir, ".claude", "settings.local.json"), "utf-8");
+    const data = JSON.parse(content);
+    // local scope mode wins
+    expect(data.permissions.defaultMode).toBe("acceptEdits");
+  });
 });

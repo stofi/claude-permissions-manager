@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.59] - 2026-04-02
+
+### Tests
+- **Coverage: 93.57% → 95.01% branch coverage** (+1.44%), 448 → 452 tests (+4). All additions target `export.ts` branches unreachable on this machine.
+- **`export.ts:89` `format ?? "json"` null branch**: New test calls `exportCommand` without a `format` option, exercising the null-coalescing default.
+- **`export.ts:131-141` `userMcpServers.map` callback**: Mocks `claudeJsonPath()` to point at a temp file with two global MCP servers (one with `env`, one with `headers`). This fires the map callback (DA:131,0 → covered) and covers all four `??` null/truthy branches within it: `envVarNames??[]` both sides and `headerNames??[]` both sides (BRDA:139,140 all branches).
+- **`export.ts:120` managed settings truthy branch**: Mocks `managedSettingsPath()` to return an existing temp file, causing `result.global.managed` to be truthy and serializing the managed block (BRDA:120,10,0).
+- **`export.ts:13` `toStringArray` false branch**: Mocks `userSettingsPath()` with a settings file containing `allow: 123`. Zod rejects the schema but the parser returns raw JSON as `data`. `toStringArray(123)` hits `Array.isArray(123)=false` → `[]` (BRDA:13,0,0).
+
 ## [1.4.58] - 2026-04-02
 
 ### Fixed

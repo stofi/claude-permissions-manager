@@ -603,6 +603,150 @@ describe("exportCommand — invalid format", () => {
 });
 
 // ────────────────────────────────────────────────────────────
+// exportCommand — branch coverage gaps
+// ────────────────────────────────────────────────────────────
+
+describe("exportCommand — branch coverage", () => {
+  it("defaults to JSON when format is omitted (export.ts:89 — format ?? 'json' null branch)", async () => {
+    // BRDA:89,5,1,0 — options.format is undefined → format ?? "json" takes the null branch
+    const lines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      lines.push(String(chunk));
+      return true;
+    });
+    // No 'format' key in options
+    await exportCommand({ root: FIXTURES, maxDepth: 3, includeGlobal: false });
+    const json = JSON.parse(lines.join(""));
+    expect(json).toHaveProperty("projects");
+    expect(Array.isArray(json.projects)).toBe(true);
+  });
+
+  it("maps userMcpServers callback when ~/.claude.json has global servers (export.ts:131-141)", async () => {
+    // DA:131,0 — map callback never called because userMcpServers is always [] on this machine.
+    // Two servers: one with env (no headers) and one with headers (no env) to cover
+    // BRDA:139,13,0/1 (envVarNames??) and BRDA:140,14,0/1 (headerNames??) both branches.
+    const tmpClaudeJson = join(tmpDir, ".claude.json");
+    writeFileSync(tmpClaudeJson, JSON.stringify({
+      mcpServers: {
+        "srv-env": { command: "node", args: ["srv.js"], env: { TOKEN: "abc" } },
+        "srv-hdr": { command: "python", args: ["srv.py"], headers: { Authorization: "Bearer x" } },
+      },
+    }));
+
+    vi.doMock("../src/utils/paths.js", async (importOriginal) => {
+      const original = await importOriginal<typeof import("../src/utils/paths.js")>();
+      return { ...original, claudeJsonPath: () => tmpClaudeJson };
+    });
+    vi.resetModules();
+    const { exportCommand: exportMocked } = await import("../src/commands/export.js");
+
+    const lines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      lines.push(String(chunk));
+      return true;
+    });
+
+    try {
+      await exportMocked({ root: tmpDir, maxDepth: 1, includeGlobal: true });
+      const json = JSON.parse(lines.join(""));
+      const servers = json.globalSettings.userMcpServers as Record<string, unknown>[];
+      expect(servers.length).toBeGreaterThanOrEqual(2);
+
+      const srvEnv = servers.find((s) => s.name === "srv-env");
+      expect(srvEnv).toBeDefined();
+      expect(srvEnv!.scope).toBe("user");
+      expect(srvEnv!.approvalState).toBe("approved");
+      // envVarNames defined → BRDA:139,13,1 (truthy branch) covered
+      expect(Array.isArray(srvEnv!.envVarNames)).toBe(true);
+      expect((srvEnv!.envVarNames as string[])).toContain("TOKEN");
+      // headerNames undefined → BRDA:140,14,0 (null branch) covered → []
+      expect(srvEnv!.headerNames).toEqual([]);
+
+      const srvHdr = servers.find((s) => s.name === "srv-hdr");
+      expect(srvHdr).toBeDefined();
+      // envVarNames undefined → BRDA:139,13,0 (null branch) covered → []
+      expect(srvHdr!.envVarNames).toEqual([]);
+      // headerNames defined → BRDA:140,14,1 (truthy branch) covered
+      expect(Array.isArray(srvHdr!.headerNames)).toBe(true);
+      expect((srvHdr!.headerNames as string[])).toContain("Authorization");
+    } finally {
+      vi.doUnmock("../src/utils/paths.js");
+      vi.resetModules();
+    }
+  });
+
+  it("globalSettings.managed is non-null when managed-settings.json exists (export.ts:120 — truthy branch)", async () => {
+    // BRDA:120,10,0,0 — managed settings truthy branch never hit (file absent on this machine)
+    const tmpManaged = join(tmpDir, "managed-settings.json");
+    writeFileSync(tmpManaged, JSON.stringify({ permissions: { allow: ["Read"], deny: ["Bash(rm *)"] } }));
+
+    vi.doMock("../src/utils/paths.js", async (importOriginal) => {
+      const original = await importOriginal<typeof import("../src/utils/paths.js")>();
+      return { ...original, managedSettingsPath: () => tmpManaged };
+    });
+    vi.resetModules();
+    const { exportCommand: exportMocked } = await import("../src/commands/export.js");
+
+    const lines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      lines.push(String(chunk));
+      return true;
+    });
+
+    try {
+      await exportMocked({ root: tmpDir, maxDepth: 1, includeGlobal: true });
+      const json = JSON.parse(lines.join(""));
+      expect(json.globalSettings.managed).not.toBeNull();
+      const m = json.globalSettings.managed as Record<string, unknown>;
+      expect(typeof m.path).toBe("string");
+      expect(m.exists).toBe(true);
+      expect(Array.isArray(m.allow)).toBe(true);
+      expect((m.allow as string[])).toContain("Read");
+      expect(Array.isArray(m.deny)).toBe(true);
+    } finally {
+      vi.doUnmock("../src/utils/paths.js");
+      vi.resetModules();
+    }
+  });
+
+  it("toStringArray returns [] for non-array permissions in user settings (export.ts:13 — false branch)", async () => {
+    // BRDA:13,0,0,0 — Array.isArray(val) false branch never hit (settings always have valid arrays).
+    // Parser returns raw JSON even on schema failure, so allow:123 becomes data.permissions.allow=123.
+    // toStringArray(123) → Array.isArray(123)=false → []
+    const tmpUserSettings = join(tmpDir, "user-settings.json");
+    writeFileSync(tmpUserSettings, JSON.stringify({ permissions: { allow: 123, deny: 456, ask: 789 } }));
+
+    vi.doMock("../src/utils/paths.js", async (importOriginal) => {
+      const original = await importOriginal<typeof import("../src/utils/paths.js")>();
+      return { ...original, userSettingsPath: () => tmpUserSettings };
+    });
+    vi.resetModules();
+    const { exportCommand: exportMocked } = await import("../src/commands/export.js");
+
+    const lines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      lines.push(String(chunk));
+      return true;
+    });
+
+    try {
+      await exportMocked({ root: tmpDir, maxDepth: 1, includeGlobal: true });
+      const json = JSON.parse(lines.join(""));
+      // User settings file exists → globalSettings.user is non-null
+      expect(json.globalSettings.user).not.toBeNull();
+      // toStringArray(123) → [] because 123 is not an array
+      expect(Array.isArray(json.globalSettings.user.allow)).toBe(true);
+      expect(json.globalSettings.user.allow).toHaveLength(0);
+      expect(Array.isArray(json.globalSettings.user.deny)).toBe(true);
+      expect(json.globalSettings.user.deny).toHaveLength(0);
+    } finally {
+      vi.doUnmock("../src/utils/paths.js");
+      vi.resetModules();
+    }
+  });
+});
+
+// ────────────────────────────────────────────────────────────
 // manage commands
 // ────────────────────────────────────────────────────────────
 

@@ -8,6 +8,24 @@
 import { PermissionModeSchema } from "../core/schemas.js";
 import { WRITABLE_SCOPES } from "../core/types.js";
 
+// Common built-in Claude Code tool names for rule completion
+const TOOLS = [
+  "Bash",
+  "Read",
+  "Write",
+  "Edit",
+  "Glob",
+  "Grep",
+  "WebFetch",
+  "WebSearch",
+  "Agent",
+  "TodoRead",
+  "TodoWrite",
+  "NotebookRead",
+  "NotebookEdit",
+  "mcp__",
+];
+
 const COMMANDS = [
   "ui",
   "list",
@@ -38,6 +56,7 @@ function bashScript(): string {
   const modeList = MODES.join(" ");
   const presetList = PRESETS.join(" ");
   const formatList = FORMATS.join(" ");
+  const toolList = TOOLS.join(" ");
 
   return `
 _cpm_completions() {
@@ -135,11 +154,19 @@ _cpm_completions() {
       return 0
       ;;
     allow|deny|ask)
-      COMPREPLY=( \$(compgen -W "--scope --project --dry-run" -- "\${cur}") )
+      if [[ "\${cur}" != -* ]]; then
+        COMPREPLY=( \$(compgen -W "${toolList}" -- "\${cur}") )
+      else
+        COMPREPLY=( \$(compgen -W "--scope --project --dry-run" -- "\${cur}") )
+      fi
       return 0
       ;;
     reset)
-      COMPREPLY=( \$(compgen -W "--scope --project --all --yes --dry-run" -- "\${cur}") )
+      if [[ "\${cur}" != -* ]]; then
+        COMPREPLY=( \$(compgen -W "${toolList}" -- "\${cur}") )
+      else
+        COMPREPLY=( \$(compgen -W "--scope --project --all --yes --dry-run" -- "\${cur}") )
+      fi
       return 0
       ;;
     init)
@@ -191,6 +218,7 @@ function zshScript(): string {
   const modeList = MODES.join(" ");
   const presetList = PRESETS.join(" ");
   const formatList = FORMATS.join(" ");
+  const toolList = TOOLS.join(" ");
 
   return `
 #compdef cpm
@@ -240,7 +268,7 @@ ${commandDefs}
             '--scope[Settings scope]:scope:(${scopeList})' \\
             '--project[Project path]:project:_directories' \\
             '--dry-run[Preview without writing]' \\
-            '1:rule:'
+            '1:rule:(${toolList})'
           ;;
         reset)
           _arguments \\
@@ -249,7 +277,7 @@ ${commandDefs}
             '--all[Clear all rules]' \\
             '--yes[Skip confirmation]' \\
             '--dry-run[Preview without writing]' \\
-            '1:rule:'
+            '1:rule:(${toolList})'
           ;;
         init)
           _arguments \\

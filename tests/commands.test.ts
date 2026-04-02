@@ -3332,6 +3332,36 @@ describe("completionCommand", () => {
     expect(output).toContain("edit");
     expect(output).toMatch(/edit\)[\s\S]*--scope\[Settings scope\]/);
   });
+
+  it("bash script suggests tool names for allow/deny/ask positional argument", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await completionCommand("bash");
+    const output = lines.join("\n");
+    // allow|deny|ask block should include common tool names
+    expect(output).toMatch(/allow\|deny\|ask\)[\s\S]*Bash.*Read.*Write/);
+    expect(output).toMatch(/allow\|deny\|ask\)[\s\S]*WebFetch/);
+    // And still suggest flags when cur starts with -
+    expect(output).toMatch(/allow\|deny\|ask\)[\s\S]*--scope.*--project.*--dry-run/);
+  });
+
+  it("zsh script suggests tool names for allow/deny/ask positional argument", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await completionCommand("zsh");
+    const output = lines.join("\n");
+    // allow|deny|ask block should define rule with tool completions
+    expect(output).toMatch(/allow\|deny\|ask\)[\s\S]*1:rule:\(.*Bash.*Read.*WebFetch/);
+  });
+
+  it("bash script suggests tool names for reset positional argument", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await completionCommand("bash");
+    const output = lines.join("\n");
+    expect(output).toMatch(/reset\)[\s\S]*Bash.*Read/);
+    expect(output).toMatch(/reset\)[\s\S]*--scope.*--project.*--all/);
+  });
 });
 
 // ────────────────────────────────────────────────────────────

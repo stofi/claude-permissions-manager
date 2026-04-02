@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
 import { Header } from "../components/Header.js";
 import type { ScanResult, ClaudeProject, PermissionMode } from "../../core/types.js";
@@ -30,20 +30,72 @@ export function ProjectList({
 }: ProjectListProps) {
   const { stdout } = useStdout();
   const termHeight = stdout?.rows ?? 24;
-  const visibleRows = Math.max(5, termHeight - 12);
 
   const [cursor, setCursor] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
+  const [filterMode, setFilterMode] = useState(false);
+  const [filter, setFilter] = useState("");
 
   const { projects } = scanResult;
+
+  const filteredProjects = useMemo(() => {
+    if (!filter) return projects;
+    const lower = filter.toLowerCase();
+    return projects.filter((p) =>
+      collapseHome(p.rootPath).toLowerCase().includes(lower)
+    );
+  }, [projects, filter]);
+
+  // Reserve extra row for filter bar when active
+  const visibleRows = Math.max(5, termHeight - (filterMode ? 13 : 12));
+
   const totalWarnings = projects.reduce(
     (sum, p) => sum + p.effectivePermissions.warnings.length,
     0
   );
 
   useInput((input, key) => {
+    if (filterMode) {
+      if (key.escape) {
+        setFilter("");
+        setFilterMode(false);
+        setCursor(0);
+        setScrollOffset(0);
+      } else if (key.backspace || key.delete) {
+        setFilter((f) => {
+          const next = f.slice(0, -1);
+          setCursor(0);
+          setScrollOffset(0);
+          return next;
+        });
+      } else if (key.downArrow || input === "j") {
+        const next = Math.min(cursor + 1, filteredProjects.length - 1);
+        setCursor(next);
+        if (next >= scrollOffset + visibleRows) {
+          setScrollOffset(next - visibleRows + 1);
+        }
+      } else if (key.upArrow || input === "k") {
+        const prev = Math.max(cursor - 1, 0);
+        setCursor(prev);
+        if (prev < scrollOffset) {
+          setScrollOffset(prev);
+        }
+      } else if (key.return) {
+        if (filteredProjects[cursor]) onSelectProject(filteredProjects[cursor]);
+      } else if (input && !key.ctrl && !key.meta) {
+        setFilter((f) => {
+          const next = f + input;
+          setCursor(0);
+          setScrollOffset(0);
+          return next;
+        });
+      }
+      return;
+    }
+
+    // Normal (non-filter) mode
     if (key.downArrow || input === "j") {
-      const next = Math.min(cursor + 1, projects.length - 1);
+      const next = Math.min(cursor + 1, filteredProjects.length - 1);
       setCursor(next);
       if (next >= scrollOffset + visibleRows) {
         setScrollOffset(next - visibleRows + 1);
@@ -55,24 +107,50 @@ export function ProjectList({
         setScrollOffset(prev);
       }
     } else if (key.return) {
-      if (projects[cursor]) onSelectProject(projects[cursor]);
+      if (filteredProjects[cursor]) onSelectProject(filteredProjects[cursor]);
     } else if (input === "a") {
       onAudit();
     } else if (input === "d") {
       onDiff();
+    } else if (input === "/" ) {
+      setFilterMode(true);
+      setFilter("");
+      setCursor(0);
+      setScrollOffset(0);
     } else if (input === "q" || (key.ctrl && input === "c")) {
       onQuit();
     }
   });
 
-  const visibleProjects = projects.slice(scrollOffset, scrollOffset + visibleRows);
+  const visibleProjects = filteredProjects.slice(scrollOffset, scrollOffset + visibleRows);
 
   return (
     <Box flexDirection="column">
       <Header
         title="Claude Permissions Manager"
-        subtitle={`Found ${projects.length} project(s)  •  ${totalWarnings} warning(s)  •  root: ${collapseHome(scanResult.scanRoot)}`}
+        subtitle={
+          filter
+            ? `${filteredProjects.length} of ${projects.length} project(s)  •  ${totalWarnings} warning(s)  •  root: ${collapseHome(scanResult.scanRoot)}`
+            : `Found ${projects.length} project(s)  •  ${totalWarnings} warning(s)  •  root: ${collapseHome(scanResult.scanRoot)}`
+        }
       />
+
+      {/* Filter bar */}
+      {filterMode && (
+        <Box marginBottom={0}>
+          <Text color="cyan" bold>Filter: </Text>
+          <Text>{filter}</Text>
+          <Text color="cyan">█</Text>
+          <Text color="gray">  (Esc to clear)</Text>
+        </Box>
+      )}
+      {!filterMode && filter && (
+        <Box marginBottom={0}>
+          <Text color="cyan">Filter: </Text>
+          <Text color="cyan" bold>{filter}</Text>
+          <Text color="gray">  (/ to edit, Esc clears on next /)</Text>
+        </Box>
+      )}
 
       {/* Column headers */}
       <Box marginBottom={0}>
@@ -88,6 +166,11 @@ export function ProjectList({
       </Box>
 
       {/* Project rows */}
+      {filteredProjects.length === 0 && (
+        <Box marginTop={1}>
+          <Text color="gray">No projects match "{filter}"</Text>
+        </Box>
+      )}
       {visibleProjects.map((project, i) => {
         const idx = scrollOffset + i;
         const isSelected = idx === cursor;
@@ -155,12 +238,12 @@ export function ProjectList({
       })}
 
       {/* Scroll indicator */}
-      {projects.length > visibleRows && (
+      {filteredProjects.length > visibleRows && (
         <Text color="gray">
           {"  "}
           {scrollOffset > 0 ? "↑ " : "  "}
-          {scrollOffset + visibleRows < projects.length
-            ? `↓ ${projects.length - scrollOffset - visibleRows} more`
+          {scrollOffset + visibleRows < filteredProjects.length
+            ? `↓ ${filteredProjects.length - scrollOffset - visibleRows} more`
             : ""}
         </Text>
       )}
@@ -187,7 +270,9 @@ export function ProjectList({
       {/* Key hints */}
       <Box marginTop={1}>
         <Text color="gray">
-          ↑↓/jk navigate  Enter: details  a: audit  d: diff  q: quit
+          {filterMode
+            ? "Type to filter  ↑↓/jk navigate  Enter: details  Esc: clear filter"
+            : "↑↓/jk navigate  Enter: details  /: filter  a: audit  d: diff  q: quit"}
         </Text>
       </Box>
     </Box>

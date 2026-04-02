@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.60] - 2026-04-02
+
+### Tests
+- **Coverage: 95.01% → 95.41% branch coverage** (+0.40%), 452 → 454 tests (+2).
+- **`format.ts:51-52` `formatProjectRow` unknown mode `??` branches**: New test calls `formatProjectRow` with `defaultMode: "futureModeX"`. Both `MODE_LABELS["futureModeX"] ?? perms.defaultMode` and `MODE_COLORS["futureModeX"] ?? chalk.white` hit their null branches. `format.ts` is now 100% branch-covered.
+- **`discovery.ts:186` `userFile.exists` false branch**: New test temporarily redirects `$HOME` to a fresh temp directory (Node.js `os.homedir()` respects `$HOME` on POSIX). With no `~/.claude/settings.json` in the fake home, `userFile.exists = false` is hit, covering the branch that was previously unreachable because `~/.claude/settings.json` always exists on this machine.
+
 ## [1.4.59] - 2026-04-02
 
 ### Tests

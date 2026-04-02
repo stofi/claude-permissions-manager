@@ -194,6 +194,15 @@ describe("formatProjectRow", () => {
     const row = stripAnsi(formatProjectRow(project));
     expect(row).not.toContain("…");
   });
+
+  it("falls back to raw mode string for unknown mode (format.ts:51-52 — MODE_LABELS/COLORS null branch)", () => {
+    // format.ts:51: MODE_LABELS[perms.defaultMode] ?? perms.defaultMode — unknown key → raw string
+    // format.ts:52: MODE_COLORS[perms.defaultMode] ?? chalk.white — unknown key → chalk.white
+    // Exercises the null branches of both ?? operators, which are skipped for all known modes.
+    const project = makeProject({ perms: { defaultMode: "futureModeX" as Parameters<typeof formatMode>[0] } });
+    const row = stripAnsi(formatProjectRow(project));
+    expect(row).toContain("futureModeX");
+  });
 });
 
 // ─────────────────────────────────────────────────────────────

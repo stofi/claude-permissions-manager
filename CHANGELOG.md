@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.62] - 2026-04-02
+
+### Tests
+- **480 → 485 tests** (+5). Added CLI integration tests for `ask`, `reset --all`, and `edit` commands — the three commands that were missing from `tests/cli.test.ts`.
+- `ask <rule>` and `ask --dry-run` — verifies the `ask` command wires correctly to `askCommand` and that `--dry-run` suppresses file creation.
+- `reset --all --yes` — verifies `resetAllCommand` clears both allow and deny lists from the settings file.
+- `reset --all --dry-run` — verifies the `--dry-run` flag is forwarded to `resetAllCommand` (leaves the file unchanged).
+- `edit --scope project` with `VISUAL=true` — verifies the `edit` command creates an empty stub settings file when none exists, then invokes the editor (no-op `true` command).
+- Extended `run()` helper in `tests/cli.test.ts` to accept a `{ env }` option that merges into the child process environment (needed for `VISUAL=true` in the edit test).
+
 ## [1.4.61] - 2026-04-02
 
 ### Fixed

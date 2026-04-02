@@ -201,6 +201,26 @@ describe("parseMcpFile", () => {
       rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("returns parsed=false when .mcp.json contains valid JSON that fails McpFileSchema (parser.ts:131-132,155-156)", async () => {
+    // parser.ts:131: McpFileSchema.safeParse(json) → success=false for non-object JSON (e.g. array)
+    // parser.ts:132: rawData = json (fallback) → mcpServers=undefined → servers=[]
+    // parser.ts:155: parsed: result.success = false
+    // parser.ts:156: parseError: result.error.message
+    // No prior test triggers the schema-fail path — all prior tests either fail JSON parse first
+    // or succeed schema validation. Passing "[1,2,3]" (valid JSON, wrong shape) covers this.
+    const tmpDir = mkdtempSync(join(tmpdir(), "cpm-mcp-schema-fail-"));
+    writeFileSync(join(tmpDir, ".mcp.json"), "[1, 2, 3]");
+    try {
+      const mcp = await parseMcpFile(tmpDir, "project");
+      expect(mcp.exists).toBe(true);
+      expect(mcp.parsed).toBe(false);     // schema validation failed
+      expect(mcp.parseError).toBeDefined(); // error message from Zod
+      expect(mcp.servers).toHaveLength(0); // no servers extractable from array
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ────────────────────────────────────────────────────────────
@@ -407,6 +427,18 @@ describe("parseClaudeJson", () => {
       chmodSync(claudeJsonPath, 0o644);
       stderrSpy.mockRestore();
     }
+  });
+
+  it("uses raw JSON when ClaudeJsonSchema validation fails for non-object input (parser.ts:205-206)", async () => {
+    // parser.ts:205: ClaudeJsonSchema.safeParse(json) → success=false for non-object JSON (e.g. array)
+    // parser.ts:206: data = json (fallback) — the else branch of `result.success ? ... : ...`
+    // Since data is an array, data?.mcpServers and data?.projects are both undefined,
+    // so globalServers=[] and projectServers is empty. All prior tests either fail JSON parse
+    // or succeed schema validation — this is the only test that hits the schema-fail fallback.
+    writeFileSync(claudeJsonPath, "[1, 2, 3]"); // valid JSON but wrong shape for ClaudeJsonSchema
+    const result = await parseClaudeJson(claudeJsonPath);
+    expect(result.globalServers).toHaveLength(0);  // no servers extractable from array
+    expect(result.projectServers.size).toBe(0);
   });
 });
 

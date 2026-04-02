@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.54] - 2026-04-02
+
+### Tests
+- **`parseMcpFile` schema-fail fallback (parser.ts:131-132,155-156)**: New test passes `[1,2,3]` (valid JSON, wrong shape) to trigger the `McpFileSchema.safeParse` failure path — `result.success=false`, `rawData = json`, `servers=[]`. All prior tests either failed JSON parsing first or passed schema validation.
+- **`parseClaudeJson` schema-fail fallback (parser.ts:205-206)**: New test passes `[1,2,3]` to trigger the `ClaudeJsonSchema.safeParse` failure path — `data = json` fallback used, both `mcpServers` and `projects` are undefined, so both server lists are empty.
+
 ## [1.4.53] - 2026-04-02
 
 ### Tests

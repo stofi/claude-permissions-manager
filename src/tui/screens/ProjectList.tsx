@@ -19,6 +19,7 @@ interface ProjectListProps {
   onAudit: () => void;
   onDiff: () => void;
   onQuit: () => void;
+  onRefresh: () => Promise<void>;
 }
 
 export function ProjectList({
@@ -27,6 +28,7 @@ export function ProjectList({
   onAudit,
   onDiff,
   onQuit,
+  onRefresh,
 }: ProjectListProps) {
   const { stdout } = useStdout();
   const termHeight = stdout?.rows ?? 24;
@@ -35,6 +37,7 @@ export function ProjectList({
   const [scrollOffset, setScrollOffset] = useState(0);
   const [filterMode, setFilterMode] = useState(false);
   const [filter, setFilter] = useState("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { projects } = scanResult;
 
@@ -97,6 +100,9 @@ export function ProjectList({
       onAudit();
     } else if (input === "d") {
       onDiff();
+    } else if (input === "r" && !isRefreshing) {
+      setIsRefreshing(true);
+      onRefresh().finally(() => setIsRefreshing(false));
     } else if (input === "/") {
       setFilterMode(true);
       setFilter("");
@@ -114,7 +120,9 @@ export function ProjectList({
       <Header
         title="Claude Permissions Manager"
         subtitle={
-          filter
+          isRefreshing
+            ? "Refreshing…"
+            : filter
             ? `${filteredProjects.length} of ${projects.length} project(s)  •  ${totalWarnings} warning(s)  •  root: ${collapseHome(scanResult.scanRoot)}`
             : `Found ${projects.length} project(s)  •  ${totalWarnings} warning(s)  •  root: ${collapseHome(scanResult.scanRoot)}`
         }
@@ -250,7 +258,7 @@ export function ProjectList({
         <Text color="gray">
           {filterMode
             ? "Type to filter  ↑↓/jk navigate  Enter: details  Esc: clear filter"
-            : "↑↓/jk navigate  Enter: details  /: filter  a: audit  d: diff  q: quit"}
+            : "↑↓/jk navigate  Enter: details  /: filter  a: audit  d: diff  r: refresh  q: quit"}
         </Text>
       </Box>
     </Box>

@@ -4,12 +4,14 @@ import { Header } from "../components/Header.js";
 import { ModeBadge, SeverityBadge } from "../components/Badge.js";
 import { TextInput } from "../components/TextInput.js";
 import { ScopePicker } from "../components/ScopePicker.js";
-import { addRule, removeRule, resolveSettingsPath } from "../../core/writer.js";
+import { addRule, removeRule, resolveSettingsPath, setMode as setPermMode } from "../../core/writer.js";
 import type {
   ClaudeProject,
   PermissionRule,
   SettingsScope,
 } from "../../core/types.js";
+import { PermissionModeSchema } from "../../core/schemas.js";
+import type { PermissionMode } from "../../core/schemas.js";
 import { collapseHome } from "../../utils/paths.js";
 
 type Tab = "permissions" | "mcp" | "warnings";
@@ -17,6 +19,7 @@ type DetailMode =
   | "view"
   | "typing"
   | "picking-scope"
+  | "picking-mode"
   | "confirming-delete"
   | "status";
 type RuleList = "allow" | "deny" | "ask";
@@ -163,6 +166,21 @@ export function ProjectDetail({ project, onBack, onRefresh }: ProjectDetailProps
     }
   }
 
+  async function handleModeSelect(newMode: PermissionMode) {
+    setMode("view");
+    try {
+      const path = resolveSettingsPath("local", project.rootPath);
+      await setPermMode(newMode, path);
+      await onRefresh();
+      showStatus(
+        `Mode set to "${newMode}" [local]`,
+        newMode === "bypassPermissions" ? "red" : "green"
+      );
+    } catch (err) {
+      showStatus(`Error: ${String(err)}`, "red");
+    }
+  }
+
   useInput(
     (input, key) => {
       if (mode !== "view") return;
@@ -208,6 +226,11 @@ export function ProjectDetail({ project, onBack, onRefresh }: ProjectDetailProps
         } else {
           setMode("confirming-delete");
         }
+      }
+
+      // Change mode
+      if (input === "m") {
+        setMode("picking-mode");
       }
     },
     { isActive: mode === "view" }
@@ -454,6 +477,14 @@ export function ProjectDetail({ project, onBack, onRefresh }: ProjectDetailProps
         </Box>
       )}
 
+      {mode === "picking-mode" && (
+        <ModePicker
+          currentMode={perms.defaultMode}
+          onSelect={handleModeSelect}
+          onCancel={() => setMode("view")}
+        />
+      )}
+
       {mode === "status" && (
         <Box marginTop={1}>
           <Text color={statusColor}>{statusMessage}</Text>
@@ -464,7 +495,7 @@ export function ProjectDetail({ project, onBack, onRefresh }: ProjectDetailProps
       <Box marginTop={1}>
         {tab === "permissions" && mode === "view" ? (
           <Text color="gray">
-            1:permissions  2:mcp  3:warnings  j/k:move  a:allow  d:deny  s:ask  x:delete  ←/h/q:back
+            1:permissions  2:mcp  3:warnings  j/k:move  a:allow  d:deny  s:ask  x:delete  m:mode  ←/h/q:back
           </Text>
         ) : (
           <Text color="gray">
@@ -486,4 +517,63 @@ function ConfirmInput({ onConfirm }: { onConfirm: (yes: boolean) => void }) {
     { isActive: true }
   );
   return null;
+}
+
+const MODE_COLORS: Record<PermissionMode, string> = {
+  default: "gray",
+  acceptEdits: "blue",
+  plan: "cyan",
+  auto: "yellow",
+  dontAsk: "magenta",
+  bypassPermissions: "red",
+};
+
+const MODE_DESC: Record<PermissionMode, string> = {
+  default: "prompt for every permission",
+  acceptEdits: "auto-approve file edits, prompt for others",
+  plan: "plan-only (no tool use)",
+  auto: "auto-approve most actions",
+  dontAsk: "skip all confirmations",
+  bypassPermissions: "⚠ disable ALL permission checks",
+};
+
+function ModePicker({
+  currentMode,
+  onSelect,
+  onCancel,
+}: {
+  currentMode: PermissionMode;
+  onSelect: (mode: PermissionMode) => void;
+  onCancel: () => void;
+}) {
+  const MODES = PermissionModeSchema.options;
+  const [cursor, setCursor] = useState(Math.max(0, MODES.indexOf(currentMode)));
+
+  useInput((input, key) => {
+    if (key.escape || input === "q") { onCancel(); return; }
+    if (key.upArrow || input === "k") { setCursor((c) => Math.max(0, c - 1)); return; }
+    if (key.downArrow || input === "j") { setCursor((c) => Math.min(MODES.length - 1, c + 1)); return; }
+    if (key.return) { onSelect(MODES[cursor]); return; }
+  });
+
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Text color="cyan">Choose new defaultMode (writes to local scope):</Text>
+      {MODES.map((m, i) => (
+        <Box key={m}>
+          <Text
+            color={i === cursor ? "black" : MODE_COLORS[m]}
+            backgroundColor={i === cursor ? MODE_COLORS[m] : undefined}
+          >
+            {i === cursor ? "▶ " : "  "}
+            {m.padEnd(20)}
+          </Text>
+          <Text color="gray">  {MODE_DESC[m]}</Text>
+        </Box>
+      ))}
+      <Text color="gray" dimColor>
+        ↑↓/jk select  Enter: confirm  Esc: cancel
+      </Text>
+    </Box>
+  );
 }

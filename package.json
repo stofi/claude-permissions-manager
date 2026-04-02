@@ -1,6 +1,6 @@
 {
   "name": "claude-permissions-manager",
-  "version": "1.4.69",
+  "version": "1.4.70",
   "description": "Discover, analyze, and manage Claude Code permissions across all your projects",
   "license": "MIT",
   "author": "stofi",

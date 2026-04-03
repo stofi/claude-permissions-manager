@@ -50,7 +50,7 @@ const COMMANDS = [
 const SCOPES = WRITABLE_SCOPES;
 const MODES = PermissionModeSchema.options;
 const PRESETS = ["safe", "node", "strict"];
-const FORMATS = ["json", "csv"];
+const FORMATS = ["json", "csv", "markdown"];
 
 // Bash completion script
 function bashScript(): string {

@@ -2,7 +2,7 @@
  * Integration tests for CLI commands: initCommand, exportCommand, listCommand, manage commands
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync, symlinkSync } from "fs";
 import { readFile, mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -591,6 +591,97 @@ describe("exportCommand — --output", () => {
     const combined = stderrMessages.join("");
     expect(combined).toMatch(/Exported.*projects to/i);
     expect(combined).toContain("export.json");
+  });
+});
+
+describe("exportCommand — Markdown format", () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), "cpm-export-md-"));
+    // Project with rules, MCP server, and warning
+    const dir = join(root, "my-proj", ".claude");
+    await mkdir(dir, { recursive: true });
+    await writeFile(
+      join(dir, "settings.json"),
+      JSON.stringify({
+        permissions: {
+          defaultMode: "acceptEdits",
+          disableBypassPermissionsMode: "disable",
+          allow: ["Bash(npm run *)"],
+          deny: ["Read(**/.env)"],
+        },
+      })
+    );
+    await writeFile(
+      join(root, "my-proj", ".mcp.json"),
+      JSON.stringify({ mcpServers: { srv: { command: "node", args: ["s.js"] } } })
+    );
+  });
+
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  async function captureMarkdown(): Promise<string> {
+    const chunks: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => { chunks.push(String(chunk)); return true; });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await exportCommand({ root, maxDepth: 2, format: "markdown", includeGlobal: false });
+    return chunks.join("");
+  }
+
+  it("output starts with '# Claude Permissions Report' heading", async () => {
+    const md = await captureMarkdown();
+    expect(md).toMatch(/^# Claude Permissions Report/);
+  });
+
+  it("output includes project path heading", async () => {
+    const md = await captureMarkdown();
+    expect(md).toMatch(/## `.*my-proj`/);
+  });
+
+  it("output includes mode line", async () => {
+    const md = await captureMarkdown();
+    expect(md).toMatch(/\*\*Mode\*\*: `acceptEdits`/);
+  });
+
+  it("output includes allow rules section", async () => {
+    const md = await captureMarkdown();
+    expect(md).toMatch(/### Allow rules/);
+    expect(md).toMatch(/`Bash\(npm run \*\)`/);
+  });
+
+  it("output includes deny rules section", async () => {
+    const md = await captureMarkdown();
+    expect(md).toMatch(/### Deny rules/);
+    expect(md).toMatch(/`Read\(\*\*\/\.env\)`/);
+  });
+
+  it("output includes MCP servers section", async () => {
+    const md = await captureMarkdown();
+    expect(md).toMatch(/### MCP servers/);
+    expect(md).toMatch(/`srv`/);
+  });
+
+  it("output includes warnings section", async () => {
+    const md = await captureMarkdown();
+    expect(md).toMatch(/### Warnings/);
+    // acceptEdits generates a warning
+    expect(md).toMatch(/\*\*medium\*\*|medium/);
+  });
+
+  it("output includes generated timestamp and scan root", async () => {
+    const md = await captureMarkdown();
+    expect(md).toMatch(/Generated:/);
+    expect(md).toMatch(/Scan root:/);
+    expect(md).toMatch(/Projects: 1/);
+  });
+
+  it("writes markdown to file when --output is set", async () => {
+    const outFile = join(root, "report.md");
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await exportCommand({ root, maxDepth: 2, format: "markdown", output: outFile, includeGlobal: false });
+    const content = await readFile(outFile, "utf-8");
+    expect(content).toMatch(/# Claude Permissions Report/);
   });
 });
 
@@ -5295,6 +5386,53 @@ describe("statsCommand — text output", () => {
       rmSync(emptyRoot, { recursive: true, force: true });
     }
   });
+
+  it("text output includes MCP servers line when projects have MCP servers (stats.ts:100)", async () => {
+    // Add an .mcp.json to the existing bypass project fixture
+    const mcpFile = join(root, "bypass", ".mcp.json");
+    await writeFile(mcpFile, JSON.stringify({ mcpServers: { testServer: { command: "node", args: ["s.js"] } } }));
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await statsCommand({ root, maxDepth: 2, includeGlobal: false });
+    const output = lines.join("\n");
+    expect(output).toMatch(/MCP servers/i);
+    expect(output).toMatch(/1 unique/);
+  });
+
+  it("text output omits 'clean' line when all projects have warnings (stats.ts:93 false branch)", async () => {
+    // Root with only bypass project (always has warnings); no clean project
+    const allWarningsRoot = mkdtempSync(join(tmpdir(), "cpm-stats-allwarn-"));
+    try {
+      const d = join(allWarningsRoot, "bypass-only", ".claude");
+      await mkdir(d, { recursive: true });
+      await writeFile(join(d, "settings.json"), JSON.stringify({ permissions: { defaultMode: "bypassPermissions" } }));
+      const lines: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+      vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      await statsCommand({ root: allWarningsRoot, maxDepth: 2, includeGlobal: false });
+      const output = lines.join("\n");
+      // cleanProjects = 0 → no "clean" line emitted
+      expect(output).not.toMatch(/clean\s+\d/);
+    } finally {
+      rmSync(allWarningsRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("text output shows scan error count when broken symlinks exist (stats.ts:107)", async () => {
+    // Create a broken symlink — scan discovers it and pushes a scan error
+    const broken = join(root, "broken-link");
+    symlinkSync("/nonexistent/path/that/does/not/exist", broken);
+    try {
+      const lines: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+      vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      await statsCommand({ root, maxDepth: 2, includeGlobal: false });
+      const output = lines.join("\n");
+      expect(output).toMatch(/scan error/i);
+    } finally {
+      rmSync(broken, { force: true });
+    }
+  });
 });
 
 describe("searchCommand", () => {
@@ -5433,5 +5571,11 @@ describe("searchCommand", () => {
     for (const m of matches) {
       expect(m.scope).toBe("project");
     }
+  });
+
+  it("--scope with non-matching scope skips all rules (search.ts:38 continue branch)", async () => {
+    // All fixture rules are project-scoped; filtering for local → continue fires for every rule
+    const lines = await captureSearch("bash", { scope: "local" });
+    expect(lines.join("\n")).toMatch(/No rules matching/i);
   });
 });

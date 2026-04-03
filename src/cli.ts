@@ -211,8 +211,8 @@ program
 
 program
   .command("export")
-  .description("Export all permissions data (JSON or CSV)")
-  .option("--format <fmt>", "Output format: json|csv", "json")
+  .description("Export all permissions data (JSON, CSV, or Markdown)")
+  .option("--format <fmt>", "Output format: json|csv|markdown", "json")
   .option("--output <file>", "Write to file instead of stdout")
   .action(async (opts) => {
     const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };

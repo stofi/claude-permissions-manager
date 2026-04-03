@@ -80,6 +80,21 @@ cpm copy ~/template-project ~/new-project --scope project --yes
 
 `cpm copy` reads allow/deny/ask rules and `defaultMode` from the **source project's `project` and `local` scope settings files only** (global user/managed rules are excluded — they already apply everywhere). It then merges those rules into the target's settings file, deduplicating any rules already present.
 
+### Lock out bypassPermissions mode
+
+```bash
+# Prevent Claude from ever activating bypassPermissions (recommended for shared/CI projects)
+cpm bypass-lock on --project ~/my-project --scope project
+
+# Remove the lock (allow bypassPermissions to be set again)
+cpm bypass-lock off --project ~/my-project --scope project
+
+# Preview without writing
+cpm bypass-lock on --scope project --dry-run
+```
+
+Setting `disableBypassPermissionsMode` to `"disable"` in a settings file prevents the `bypassPermissions` mode from being activated in that project. This is also auto-applied by `cpm audit --fix` when the corresponding LOW-severity warning is present.
+
 ### Open settings in your editor
 
 ```bash
@@ -168,7 +183,7 @@ cpm show ~              # ✗ won't expand to home directory
 | `medium` | MCP server has not been approved or denied (`pending`) |
 | `medium` | `allowManagedHooksOnly` or `allowManagedMcpServersOnly` in managed settings |
 | `medium` | Wildcard `"*"` in deny list — all tools blocked |
-| `low` | `disableBypassPermissionsMode` not set (bypass mode can be activated) |
+| `low` | `disableBypassPermissionsMode` not set (bypass mode can be activated) — fix with `cpm bypass-lock on` |
 | `low` | No deny rules configured when non-read-only tools are allowed |
 | `low` | MCP server has no `command` (stdio) or no `url` (http) configured |
 | `low` | Rule appears in conflicting lists (allow+deny, ask+deny, allow+ask) |

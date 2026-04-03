@@ -4,6 +4,7 @@ import {
   addRule,
   removeRule,
   setMode,
+  setBypassLock,
   clearAllRules,
   resolveSettingsPath,
   validateRule,
@@ -239,6 +240,31 @@ export async function modeCommand(
       console.log(chalk.red.bold("  ⚠ This is set at user scope — it applies to ALL Claude Code projects on this machine."));
     }
   }
+}
+
+export async function bypassLockCommand(
+  enable: boolean,
+  opts: { project?: string; scope?: string; dryRun?: boolean }
+): Promise<void> {
+  const scope = resolveScope(opts.scope);
+  const projectPath = resolveProject(opts.project);
+  const settingsPath = resolveSettingsPath(scope, projectPath);
+
+  if (opts.dryRun) {
+    console.log(chalk.cyan(`[dry-run] No files will be modified`));
+    console.log(`  Would ${enable ? "enable" : "disable"} bypass-permissions lock (disableBypassPermissionsMode)`);
+    console.log(chalk.gray(`  target: ${collapseHome(settingsPath)} [${scope}]`));
+    return;
+  }
+
+  await setBypassLock(enable, settingsPath);
+
+  if (enable) {
+    console.log(chalk.green(`✓ Bypass-permissions lock enabled — bypassPermissions mode is now blocked`));
+  } else {
+    console.log(chalk.yellow(`✓ Bypass-permissions lock disabled — bypassPermissions mode can now be activated`));
+  }
+  console.log(chalk.gray(`  in: ${collapseHome(settingsPath)} [${scope}]`));
 }
 
 export async function resetAllCommand(

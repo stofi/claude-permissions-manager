@@ -223,6 +223,18 @@ program
   });
 
 program
+  .command("bypass-lock")
+  .addArgument(new Argument("<state>", "Enable or disable the lock").choices(["on", "off"]))
+  .description("Enable or disable disableBypassPermissionsMode (prevents bypassPermissions activation)")
+  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
+  .option("--project <path>", "Project path for local/project scope (default: cwd)")
+  .option("--dry-run", "Preview what would be written without modifying any files")
+  .action(async (state, opts) => {
+    const { bypassLockCommand } = await import("./commands/manage.js");
+    await bypassLockCommand(state === "on", { ...opts, dryRun: opts.dryRun });
+  });
+
+program
   .command("completion <shell>")
   .description("Print shell completion script (bash or zsh). Add to shell profile:")
   .addHelpText("after", "\n  eval \"$(cpm completion bash)\"  # ~/.bashrc\n  eval \"$(cpm completion zsh)\"   # ~/.zshrc")

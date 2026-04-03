@@ -19,6 +19,7 @@ import {
   resetRuleCommand,
   modeCommand,
   resetAllCommand,
+  bypassLockCommand,
 } from "../src/commands/manage.js";
 import { formatEffectivePermissions } from "../src/utils/format.js";
 import type { ClaudeProject } from "../src/core/types.js";
@@ -1248,6 +1249,58 @@ describe("resetAllCommand", () => {
     const data = await readSettings();
     expect(data.permissions?.allow ?? []).toHaveLength(0);
     expect(data.permissions?.deny ?? []).toHaveLength(0);
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// bypassLockCommand
+// ────────────────────────────────────────────────────────────
+
+describe("bypassLockCommand", () => {
+  it("enable=true sets disableBypassPermissionsMode to 'disable'", async () => {
+    await bypassLockCommand(true, { project: tmpDir, scope: "project" });
+    const data = await readSettings();
+    expect(data.permissions?.disableBypassPermissionsMode).toBe("disable");
+  });
+
+  it("enable=false removes disableBypassPermissionsMode", async () => {
+    // First enable, then disable
+    await bypassLockCommand(true, { project: tmpDir, scope: "project" });
+    await bypassLockCommand(false, { project: tmpDir, scope: "project" });
+    const data = await readSettings();
+    expect(data.permissions?.disableBypassPermissionsMode).toBeUndefined();
+  });
+
+  it("enable=true prints success message about lock enabled", async () => {
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await bypassLockCommand(true, { project: tmpDir, scope: "project" });
+    const output = calls.join("\n");
+    expect(output).toMatch(/bypass.permissions lock enabled/i);
+  });
+
+  it("enable=false prints message about lock disabled", async () => {
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await bypassLockCommand(false, { project: tmpDir, scope: "project" });
+    const output = calls.join("\n");
+    expect(output).toMatch(/bypass.permissions lock disabled/i);
+  });
+
+  it("--dry-run does not modify the file", async () => {
+    // Write a known initial state
+    await allowCommand("Read", { project: tmpDir, scope: "project" });
+    const before = await readSettings();
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await bypassLockCommand(true, { project: tmpDir, scope: "project", dryRun: true });
+    // File must be unchanged
+    const after = await readSettings();
+    expect(after.permissions?.disableBypassPermissionsMode).toBeUndefined();
+    expect(after).toEqual(before);
+    const output = calls.join("\n");
+    expect(output).toMatch(/dry.run/i);
+    expect(output).toMatch(/enable/i);
   });
 });
 
@@ -3254,12 +3307,13 @@ describe("auditCommand — --fix", () => {
 
   it("--fix with no fixable issues reports no auto-fixable issues", async () => {
     // "No deny rules configured" has no fixOp — not auto-fixable
+    // disableBypassPermissionsMode is set to suppress the bypass-lock warning (which is fixable)
     const root = mkdtempSync(join(tmpdir(), "cpm-audit-fix-none-"));
     const claudeDir = join(root, "proj", ".claude");
     await mkdir(claudeDir, { recursive: true });
     const fs = await import("fs/promises");
     await fs.writeFile(join(claudeDir, "settings.json"), JSON.stringify({
-      permissions: { allow: ["Bash(npm run *)"] },  // no deny → LOW warning with no fixOp
+      permissions: { allow: ["Bash(npm run *)"], disableBypassPermissionsMode: "disable" },  // no deny → LOW warning with no fixOp
     }));
     const calls: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
@@ -3341,6 +3395,29 @@ describe("auditCommand — --fix", () => {
       expect(output).toMatch(/Applied \d+ fix\(es\); \d+ failed/i);
     } finally {
       await fs.chmod(claudeDir, 0o755);
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("--fix --yes enables bypass lock when disableBypassPermissionsMode is missing", async () => {
+    // Project with allow+deny rules but no disableBypassPermissionsMode → fixable LOW warning
+    const root = mkdtempSync(join(tmpdir(), "cpm-audit-fix-bypasslock-"));
+    const claudeDir = join(root, "proj", ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    const settingsPath = join(claudeDir, "settings.json");
+    const fs = await import("fs/promises");
+    await fs.writeFile(settingsPath, JSON.stringify({
+      permissions: { allow: ["Bash(npm run *)"], deny: ["Read(**/.env)"] },
+    }));
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await auditCommand({ root, maxDepth: 2, includeGlobal: false, fix: true, yes: true });
+      const output = calls.join("\n");
+      expect(output).toMatch(/Applied \d+ fix/i);
+      const updated = JSON.parse(await fs.readFile(settingsPath, "utf8"));
+      expect(updated.permissions?.disableBypassPermissionsMode).toBe("disable");
+    } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });

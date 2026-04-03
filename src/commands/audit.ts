@@ -2,7 +2,7 @@ import chalk from "chalk";
 import { createInterface } from "readline";
 import { scan } from "../core/discovery.js";
 import { collapseHome } from "../utils/paths.js";
-import { resolveSettingsPath, setMode, removeRule } from "../core/writer.js";
+import { resolveSettingsPath, setMode, removeRule, setBypassLock } from "../core/writer.js";
 import type { ScanOptions } from "../core/discovery.js";
 import { SEVERITY_ORDER } from "../core/types.js";
 import type { WarningSeverity, FixOp } from "../core/types.js";
@@ -17,6 +17,8 @@ async function applyFixOp(op: FixOp, projectPath: string): Promise<string | null
     const settingsPath = resolveSettingsPath(op.scope, projectPath);
     if (op.kind === "mode") {
       await setMode(op.mode, settingsPath);
+    } else if (op.kind === "bypass-lock") {
+      await setBypassLock(op.enabled, settingsPath);
     } else {
       await removeRule(op.rule, settingsPath);
     }

@@ -88,9 +88,21 @@ function detectWarnings(
     hasExplicitPermissions &&
     !permissions.isBypassDisabled
   ) {
+    // Find which writable scope has the explicit permission rules (to target fix)
+    const bypassLockScope =
+      settingsFiles.find(
+        (f) =>
+          f.exists &&
+          f.scope !== "managed" &&
+          f.data?.permissions &&
+          ((Array.isArray(f.data.permissions.allow) && f.data.permissions.allow.length > 0) ||
+            (Array.isArray(f.data.permissions.deny) && f.data.permissions.deny.length > 0))
+      )?.scope ?? "local";
     warnings.push({
       severity: "low",
       message: "disableBypassPermissionsMode is not set — bypassPermissions mode can be activated",
+      fixCmd: `cpm bypass-lock on --scope ${bypassLockScope}`,
+      fixOp: { kind: "bypass-lock", enabled: true, scope: bypassLockScope },
     });
   }
 

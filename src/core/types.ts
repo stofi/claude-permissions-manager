@@ -56,7 +56,8 @@ export const SEVERITY_ORDER: WarningSeverity[] = ["critical", "high", "medium", 
 /** Structured, executable fix operation — used by `cpm audit --fix` */
 export type FixOp =
   | { kind: "mode"; mode: "default"; scope: SettingsScope }
-  | { kind: "reset"; rule: string; scope: SettingsScope };
+  | { kind: "reset"; rule: string; scope: SettingsScope }
+  | { kind: "bypass-lock"; enabled: true; scope: SettingsScope };
 
 export interface Warning {
   severity: WarningSeverity;

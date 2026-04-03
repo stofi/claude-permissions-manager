@@ -7,6 +7,7 @@ import {
   addRule,
   removeRule,
   setMode,
+  setBypassLock,
   clearAllRules,
   validateRule,
   resolveSettingsPath,
@@ -504,6 +505,47 @@ describe("setMode", () => {
     const data = await readSettings();
     expect(data.permissions.defaultMode).toBe("plan");
     // Other fields from the file should be preserved
+    expect((data as Record<string, unknown>).someOtherKey).toBe(true);
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// setBypassLock
+// ────────────────────────────────────────────────────────────
+
+describe("setBypassLock", () => {
+  it("enabled=true sets disableBypassPermissionsMode to 'disable'", async () => {
+    const path = settingsPath();
+    await setBypassLock(true, path);
+    const data = await readSettings();
+    expect(data.permissions.disableBypassPermissionsMode).toBe("disable");
+  });
+
+  it("enabled=false removes disableBypassPermissionsMode", async () => {
+    const path = settingsPath();
+    await setBypassLock(true, path);
+    await setBypassLock(false, path);
+    const data = await readSettings();
+    expect(data.permissions.disableBypassPermissionsMode).toBeUndefined();
+  });
+
+  it("preserves existing allow/deny rules", async () => {
+    const path = settingsPath();
+    await addRule("Read", "allow", path);
+    await setBypassLock(true, path);
+    const data = await readSettings();
+    expect(data.permissions.allow).toContain("Read");
+    expect(data.permissions.disableBypassPermissionsMode).toBe("disable");
+  });
+
+  it("works on a file with no permissions object", async () => {
+    const path = settingsPath();
+    const { mkdir, writeFile } = await import("fs/promises");
+    await mkdir(join(tmpDir, ".claude"), { recursive: true });
+    await writeFile(path, JSON.stringify({ someOtherKey: true }), "utf-8");
+    await setBypassLock(true, path);
+    const data = await readSettings();
+    expect(data.permissions.disableBypassPermissionsMode).toBe("disable");
     expect((data as Record<string, unknown>).someOtherKey).toBe(true);
   });
 });

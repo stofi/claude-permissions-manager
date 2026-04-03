@@ -965,11 +965,30 @@ describe("mergeSettingsFiles — Warning.fixCmd", () => {
   });
 
   it("warnings without a clear fix action have no fixCmd", () => {
-    // "No deny rules configured" and "disableBypassPermissionsMode not set" have no fixCmd
-    const f = makeFile("local", { permissions: { allow: ["Bash(npm run *)"] } });
+    // "No deny rules configured" has no fixCmd
+    const f = makeFile("local", {
+      permissions: { allow: ["Bash(npm run *)"], disableBypassPermissionsMode: "disable" },
+    });
     const result = mergeSettingsFiles([f]);
     const noDeny = result.warnings.find((w) => /No deny rules/.test(w.message));
     expect(noDeny?.fixCmd).toBeUndefined();
+  });
+
+  it("disableBypassPermissionsMode not set warning includes fixCmd pointing at scope with rules", () => {
+    const f = makeFile("project", { permissions: { allow: ["Bash(npm run *)"], deny: ["Read(**/.env)"] } });
+    const result = mergeSettingsFiles([f]);
+    const w = result.warnings.find((w) => /disableBypassPermissionsMode/.test(w.message));
+    expect(w).toBeDefined();
+    expect(w?.fixCmd).toBe("cpm bypass-lock on --scope project");
+    expect(w?.fixOp).toEqual({ kind: "bypass-lock", enabled: true, scope: "project" });
+  });
+
+  it("bypass-lock fixCmd defaults to local scope when no writable scope has explicit rules", () => {
+    // Rules come from "local" scope file
+    const f = makeFile("local", { permissions: { allow: ["Bash(npm run *)"], deny: ["Read(**/.env)"] } });
+    const result = mergeSettingsFiles([f]);
+    const w = result.warnings.find((w) => /disableBypassPermissionsMode/.test(w.message));
+    expect(w?.fixCmd).toBe("cpm bypass-lock on --scope local");
   });
 });
 

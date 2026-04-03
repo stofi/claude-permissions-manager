@@ -3176,6 +3176,125 @@ describe("auditCommand — text output", () => {
 });
 
 // ────────────────────────────────────────────────────────────
+// auditCommand — --fix
+// ────────────────────────────────────────────────────────────
+
+describe("auditCommand — --fix", () => {
+  it("--fix --yes removes a bare Bash allow rule and reports success", async () => {
+    const root = mkdtempSync(join(tmpdir(), "cpm-audit-fix-apply-"));
+    const claudeDir = join(root, "proj", ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    const settingsPath = join(claudeDir, "settings.json");
+    const fs = await import("fs/promises");
+    await fs.writeFile(settingsPath, JSON.stringify({ permissions: { allow: ["Bash"] } }));
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await auditCommand({ root, maxDepth: 2, includeGlobal: false, fix: true, yes: true });
+      const output = calls.join("\n");
+      // Should report at least one fix applied
+      expect(output).toMatch(/Applied \d+ fix/i);
+      // The settings.json should now have Bash removed from allow
+      const updated = JSON.parse(await fs.readFile(settingsPath, "utf8"));
+      expect(updated.permissions?.allow ?? []).not.toContain("Bash");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("--fix --yes resets a dangerous mode (bypassPermissions) to default", async () => {
+    const root = mkdtempSync(join(tmpdir(), "cpm-audit-fix-mode-"));
+    const claudeDir = join(root, "proj", ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    const settingsPath = join(claudeDir, "settings.json");
+    const fs = await import("fs/promises");
+    await fs.writeFile(settingsPath, JSON.stringify({
+      permissions: { defaultMode: "bypassPermissions", allow: ["Bash(*)"] },
+    }));
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await auditCommand({ root, maxDepth: 2, includeGlobal: false, fix: true, yes: true });
+      const output = calls.join("\n");
+      expect(output).toMatch(/Applied \d+ fix/i);
+      const updated = JSON.parse(await fs.readFile(settingsPath, "utf8"));
+      // Mode should be set to "default" after fix
+      expect(updated.permissions?.defaultMode).toBe("default");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("--fix with no fixable issues reports no auto-fixable issues", async () => {
+    // "No deny rules configured" has no fixOp — not auto-fixable
+    const root = mkdtempSync(join(tmpdir(), "cpm-audit-fix-none-"));
+    const claudeDir = join(root, "proj", ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    const fs = await import("fs/promises");
+    await fs.writeFile(join(claudeDir, "settings.json"), JSON.stringify({
+      permissions: { allow: ["Bash(npm run *)"] },  // no deny → LOW warning with no fixOp
+    }));
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await auditCommand({ root, maxDepth: 2, includeGlobal: false, fix: true, yes: true });
+      const output = calls.join("\n");
+      expect(output).toMatch(/No auto-fixable issues/i);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("--fix deduplicates identical fix ops (same rule twice from different warnings)", async () => {
+    // Both bypassPermissions and "mode is active" style warnings share the same modeFixOp
+    // — only one setMode call should be made
+    const root = mkdtempSync(join(tmpdir(), "cpm-audit-fix-dedup-"));
+    const claudeDir = join(root, "proj", ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    const settingsPath = join(claudeDir, "settings.json");
+    const fs = await import("fs/promises");
+    // bypassPermissions mode generates a single CRITICAL warning with one fixOp
+    await fs.writeFile(settingsPath, JSON.stringify({
+      permissions: { defaultMode: "bypassPermissions", allow: ["Bash(*)"] },
+    }));
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await auditCommand({ root, maxDepth: 2, includeGlobal: false, fix: true, yes: true });
+      const output = calls.join("\n");
+      // Should show "Auto-fixable: N fix(es)" line
+      expect(output).toMatch(/Auto-fixable:/i);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("--fix --yes with no issues finds nothing to fix", async () => {
+    const root = mkdtempSync(join(tmpdir(), "cpm-audit-fix-noissues-"));
+    const claudeDir = join(root, "proj", ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    const fs = await import("fs/promises");
+    await fs.writeFile(join(claudeDir, "settings.json"), JSON.stringify({
+      permissions: {
+        allow: ["Bash(npm run *)"],
+        deny: ["Read(**/.env)"],
+        disableBypassPermissionsMode: "disable",
+      },
+    }));
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await auditCommand({ root, maxDepth: 2, includeGlobal: false, fix: true, yes: true });
+      const output = calls.join("\n");
+      // When no issues: shows "No issues found", --fix is irrelevant
+      expect(output).toMatch(/No issues found/i);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+// ────────────────────────────────────────────────────────────
 // showCommand — --no-global
 // ────────────────────────────────────────────────────────────
 

@@ -24,6 +24,8 @@ cpm show                    # Show permissions for current project (cwd)
 cpm show ~/my-project       # Show detailed permissions for a specific project
 cpm audit                   # Report risky permissions across all projects
 cpm audit --min-severity high  # Only report high and critical issues
+cpm audit --fix             # Auto-apply all available fixes (prompts for confirmation)
+cpm audit --fix --yes       # Auto-apply all available fixes without prompting
 cpm diff <path1> <path2>    # Compare two projects side by side
 cpm copy <source> <target>  # Copy project-level permissions to another project
 cpm export                  # Dump all permissions as JSON (stdout)
@@ -104,6 +106,8 @@ Creates the file (empty `{}`) if it doesn't already exist, then opens it in `$VI
 --json             Output as JSON (list, show, audit, diff, export)
 --no-global        Skip user/managed global settings (list, show, audit, diff, export, ui)
 --exit-code        Exit 1 if issues found, 2 if critical issues (audit only — useful in CI)
+--fix              Auto-apply all available fix commands (audit only)
+--yes / -y         Skip confirmation prompt when using --fix (audit only)
 --dry-run          Preview what would be written without modifying files (allow, deny, ask, reset, mode, init, copy)
 --format <fmt>     Output format: json|csv (export only, default: json)
 --output <file>    Write output to file instead of stdout (export only)

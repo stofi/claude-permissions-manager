@@ -146,7 +146,7 @@ _cpm_completions() {
       return 0
       ;;
     audit)
-      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --exit-code --min-severity" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --exit-code --min-severity --fix --yes" -- "\${cur}") )
       return 0
       ;;
     export)
@@ -309,7 +309,9 @@ ${commandDefs}
             '--json[Output as JSON]' \\
             '--no-global[Skip user and managed global settings]' \\
             '--exit-code[Exit 1 if issues, 2 if critical (for CI)]' \\
-            '--min-severity[Minimum severity to report]:severity:(critical high medium low)'
+            '--min-severity[Minimum severity to report]:severity:(critical high medium low)' \\
+            '--fix[Auto-apply all available fix commands]' \\
+            '(-y --yes)'{-y,--yes}'[Skip confirmation prompt]'
           ;;
         export)
           _arguments \\

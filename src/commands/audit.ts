@@ -1,15 +1,49 @@
 import chalk from "chalk";
+import { createInterface } from "readline";
 import { scan } from "../core/discovery.js";
 import { collapseHome } from "../utils/paths.js";
+import { resolveSettingsPath, setMode, removeRule } from "../core/writer.js";
 import type { ScanOptions } from "../core/discovery.js";
 import { SEVERITY_ORDER } from "../core/types.js";
-import type { WarningSeverity } from "../core/types.js";
+import type { WarningSeverity, FixOp } from "../core/types.js";
 
 const SEVERITY_RANK: Record<WarningSeverity, number> = Object.fromEntries(
   SEVERITY_ORDER.map((s, i) => [s, i])
 ) as Record<WarningSeverity, number>;
 
-export async function auditCommand(options: ScanOptions & { json?: boolean; exitCode?: boolean; minSeverity?: WarningSeverity }): Promise<void> {
+/** Apply a single fix op to a project path. Returns null on success, error message on failure. */
+async function applyFixOp(op: FixOp, projectPath: string): Promise<string | null> {
+  try {
+    const settingsPath = resolveSettingsPath(op.scope, projectPath);
+    if (op.kind === "mode") {
+      await setMode(op.mode, settingsPath);
+    } else {
+      await removeRule(op.rule, settingsPath);
+    }
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+}
+
+/** Prompt the user for a yes/no answer. Returns true if they answer yes. */
+async function promptConfirm(question: string): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase() === "y" || answer.trim().toLowerCase() === "yes" || answer.trim() === "");
+    });
+  });
+}
+
+export async function auditCommand(options: ScanOptions & {
+  json?: boolean;
+  exitCode?: boolean;
+  minSeverity?: WarningSeverity;
+  fix?: boolean;
+  yes?: boolean;
+}): Promise<void> {
   process.stderr.write(chalk.gray("Scanning for Claude projects...\n"));
   const result = await scan(options);
 
@@ -23,6 +57,7 @@ export async function auditCommand(options: ScanOptions & { json?: boolean; exit
     message: string;
     rule?: string;
     fix?: string;
+    fixOp?: FixOp;
   }> = [];
 
   for (const project of result.projects) {
@@ -34,6 +69,7 @@ export async function auditCommand(options: ScanOptions & { json?: boolean; exit
           message: w.message,
           rule: w.rule,
           fix: w.fixCmd ? `${w.fixCmd} --project ${project.rootPath}` : undefined,
+          fixOp: w.fixOp,
         });
       }
     }
@@ -49,7 +85,9 @@ export async function auditCommand(options: ScanOptions & { json?: boolean; exit
   const affectedProjects = new Set(allIssues.map((i) => i.project)).size;
   const cleanCount = result.projects.length - affectedProjects;
 
+  // --json output (never applies fixes)
   if (options.json) {
+    const jsonIssues = allIssues.map(({ fixOp: _ignored, ...rest }) => rest);
     console.log(JSON.stringify({
       generatedAt: result.scannedAt.toISOString(),
       scanRoot: result.scanRoot,
@@ -58,7 +96,7 @@ export async function auditCommand(options: ScanOptions & { json?: boolean; exit
       cleanProjectCount: cleanCount,
       issueCount: allIssues.length,
       minSeverity: options.minSeverity ?? "low",
-      issues: allIssues,
+      issues: jsonIssues,
       errors: result.errors,
     }, null, 2));
     exitWithCode();
@@ -109,6 +147,69 @@ export async function auditCommand(options: ScanOptions & { json?: boolean; exit
     for (const e of result.errors) {
       console.log(chalk.red(`  ${collapseHome(e.path)}: ${e.error}`));
     }
+  }
+
+  // --fix: apply all available fix ops
+  if (options.fix) {
+    const fixable = allIssues.filter((i) => i.fixOp !== undefined);
+    const unfixable = allIssues.filter((i) => i.fixOp === undefined);
+
+    if (fixable.length === 0) {
+      console.log(chalk.yellow("\nNo auto-fixable issues found."));
+      exitWithCode();
+      return;
+    }
+
+    // Deduplicate by (project, kind, rule/mode, scope)
+    const seen = new Set<string>();
+    const uniqueFixes: Array<{ project: string; fixOp: FixOp; fix: string }> = [];
+    for (const issue of fixable) {
+      const key = JSON.stringify({ project: issue.project, op: issue.fixOp });
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueFixes.push({ project: issue.project, fixOp: issue.fixOp!, fix: issue.fix! });
+      }
+    }
+
+    console.log(`\n${chalk.bold("Auto-fixable:")} ${uniqueFixes.length} fix(es) available`);
+    for (const f of uniqueFixes) {
+      console.log(`  ${chalk.cyan(f.fix)}`);
+    }
+    if (unfixable.length > 0) {
+      console.log(chalk.gray(`  (${unfixable.length} issue(s) require manual intervention)`));
+    }
+
+    const proceed = options.yes || await promptConfirm(chalk.yellow("\nApply fixes? [Y/n] "));
+    if (!proceed) {
+      console.log(chalk.gray("Aborted."));
+      exitWithCode();
+      return;
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+    for (const f of uniqueFixes) {
+      const err = await applyFixOp(f.fixOp, f.project);
+      if (err) {
+        console.log(chalk.red(`  ✗ ${f.fix}`));
+        console.log(chalk.red(`    Error: ${err}`));
+        failCount++;
+      } else {
+        console.log(chalk.green(`  ✓ ${f.fix}`));
+        successCount++;
+      }
+    }
+
+    console.log("");
+    if (failCount === 0) {
+      console.log(chalk.green(`✓ Applied ${successCount} fix(es) successfully.`));
+    } else {
+      console.log(chalk.yellow(`Applied ${successCount} fix(es); ${failCount} failed.`));
+    }
+    if (unfixable.length > 0) {
+      console.log(chalk.gray(`Run \`cpm audit\` again to check remaining issues.`));
+    }
+    return;
   }
 
   exitWithCode();

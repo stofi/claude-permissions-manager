@@ -1,8 +1,8 @@
 import chalk from "chalk";
-import { createInterface } from "readline";
 import { scan } from "../core/discovery.js";
 import { collapseHome } from "../utils/paths.js";
 import { resolveSettingsPath, setMode, removeRule, setBypassLock } from "../core/writer.js";
+import { promptConfirm } from "../utils/prompt.js";
 import type { ScanOptions } from "../core/discovery.js";
 import { SEVERITY_ORDER } from "../core/types.js";
 import type { WarningSeverity, FixOp } from "../core/types.js";
@@ -26,17 +26,6 @@ async function applyFixOp(op: FixOp, projectPath: string): Promise<string | null
   } catch (e) {
     return e instanceof Error ? e.message : String(e);
   }
-}
-
-/** Prompt the user for a yes/no answer. Returns true if they answer yes. */
-async function promptConfirm(question: string): Promise<boolean> {
-  const rl = createInterface({ input: process.stdin, output: process.stderr });
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer.trim().toLowerCase() === "y" || answer.trim().toLowerCase() === "yes" || answer.trim() === "");
-    });
-  });
 }
 
 type IssueRow = {

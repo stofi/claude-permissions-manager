@@ -11,9 +11,12 @@ import {
   readSettingsOrEmpty, // used by modeCommand dry-run
 } from "../core/writer.js";
 import { expandHome, collapseHome } from "../utils/paths.js";
+import { promptConfirm } from "../utils/prompt.js";
+import { scan } from "../core/discovery.js";
 import { PermissionModeSchema } from "../core/schemas.js";
 import type { RuleList } from "../core/writer.js";
 import type { PermissionMode, SettingsScope } from "../core/types.js";
+import type { ScanOptions } from "../core/discovery.js";
 import { WRITABLE_SCOPES } from "../core/types.js";
 
 // Derived from schema — single source of truth for valid modes
@@ -303,4 +306,101 @@ export async function resetAllCommand(
   await clearAllRules(settingsPath);
   console.log(chalk.green(`✓ Cleared all permission rules`));
   console.log(chalk.gray(`  in: ${collapseHome(settingsPath)} [${scope}]`));
+}
+
+/** Apply an allow/deny/ask rule to all discovered projects at once. */
+export async function batchAddCommand(
+  rule: string,
+  list: RuleList,
+  opts: ScanOptions & {
+    scope?: string;
+    dryRun?: boolean;
+    yes?: boolean;
+    _confirmFn?: (q: string) => Promise<boolean>;
+  }
+): Promise<void> {
+  const validation = validateRule(rule);
+  if (!validation.valid) {
+    console.error(chalk.red(`Invalid rule: ${validation.error}`));
+    process.exit(1);
+  }
+
+  const scope = resolveScope(opts.scope);
+  if (scope === "user") {
+    console.log(chalk.yellow(`⚠ --scope user already applies to all projects globally.`));
+    console.log(chalk.yellow(`  Use: cpm ${list} "${rule}" --scope user`));
+    return;
+  }
+
+  process.stderr.write(chalk.gray("Scanning for Claude projects...\n"));
+  const result = await scan(opts);
+  const { projects } = result;
+
+  if (projects.length === 0) {
+    console.log(chalk.yellow("No Claude projects found."));
+    return;
+  }
+
+  // Pre-check which projects already have the rule (dry-run mode per project)
+  const toAdd: string[] = [];
+  const alreadyHave: string[] = [];
+  for (const project of projects) {
+    const settingsPath = resolveSettingsPath(scope, project.rootPath);
+    const check = await addRule(rule, list, settingsPath, { dryRun: true });
+    if (check.alreadyPresent) {
+      alreadyHave.push(project.rootPath);
+    } else {
+      toAdd.push(project.rootPath);
+    }
+  }
+
+  if (toAdd.length === 0) {
+    console.log(chalk.yellow(`All ${projects.length} project(s) already have "${rule}" in ${list} list.`));
+    return;
+  }
+
+  const listColor = list === "allow" ? chalk.green : list === "deny" ? chalk.red : chalk.yellow;
+  const ruleLabel = `${listColor(list)} "${chalk.bold(rule)}" [${scope}]`;
+
+  if (opts.dryRun) {
+    console.log(chalk.cyan(`[dry-run] No files will be modified`));
+    console.log(`\nWould add ${ruleLabel} to ${toAdd.length} project(s):`);
+    for (const p of toAdd) console.log(`  ${collapseHome(p)}`);
+    if (alreadyHave.length > 0) {
+      console.log(chalk.gray(`\nSkipped ${alreadyHave.length} already-present.`));
+    }
+    return;
+  }
+
+  console.log(`\nWill add ${ruleLabel} to ${toAdd.length} project(s):`);
+  for (const p of toAdd) console.log(`  ${collapseHome(p)}`);
+  if (alreadyHave.length > 0) {
+    console.log(chalk.gray(`\nSkipped ${alreadyHave.length} already-present.`));
+  }
+
+  const confirmFn = opts._confirmFn ?? promptConfirm;
+  const proceed = opts.yes || await confirmFn(chalk.yellow("\nApply to all? [Y/n] "));
+  if (!proceed) {
+    console.log(chalk.gray("Aborted."));
+    return;
+  }
+
+  let added = 0;
+  const errors: string[] = [];
+  for (const projectPath of toAdd) {
+    const settingsPath = resolveSettingsPath(scope, projectPath);
+    try {
+      await addRule(rule, list, settingsPath);
+      added++;
+    } catch (e) {
+      errors.push(`${collapseHome(projectPath)}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  console.log(chalk.green(`\n✓ Added to ${added} project(s)`));
+  if (errors.length > 0) {
+    console.log(chalk.red(`\n${errors.length} error(s):`));
+    for (const err of errors) console.log(chalk.red(`  ${err}`));
+    process.exit(1);
+  }
 }

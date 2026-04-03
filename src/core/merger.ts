@@ -43,6 +43,7 @@ function detectWarnings(
     warnings.push({
       severity: "critical",
       message: "bypassPermissions mode is active — all permission checks disabled",
+      fixCmd: "cpm mode default --scope local",
     });
   }
 
@@ -50,6 +51,7 @@ function detectWarnings(
     warnings.push({
       severity: "high",
       message: "dontAsk mode is active — Claude executes actions without asking permission (deny rules still apply)",
+      fixCmd: "cpm mode default --scope local",
     });
   }
 
@@ -57,6 +59,7 @@ function detectWarnings(
     warnings.push({
       severity: "medium",
       message: "acceptEdits mode is active — file edits are accepted without confirmation prompts",
+      fixCmd: "cpm mode default --scope local",
     });
   }
 
@@ -82,6 +85,7 @@ function detectWarnings(
         severity: "high",
         message: 'Wildcard "*" in allow list — all tools permitted without prompting',
         rule: rule.raw,
+        fixCmd: 'cpm reset "*"',
       });
     }
     if (rule.tool === "Bash" && !rule.specifier) {
@@ -89,6 +93,7 @@ function detectWarnings(
         severity: "high",
         message: "Bash is allowed without any specifier — all shell commands permitted",
         rule: rule.raw,
+        fixCmd: 'cpm reset "Bash"',
       });
     }
     if (rule.tool === "Write" && !rule.specifier) {
@@ -96,6 +101,7 @@ function detectWarnings(
         severity: "high",
         message: "Write is allowed without any specifier — all file writes permitted",
         rule: rule.raw,
+        fixCmd: 'cpm reset "Write"',
       });
     }
     if (rule.tool === "Edit" && !rule.specifier) {
@@ -103,6 +109,7 @@ function detectWarnings(
         severity: "high",
         message: "Edit is allowed without any specifier — all file edits permitted",
         rule: rule.raw,
+        fixCmd: 'cpm reset "Edit"',
       });
     }
     if (rule.tool === "WebFetch" && !rule.specifier) {
@@ -110,6 +117,7 @@ function detectWarnings(
         severity: "medium",
         message: "WebFetch is allowed without any URL specifier — arbitrary URLs can be fetched",
         rule: rule.raw,
+        fixCmd: 'cpm reset "WebFetch"',
       });
     }
     if (rule.tool === "WebSearch" && !rule.specifier) {
@@ -117,6 +125,7 @@ function detectWarnings(
         severity: "medium",
         message: "WebSearch is allowed without any query specifier — arbitrary web searches can be performed",
         rule: rule.raw,
+        fixCmd: 'cpm reset "WebSearch"',
       });
     }
     // Check for sensitive paths in allow
@@ -132,6 +141,7 @@ function detectWarnings(
         severity: "medium",
         message: `Sensitive path in allow rule: ${rule.raw}`,
         rule: rule.raw,
+        fixCmd: `cpm reset "${rule.raw}"`,
       });
     }
   }

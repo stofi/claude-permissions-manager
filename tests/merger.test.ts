@@ -896,6 +896,69 @@ describe("mergeSettingsFiles — invalid defaultMode", () => {
   });
 });
 
+// ────────────────────────────────────────────────────────────
+// fixCmd on Warning objects
+// ────────────────────────────────────────────────────────────
+
+describe("mergeSettingsFiles — Warning.fixCmd", () => {
+  it("critical bypassPermissions warning includes fixCmd", () => {
+    const f = makeFile("local", { permissions: { defaultMode: "bypassPermissions" } });
+    const result = mergeSettingsFiles([f]);
+    const w = result.warnings.find((w) => w.severity === "critical");
+    expect(w?.fixCmd).toBe("cpm mode default --scope local");
+  });
+
+  it("high dontAsk warning includes fixCmd", () => {
+    const f = makeFile("local", { permissions: { defaultMode: "dontAsk" } });
+    const result = mergeSettingsFiles([f]);
+    const w = result.warnings.find((w) => /dontAsk/.test(w.message));
+    expect(w?.fixCmd).toBe("cpm mode default --scope local");
+  });
+
+  it("medium acceptEdits warning includes fixCmd", () => {
+    const f = makeFile("local", { permissions: { defaultMode: "acceptEdits" } });
+    const result = mergeSettingsFiles([f]);
+    const w = result.warnings.find((w) => /acceptEdits/.test(w.message));
+    expect(w?.fixCmd).toBe("cpm mode default --scope local");
+  });
+
+  it("bare Bash allow warning includes fixCmd", () => {
+    const f = makeFile("local", { permissions: { allow: ["Bash"], deny: ["Read(**/.env)"] } });
+    const result = mergeSettingsFiles([f]);
+    const w = result.warnings.find((w) => /Bash is allowed without/.test(w.message));
+    expect(w?.fixCmd).toBe('cpm reset "Bash"');
+  });
+
+  it("bare Write allow warning includes fixCmd", () => {
+    const f = makeFile("local", { permissions: { allow: ["Write"] } });
+    const result = mergeSettingsFiles([f]);
+    const w = result.warnings.find((w) => /Write is allowed without/.test(w.message));
+    expect(w?.fixCmd).toBe('cpm reset "Write"');
+  });
+
+  it("wildcard allow warning includes fixCmd", () => {
+    const f = makeFile("local", { permissions: { allow: ["*"] } });
+    const result = mergeSettingsFiles([f]);
+    const w = result.warnings.find((w) => /Wildcard.*allow list/.test(w.message));
+    expect(w?.fixCmd).toBe('cpm reset "*"');
+  });
+
+  it("sensitive path allow warning includes fixCmd with the specific rule", () => {
+    const f = makeFile("local", { permissions: { allow: ["Read(~/.ssh/id_rsa)"] } });
+    const result = mergeSettingsFiles([f]);
+    const w = result.warnings.find((w) => /Sensitive path/.test(w.message));
+    expect(w?.fixCmd).toBe('cpm reset "Read(~/.ssh/id_rsa)"');
+  });
+
+  it("warnings without a clear fix action have no fixCmd", () => {
+    // "No deny rules configured" and "disableBypassPermissionsMode not set" have no fixCmd
+    const f = makeFile("local", { permissions: { allow: ["Bash(npm run *)"] } });
+    const result = mergeSettingsFiles([f]);
+    const noDeny = result.warnings.find((w) => /No deny rules/.test(w.message));
+    expect(noDeny?.fixCmd).toBeUndefined();
+  });
+});
+
 describe("mergeSettingsFiles — non-string array element guards", () => {
   it("silently skips non-string elements in allow, deny, and ask arrays (merger.ts:354,359,364)", () => {
     // These guards protect against malformed JSON that passes Array.isArray()

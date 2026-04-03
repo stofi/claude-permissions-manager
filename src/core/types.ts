@@ -57,6 +57,8 @@ export interface Warning {
   severity: WarningSeverity;
   message: string;
   rule?: string;
+  /** Suggested fix command (without --project <path>); append --project to get a runnable fix. */
+  fixCmd?: string;
 }
 
 export interface EffectivePermissions {

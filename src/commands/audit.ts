@@ -22,6 +22,7 @@ export async function auditCommand(options: ScanOptions & { json?: boolean; exit
     severity: string;
     message: string;
     rule?: string;
+    fix?: string;
   }> = [];
 
   for (const project of result.projects) {
@@ -32,6 +33,7 @@ export async function auditCommand(options: ScanOptions & { json?: boolean; exit
           severity: w.severity,
           message: w.message,
           rule: w.rule,
+          fix: w.fixCmd ? `${w.fixCmd} --project ${project.rootPath}` : undefined,
         });
       }
     }
@@ -93,6 +95,7 @@ export async function auditCommand(options: ScanOptions & { json?: boolean; exit
       console.log(`  ${chalk.dim(collapseHome(issue.project))}`);
       console.log(`    ${issue.message}`);
       if (issue.rule) console.log(`    Rule: ${chalk.italic(issue.rule)}`);
+      if (issue.fix) console.log(`    Fix:  ${chalk.cyan(issue.fix)}`);
     }
     console.log("");
   }

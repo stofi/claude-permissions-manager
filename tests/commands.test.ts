@@ -3125,6 +3125,52 @@ describe("auditCommand — text output", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("shows Fix: hint line for mode warnings in text output", async () => {
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    // project-bypass has bypassPermissions mode → fixCmd: "cpm mode default --scope local"
+    await auditCommand({ root: join(FIXTURES, "project-bypass"), maxDepth: 1, includeGlobal: false });
+    const output = calls.join("\n");
+    expect(output).toMatch(/Fix:/i);
+    expect(output).toContain("cpm mode default --scope local");
+    expect(output).toContain("project-bypass");
+  });
+
+  it("shows Fix: hint line for bare Bash allow warning in text output", async () => {
+    const root = mkdtempSync(join(tmpdir(), "cpm-audit-fix-bash-"));
+    const claudeDir = join(root, "proj", ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    await import("fs/promises").then((fs) =>
+      fs.writeFile(join(claudeDir, "settings.json"), JSON.stringify({
+        permissions: { allow: ["Bash"] },
+      }))
+    );
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await auditCommand({ root, maxDepth: 2, includeGlobal: false });
+      const output = calls.join("\n");
+      expect(output).toMatch(/Fix:/i);
+      expect(output).toContain('cpm reset "Bash"');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("includes fix field in JSON output for warnings that have fixCmd", async () => {
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    // project-bypass has bypassPermissions (fixCmd) + bare Bash allow (fixCmd)
+    await auditCommand({ root: join(FIXTURES, "project-bypass"), maxDepth: 1, json: true, includeGlobal: false });
+    const json = JSON.parse(calls.join(""));
+    const issuesWithFix = json.issues.filter((i: Record<string, unknown>) => i.fix !== undefined);
+    expect(issuesWithFix.length).toBeGreaterThan(0);
+    const modeFix = json.issues.find((i: Record<string, unknown>) => typeof i.fix === "string" && (i.fix as string).includes("mode default"));
+    expect(modeFix).toBeDefined();
+    // fix should include --project with an absolute path
+    expect(modeFix.fix).toMatch(/--project .+project-bypass/);
+  });
 });
 
 // ────────────────────────────────────────────────────────────

@@ -164,6 +164,14 @@ export async function auditCommand(options: ScanOptions & {
     }
   }
 
+  // Hint about --fix when there are auto-fixable issues and --fix wasn't requested
+  if (!options.fix) {
+    const uniqueFixCmds = new Set(allIssues.filter((i) => i.fix !== undefined).map((i) => i.fix!));
+    if (uniqueFixCmds.size > 0) {
+      console.log(chalk.gray(`\nℹ  ${uniqueFixCmds.size} fix(es) available. Run: cpm audit --fix`));
+    }
+  }
+
   // --fix: apply all available fix ops
   if (options.fix) {
     const fixable = allIssues.filter((i) => i.fixOp !== undefined);
@@ -176,21 +184,28 @@ export async function auditCommand(options: ScanOptions & {
     }
 
     // Deduplicate by (resolved settings file path, op) — user-scope ops share ~/.claude/settings.json
-    // across all projects, so they should only be applied once.
+    // across all projects, so they should only be applied once. Track issue count per key for display.
+    const keyCount = new Map<string, number>();
+    for (const issue of fixable) {
+      const settingsFile = resolveSettingsPath(issue.fixOp!.scope, issue.project);
+      const key = JSON.stringify({ settingsFile, op: issue.fixOp });
+      keyCount.set(key, (keyCount.get(key) ?? 0) + 1);
+    }
     const seen = new Set<string>();
-    const uniqueFixes: Array<{ project: string; fixOp: FixOp; fix: string }> = [];
+    const uniqueFixes: Array<{ project: string; fixOp: FixOp; fix: string; affectedCount: number }> = [];
     for (const issue of fixable) {
       const settingsFile = resolveSettingsPath(issue.fixOp!.scope, issue.project);
       const key = JSON.stringify({ settingsFile, op: issue.fixOp });
       if (!seen.has(key)) {
         seen.add(key);
-        uniqueFixes.push({ project: issue.project, fixOp: issue.fixOp!, fix: issue.fix! });
+        uniqueFixes.push({ project: issue.project, fixOp: issue.fixOp!, fix: issue.fix!, affectedCount: keyCount.get(key)! });
       }
     }
 
     console.log(`\n${chalk.bold("Auto-fixable:")} ${uniqueFixes.length} fix(es) available`);
     for (const f of uniqueFixes) {
-      console.log(`  ${chalk.cyan(f.fix)}`);
+      const affectedNote = f.affectedCount > 1 ? chalk.gray(` (affects ${f.affectedCount} projects)`) : "";
+      console.log(`  ${chalk.cyan(f.fix)}${affectedNote}`);
     }
     if (unfixable.length > 0) {
       console.log(chalk.gray(`  (${unfixable.length} issue(s) require manual intervention)`));

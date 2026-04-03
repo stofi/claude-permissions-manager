@@ -139,7 +139,7 @@ _cpm_completions() {
       return 0
       ;;
     list)
-      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --warnings" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --warnings --sort" -- "\${cur}") )
       return 0
       ;;
     ui)
@@ -304,7 +304,8 @@ ${commandDefs}
             '--depth[Max scan depth]:depth:' \\
             '--json[Output as JSON]' \\
             '--no-global[Skip user and managed global settings]' \\
-            '--warnings[Only show projects with warnings]'
+            '--warnings[Only show projects with warnings]' \\
+            '--sort[Sort projects by field]:sort:(name warnings mode)'
           ;;
         ui)
           _arguments \\

@@ -4887,3 +4887,95 @@ describe("listCommand — --warningsOnly", () => {
     }
   });
 });
+
+// ────────────────────────────────────────────────────────────
+// listCommand — --sort
+// ────────────────────────────────────────────────────────────
+
+describe("listCommand — --sort", () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), "cpm-list-sort-"));
+    const fs = await import("fs/promises");
+    // proj-b: bypassPermissions + Bash → many warnings
+    const bDir = join(root, "proj-b", ".claude");
+    await mkdir(bDir, { recursive: true });
+    await fs.writeFile(join(bDir, "settings.json"), JSON.stringify({
+      permissions: { defaultMode: "bypassPermissions", allow: ["Bash"] },
+    }));
+    // proj-a: default mode, no rules, bypass locked → 0 warnings
+    const aDir = join(root, "proj-a", ".claude");
+    await mkdir(aDir, { recursive: true });
+    await fs.writeFile(join(aDir, "settings.json"), JSON.stringify({
+      permissions: { disableBypassPermissionsMode: "disable" },
+    }));
+    // proj-c: default mode, 1 warning (no deny rules)
+    const cDir = join(root, "proj-c", ".claude");
+    await mkdir(cDir, { recursive: true });
+    await fs.writeFile(join(cDir, "settings.json"), JSON.stringify({
+      permissions: { allow: ["Bash(npm run *)"], disableBypassPermissionsMode: "disable" },
+    }));
+  });
+
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it("--sort name returns projects in alphabetical order", async () => {
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await listCommand({ root, maxDepth: 2, includeGlobal: false, sort: "name" });
+    const output = calls.join("\n");
+    const idxA = output.indexOf("proj-a");
+    const idxB = output.indexOf("proj-b");
+    const idxC = output.indexOf("proj-c");
+    expect(idxA).toBeLessThan(idxB);
+    expect(idxB).toBeLessThan(idxC);
+  });
+
+  it("--sort warnings returns project with most warnings first", async () => {
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await listCommand({ root, maxDepth: 2, includeGlobal: false, sort: "warnings" });
+    const output = calls.join("\n");
+    // proj-b: bypassPermissions (CRITICAL) + Bash (HIGH) = most warnings → first
+    // proj-c: 1 warning; proj-a: 0 warnings → last
+    const idxB = output.indexOf("proj-b");
+    const idxC = output.indexOf("proj-c");
+    const idxA = output.indexOf("proj-a");
+    expect(idxB).toBeLessThan(idxC);
+    expect(idxC).toBeLessThan(idxA);
+  });
+
+  it("--sort mode returns projects in alphabetical mode order", async () => {
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await listCommand({ root, maxDepth: 2, includeGlobal: false, sort: "mode" });
+    const output = calls.join("\n");
+    // modes: bypassPermissions < default (alphabetical b < d)
+    // proj-a and proj-c both use "default" mode — their relative order doesn't matter
+    const idxB = output.indexOf("proj-b"); // bypassPermissions
+    const idxC = output.indexOf("proj-c"); // default
+    expect(idxB).toBeLessThan(idxC);
+  });
+
+  it("--sort also applies to JSON output", async () => {
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await listCommand({ root, maxDepth: 2, includeGlobal: false, sort: "name", json: true });
+    const json = JSON.parse(calls.join(""));
+    const paths: string[] = json.projects.map((p: Record<string, unknown>) => p.path as string);
+    expect(paths[0]).toContain("proj-a");
+    expect(paths[1]).toContain("proj-b");
+    expect(paths[2]).toContain("proj-c");
+  });
+
+  it("no --sort returns projects in discovery order (no crash)", async () => {
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await listCommand({ root, maxDepth: 2, includeGlobal: false });
+    const output = calls.join("\n");
+    expect(output).toContain("proj-a");
+    expect(output).toContain("proj-b");
+    expect(output).toContain("proj-c");
+  });
+});

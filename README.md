@@ -30,6 +30,10 @@ cpm stats --json            # Machine-readable statistics
 cpm search bash             # Find all projects with rules matching "bash"
 cpm search "npm run" --type allow  # Only search allow rules
 cpm search "Bash(npm run *)" --exact  # Exact rule match
+cpm rules                   # List all unique rules ranked by frequency across projects
+cpm rules --type allow      # Only allow rules
+cpm rules --top 10          # Show top 10 most common rules
+cpm rules --json            # Machine-readable output
 cpm show                    # Show permissions for current project (cwd)
 cpm show ~/my-project       # Show detailed permissions for a specific project
 cpm audit                   # Report risky permissions across all projects
@@ -142,8 +146,9 @@ Creates the file (empty `{}`) if it doesn't already exist, then opens it in `$VI
 --format <fmt>     Output format: json|csv|markdown (export only, default: json)
 --output <file>    Write output to file instead of stdout (export only)
 --exact            Exact rule match instead of substring (search only)
---type <type>      Only search in this rule list: allow | deny | ask (search only)
+--type <type>      Filter to rule list: allow | deny | ask (search and rules)
 --scope <scope>    Only match rules in this scope: local | project | user | managed (search only)
+--top <n>          Show only top N rules by frequency (rules only)
 ```
 
 #### Exit codes

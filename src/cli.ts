@@ -263,6 +263,25 @@ program
   });
 
 program
+  .command("rules")
+  .description("List all unique rules across projects, ranked by frequency")
+  .option("--json", "Output as JSON")
+  .addOption(new Option("--type <type>", "Only show this rule list").choices(["allow", "deny", "ask"]))
+  .option("--top <n>", "Show only the top N rules by frequency")
+  .action(async (opts) => {
+    const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
+    const { rulesCommand } = await import("./commands/rules.js");
+    await rulesCommand({
+      root,
+      maxDepth: parseDepth(depth),
+      json: opts.json,
+      includeGlobal: g !== false,
+      type: opts.type,
+      top: opts.top !== undefined ? parseInt(opts.top, 10) : undefined,
+    });
+  });
+
+program
   .command("completion <shell>")
   .description("Print shell completion script (bash or zsh). Add to shell profile:")
   .addHelpText("after", "\n  eval \"$(cpm completion bash)\"  # ~/.bashrc\n  eval \"$(cpm completion zsh)\"   # ~/.zshrc")

@@ -27,6 +27,7 @@ import { completionCommand } from "../src/commands/completion.js";
 import { editCommand } from "../src/commands/edit.js";
 import { statsCommand } from "../src/commands/stats.js";
 import { searchCommand } from "../src/commands/search.js";
+import { rulesCommand } from "../src/commands/rules.js";
 
 // ────────────────────────────────────────────────────────────
 // Helpers
@@ -5577,5 +5578,148 @@ describe("searchCommand", () => {
     // All fixture rules are project-scoped; filtering for local → continue fires for every rule
     const lines = await captureSearch("bash", { scope: "local" });
     expect(lines.join("\n")).toMatch(/No rules matching/i);
+  });
+});
+
+describe("rulesCommand", () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), "cpm-rules-"));
+
+    // proj-a: allow Bash(npm run *), deny Read(**/.env)
+    const dirA = join(root, "proj-a", ".claude");
+    await mkdir(dirA, { recursive: true });
+    await writeFile(
+      join(dirA, "settings.json"),
+      JSON.stringify({
+        permissions: {
+          allow: ["Bash(npm run *)"],
+          deny: ["Read(**/.env)"],
+        },
+      })
+    );
+
+    // proj-b: allow Bash(npm run *) (same rule as proj-a), allow WebFetch(*)
+    const dirB = join(root, "proj-b", ".claude");
+    await mkdir(dirB, { recursive: true });
+    await writeFile(
+      join(dirB, "settings.json"),
+      JSON.stringify({
+        permissions: {
+          allow: ["Bash(npm run *)", "WebFetch(*)"],
+        },
+      })
+    );
+  });
+
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  async function captureRulesText(opts: Record<string, unknown> = {}): Promise<string> {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await rulesCommand({ root, maxDepth: 2, includeGlobal: false, ...opts } as Parameters<typeof rulesCommand>[0]);
+    return lines.join("\n");
+  }
+
+  async function captureRulesJson(opts: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await rulesCommand({ root, maxDepth: 2, includeGlobal: false, json: true, ...opts } as Parameters<typeof rulesCommand>[0]);
+    return JSON.parse(calls.map((a) => a.join("")).join(""));
+  }
+
+  it("text output includes unique rule count and project count", async () => {
+    const out = await captureRulesText();
+    // 3 unique rules total: Bash(npm run *), Read(**/.env), WebFetch(*)
+    expect(out).toMatch(/3 unique rule/);
+    expect(out).toMatch(/2 project/);
+  });
+
+  it("text output shows rules sorted by frequency (most common first)", async () => {
+    const out = await captureRulesText();
+    // Bash(npm run *) appears in 2 projects; WebFetch(*) in 1; Read(**/.env) in 1
+    const bashIdx = out.indexOf("Bash(npm run *)");
+    const webIdx = out.indexOf("WebFetch(*)");
+    expect(bashIdx).toBeGreaterThanOrEqual(0);
+    expect(webIdx).toBeGreaterThanOrEqual(0);
+    expect(bashIdx).toBeLessThan(webIdx); // Bash first (higher frequency)
+  });
+
+  it("JSON output has required top-level fields", async () => {
+    const json = await captureRulesJson();
+    expect(json).toHaveProperty("typeFilter", null);
+    expect(json).toHaveProperty("top", null);
+    expect(json).toHaveProperty("totalProjects", 2);
+    expect(json).toHaveProperty("totalRules", 3);
+    expect(json).toHaveProperty("rules");
+    expect(Array.isArray(json.rules)).toBe(true);
+  });
+
+  it("JSON rules have rule, type, count, projects fields", async () => {
+    const json = await captureRulesJson();
+    const rules = json.rules as Array<Record<string, unknown>>;
+    expect(rules.length).toBeGreaterThan(0);
+    const r = rules[0];
+    expect(r).toHaveProperty("rule");
+    expect(r).toHaveProperty("type");
+    expect(r).toHaveProperty("count");
+    expect(r).toHaveProperty("projects");
+    expect(Array.isArray(r.projects)).toBe(true);
+  });
+
+  it("JSON first rule has count=2 (Bash(npm run *) in both projects)", async () => {
+    const json = await captureRulesJson();
+    const rules = json.rules as Array<Record<string, unknown>>;
+    expect(rules[0].rule).toBe("Bash(npm run *)");
+    expect(rules[0].count).toBe(2);
+  });
+
+  it("--type allow filters to only allow rules", async () => {
+    const json = await captureRulesJson({ type: "allow" });
+    const rules = json.rules as Array<Record<string, unknown>>;
+    expect(json.typeFilter).toBe("allow");
+    // deny rules excluded; Read(**/.env) should not appear
+    expect(rules.every((r) => r.type === "allow")).toBe(true);
+    expect(rules.find((r) => r.rule === "Read(**/.env)")).toBeUndefined();
+  });
+
+  it("--type deny filters to only deny rules", async () => {
+    const json = await captureRulesJson({ type: "deny" });
+    const rules = json.rules as Array<Record<string, unknown>>;
+    expect(json.totalRules).toBe(1);
+    expect((rules[0] as Record<string, unknown>).rule).toBe("Read(**/.env)");
+  });
+
+  it("--top limits the number of rules returned", async () => {
+    const json = await captureRulesJson({ top: 2 });
+    const rules = json.rules as Array<Record<string, unknown>>;
+    expect(json.top).toBe(2);
+    expect(rules.length).toBeLessThanOrEqual(2);
+  });
+
+  it("shows 'No rules found' text when no rules exist", async () => {
+    const emptyRoot = mkdtempSync(join(tmpdir(), "cpm-rules-empty-"));
+    try {
+      const dir = join(emptyRoot, "empty-proj", ".claude");
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "settings.json"), JSON.stringify({ permissions: {} }));
+      const out = await captureRulesText({ root: emptyRoot });
+      expect(out).toMatch(/No rules found/i);
+    } finally {
+      rmSync(emptyRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("--type text output shows type label in summary", async () => {
+    const out = await captureRulesText({ type: "allow" });
+    expect(out).toMatch(/allow/);
+  });
+
+  it("--top text output shows 'top N' in summary", async () => {
+    const out = await captureRulesText({ top: 1 });
+    expect(out).toMatch(/top 1/);
   });
 });

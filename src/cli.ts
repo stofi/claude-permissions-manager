@@ -79,6 +79,8 @@ program
   .option("--json", "Output as JSON")
   .option("--exit-code", "Exit with code 1 (issues found) or 2 (critical issues) for CI use")
   .addOption(new Option("--min-severity <level>", "Only report issues at or above this severity").choices(["critical", "high", "medium", "low"]).default("low"))
+  .option("--fix", "Auto-apply all available fix commands")
+  .option("-y, --yes", "Skip confirmation prompt when using --fix")
   .action(async (opts) => {
     const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
     await auditCommand({
@@ -88,6 +90,8 @@ program
       includeGlobal: g !== false,
       exitCode: opts.exitCode,
       minSeverity: opts.minSeverity as import("./core/types.js").WarningSeverity | undefined,
+      fix: opts.fix,
+      yes: opts.yes,
     });
   });
 
@@ -216,6 +220,18 @@ program
   .action(async (opts) => {
     const { editCommand } = await import("./commands/edit.js");
     await editCommand({ project: opts.project, scope: opts.scope });
+  });
+
+program
+  .command("bypass-lock")
+  .addArgument(new Argument("<state>", "Enable or disable the lock").choices(["on", "off"]))
+  .description("Enable or disable disableBypassPermissionsMode (prevents bypassPermissions activation)")
+  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
+  .option("--project <path>", "Project path for local/project scope (default: cwd)")
+  .option("--dry-run", "Preview what would be written without modifying any files")
+  .action(async (state, opts) => {
+    const { bypassLockCommand } = await import("./commands/manage.js");
+    await bypassLockCommand(state === "on", { ...opts, dryRun: opts.dryRun });
   });
 
 program

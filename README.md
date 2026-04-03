@@ -24,6 +24,9 @@ cpm show                    # Show permissions for current project (cwd)
 cpm show ~/my-project       # Show detailed permissions for a specific project
 cpm audit                   # Report risky permissions across all projects
 cpm audit --min-severity high  # Only report high and critical issues
+cpm audit --fix             # Auto-apply all available fixes (prompts for confirmation), then re-scans
+cpm audit --fix --yes       # Auto-apply all available fixes without prompting, then re-scans
+cpm audit --fix --yes --exit-code  # Fix, re-scan, exit non-zero if issues remain
 cpm diff <path1> <path2>    # Compare two projects side by side
 cpm copy <source> <target>  # Copy project-level permissions to another project
 cpm export                  # Dump all permissions as JSON (stdout)
@@ -77,6 +80,21 @@ cpm copy ~/template-project ~/new-project --scope project --yes
 
 `cpm copy` reads allow/deny/ask rules and `defaultMode` from the **source project's `project` and `local` scope settings files only** (global user/managed rules are excluded — they already apply everywhere). It then merges those rules into the target's settings file, deduplicating any rules already present.
 
+### Lock out bypassPermissions mode
+
+```bash
+# Prevent Claude from ever activating bypassPermissions (recommended for shared/CI projects)
+cpm bypass-lock on --project ~/my-project --scope project
+
+# Remove the lock (allow bypassPermissions to be set again)
+cpm bypass-lock off --project ~/my-project --scope project
+
+# Preview without writing
+cpm bypass-lock on --scope project --dry-run
+```
+
+Setting `disableBypassPermissionsMode` to `"disable"` in a settings file prevents the `bypassPermissions` mode from being activated in that project. This is also auto-applied by `cpm audit --fix` when the corresponding LOW-severity warning is present.
+
 ### Open settings in your editor
 
 ```bash
@@ -104,6 +122,8 @@ Creates the file (empty `{}`) if it doesn't already exist, then opens it in `$VI
 --json             Output as JSON (list, show, audit, diff, export)
 --no-global        Skip user/managed global settings (list, show, audit, diff, export, ui)
 --exit-code        Exit 1 if issues found, 2 if critical issues (audit only — useful in CI)
+--fix              Auto-apply all available fix commands (audit only)
+--yes / -y         Skip confirmation prompt when using --fix (audit only)
 --dry-run          Preview what would be written without modifying files (allow, deny, ask, reset, mode, init, copy)
 --format <fmt>     Output format: json|csv (export only, default: json)
 --output <file>    Write output to file instead of stdout (export only)
@@ -163,7 +183,7 @@ cpm show ~              # ✗ won't expand to home directory
 | `medium` | MCP server has not been approved or denied (`pending`) |
 | `medium` | `allowManagedHooksOnly` or `allowManagedMcpServersOnly` in managed settings |
 | `medium` | Wildcard `"*"` in deny list — all tools blocked |
-| `low` | `disableBypassPermissionsMode` not set (bypass mode can be activated) |
+| `low` | `disableBypassPermissionsMode` not set (bypass mode can be activated) — fix with `cpm bypass-lock on` |
 | `low` | No deny rules configured when non-read-only tools are allowed |
 | `low` | MCP server has no `command` (stdio) or no `url` (http) configured |
 | `low` | Rule appears in conflicting lists (allow+deny, ask+deny, allow+ask) |
@@ -217,7 +237,7 @@ All `--json` outputs share these conventions:
 | `settingsFiles` | — | ✓ (incl. global) | ✓ (incl. global) | — |
 | `claudeMdFiles` | — | ✓ (objects) | ✓ (objects) | — |
 
-`cpm show --json` is the **detail view** for a single project. It nests `defaultMode`, `allow`, `deny`, `ask`, `isBypassDisabled`, `envVarNames`, and `additionalDirs` under an `effectivePermissions` key. It emits `warnings` as a full array of objects.
+`cpm show --json` is the **detail view** for a single project. It nests `defaultMode`, `allow`, `deny`, `ask`, `isBypassDisabled`, `envVarNames`, and `additionalDirs` under an `effectivePermissions` key. It emits `warnings` as a full array of objects (each warning may include `rule`, `fixCmd`, and `fixOp` fields). The text output also shows `Rule:` and `Fix:` lines under each warning — the same hints as `cpm audit`.
 
 `cpm list --json` is the **summary** format (compact, no `settingsFiles`/`claudeMdFiles`). Fields are flat at the project root. Use `cpm export --json` for the full data dump.
 
@@ -228,12 +248,19 @@ All `--json` outputs share these conventions:
   "projectCount": 3, "affectedProjectCount": 2, "cleanProjectCount": 1,
   "issueCount": 4, "minSeverity": "low",
   "issues": [
-    { "project": "/path/to/project", "severity": "high", "message": "...", "rule": "Bash" }
+    {
+      "project": "/path/to/project",
+      "severity": "high",
+      "message": "Bash is allowed without any specifier — all shell commands permitted",
+      "rule": "Bash",
+      "fix": "cpm reset \"Bash\" --scope project --project /path/to/project",
+      "fixOp": { "kind": "reset", "rule": "Bash", "scope": "project" }
+    }
   ],
   "errors": []
 }
 ```
-`affectedProjectCount` is the number of projects that have at least one issue. `cleanProjectCount` is projects with no issues. `minSeverity` reflects the `--min-severity` option used (default `"low"`).
+`affectedProjectCount` is the number of projects that have at least one issue. `cleanProjectCount` is projects with no issues. `minSeverity` reflects the `--min-severity` option used (default `"low"`). `fix` is the exact `cpm` command to resolve the issue (omitted when no automated fix is available). `fixOp` is the structured fix operation for programmatic use (`kind: "reset"` or `kind: "mode"`; omitted when no fix is available).
 
 `cpm diff --json` structure:
 ```json

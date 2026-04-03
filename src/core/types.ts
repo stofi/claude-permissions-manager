@@ -53,10 +53,20 @@ export interface ClaudeMdFile {
 export type WarningSeverity = "critical" | "high" | "medium" | "low";
 export const SEVERITY_ORDER: WarningSeverity[] = ["critical", "high", "medium", "low"];
 
+/** Structured, executable fix operation — used by `cpm audit --fix` */
+export type FixOp =
+  | { kind: "mode"; mode: "default"; scope: SettingsScope }
+  | { kind: "reset"; rule: string; scope: SettingsScope }
+  | { kind: "bypass-lock"; enabled: true; scope: SettingsScope };
+
 export interface Warning {
   severity: WarningSeverity;
   message: string;
   rule?: string;
+  /** Suggested fix command (without --project <path>); append --project to get a runnable fix. */
+  fixCmd?: string;
+  /** Structured version of fixCmd for programmatic execution by `cpm audit --fix`. */
+  fixOp?: FixOp;
 }
 
 export interface EffectivePermissions {

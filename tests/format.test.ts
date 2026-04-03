@@ -522,4 +522,29 @@ describe("formatEffectivePermissions — envVarNames / additionalDirs / warnings
     const out = stripAnsi(formatEffectivePermissions(makeProject()));
     expect(out).not.toContain("Warnings:");
   });
+
+  it("shows Rule and Fix lines when warning has rule and fixCmd", () => {
+    const project = makeProject({
+      perms: {
+        warnings: [{
+          severity: "high",
+          message: "Bash is allowed without specifier",
+          rule: "Bash",
+          fixCmd: 'cpm reset "Bash" --scope project',
+        }],
+      },
+    });
+    const out = stripAnsi(formatEffectivePermissions(project));
+    expect(out).toContain("Rule: Bash");
+    expect(out).toContain('cpm reset "Bash" --scope project --project');
+  });
+
+  it("omits Rule and Fix lines when warning has neither", () => {
+    const project = makeProject({
+      perms: { warnings: [{ severity: "low", message: "No deny rules configured" }] },
+    });
+    const out = stripAnsi(formatEffectivePermissions(project));
+    expect(out).not.toContain("Rule:");
+    expect(out).not.toContain("Fix:");
+  });
 });

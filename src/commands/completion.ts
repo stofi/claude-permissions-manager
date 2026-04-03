@@ -37,6 +37,7 @@ const COMMANDS = [
   "ask",
   "reset",
   "mode",
+  "bypass-lock",
   "copy",
   "export",
   "init",
@@ -146,7 +147,7 @@ _cpm_completions() {
       return 0
       ;;
     audit)
-      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --exit-code --min-severity" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --exit-code --min-severity --fix --yes" -- "\${cur}") )
       return 0
       ;;
     export)
@@ -177,6 +178,14 @@ _cpm_completions() {
       COMPREPLY=( \$(compgen -W "--scope --project" -- "\${cur}") )
       return 0
       ;;
+    bypass-lock)
+      if [[ "\${cur}" != -* ]]; then
+        COMPREPLY=( \$(compgen -W "on off" -- "\${cur}") )
+      else
+        COMPREPLY=( \$(compgen -W "--scope --project --dry-run" -- "\${cur}") )
+      fi
+      return 0
+      ;;
     copy)
       COMPREPLY=( \$(compgen -W "--scope --yes --dry-run" -- "\${cur}") )
       return 0
@@ -205,6 +214,7 @@ function zshScript(): string {
       ask: "Add ask rule",
       reset: "Remove rule(s)",
       mode: "Set default mode",
+      "bypass-lock": "Enable/disable bypass-permissions lock",
       copy: "Copy permissions to another project",
       export: "Export permissions data",
       init: "Create starter settings",
@@ -309,7 +319,9 @@ ${commandDefs}
             '--json[Output as JSON]' \\
             '--no-global[Skip user and managed global settings]' \\
             '--exit-code[Exit 1 if issues, 2 if critical (for CI)]' \\
-            '--min-severity[Minimum severity to report]:severity:(critical high medium low)'
+            '--min-severity[Minimum severity to report]:severity:(critical high medium low)' \\
+            '--fix[Auto-apply all available fix commands]' \\
+            '(-y --yes)'{-y,--yes}'[Skip confirmation prompt]'
           ;;
         export)
           _arguments \\
@@ -323,6 +335,13 @@ ${commandDefs}
           _arguments \\
             '--scope[Settings scope]:scope:(${scopeList})' \\
             '--project[Project path]:project:_directories'
+          ;;
+        bypass-lock)
+          _arguments \\
+            '--scope[Settings scope]:scope:(${scopeList})' \\
+            '--project[Project path]:project:_directories' \\
+            '--dry-run[Preview without writing]' \\
+            '1:state:(on off)'
           ;;
         copy)
           _arguments \\

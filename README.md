@@ -157,6 +157,38 @@ cpm show ~/my-project   # ✓ works
 cpm show ~              # ✗ won't expand to home directory
 ```
 
+### Audit output format
+
+`cpm audit` text output groups issues by severity. When multiple projects share the same user-scope issue (e.g. `bypassPermissions` in `~/.claude/settings.json`), the output collapses them into a single line with a project count:
+
+```
+CRITICAL (17)
+  [17 projects] bypassPermissions mode is active — all permission checks disabled
+    Fix:  cpm mode default --scope user
+
+HIGH (2)
+  ~/proj-a
+    Bash is allowed without any specifier — all shell commands permitted
+    Rule: Bash
+    Fix:  cpm reset "Bash" --scope project --project ~/proj-a
+  ~/proj-b
+    Write is allowed without any specifier
+    Rule: Write
+    Fix:  cpm reset "Write" --scope project --project ~/proj-b
+
+ℹ  3 fix(es) available. Run: cpm audit --fix
+```
+
+When you run `cpm audit --fix`, the fix list deduplicates by target file and shows how many projects are affected:
+
+```
+Auto-fixable: 2 fix(es) available
+  cpm mode default --scope user (affects 17 projects)
+  cpm reset "Bash" --scope project --project ~/proj-a
+
+Apply fixes? [Y/n]
+```
+
 ### Audit warnings reference
 
 `cpm audit` (and the TUI warnings tab) surfaces issues at four severity levels:

@@ -24,8 +24,9 @@ cpm show                    # Show permissions for current project (cwd)
 cpm show ~/my-project       # Show detailed permissions for a specific project
 cpm audit                   # Report risky permissions across all projects
 cpm audit --min-severity high  # Only report high and critical issues
-cpm audit --fix             # Auto-apply all available fixes (prompts for confirmation)
-cpm audit --fix --yes       # Auto-apply all available fixes without prompting
+cpm audit --fix             # Auto-apply all available fixes (prompts for confirmation), then re-scans
+cpm audit --fix --yes       # Auto-apply all available fixes without prompting, then re-scans
+cpm audit --fix --yes --exit-code  # Fix, re-scan, exit non-zero if issues remain
 cpm diff <path1> <path2>    # Compare two projects side by side
 cpm copy <source> <target>  # Copy project-level permissions to another project
 cpm export                  # Dump all permissions as JSON (stdout)
@@ -237,13 +238,14 @@ All `--json` outputs share these conventions:
       "severity": "high",
       "message": "Bash is allowed without any specifier — all shell commands permitted",
       "rule": "Bash",
-      "fix": "cpm reset \"Bash\" --scope project --project /path/to/project"
+      "fix": "cpm reset \"Bash\" --scope project --project /path/to/project",
+      "fixOp": { "kind": "reset", "rule": "Bash", "scope": "project" }
     }
   ],
   "errors": []
 }
 ```
-`affectedProjectCount` is the number of projects that have at least one issue. `cleanProjectCount` is projects with no issues. `minSeverity` reflects the `--min-severity` option used (default `"low"`). `fix` is the exact `cpm` command to resolve the issue (omitted when no automated fix is available).
+`affectedProjectCount` is the number of projects that have at least one issue. `cleanProjectCount` is projects with no issues. `minSeverity` reflects the `--min-severity` option used (default `"low"`). `fix` is the exact `cpm` command to resolve the issue (omitted when no automated fix is available). `fixOp` is the structured fix operation for programmatic use (`kind: "reset"` or `kind: "mode"`; omitted when no fix is available).
 
 `cpm diff --json` structure:
 ```json

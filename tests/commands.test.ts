@@ -3372,6 +3372,80 @@ describe("auditCommand — --fix", () => {
 });
 
 // ────────────────────────────────────────────────────────────
+// auditCommand — --fix re-scan
+// ────────────────────────────────────────────────────────────
+
+describe("auditCommand — --fix re-scan", () => {
+  it("shows 'All issues resolved' after fixing all fixable issues", async () => {
+    // Project with only a fixable issue (bypassPermissions mode + safe allow)
+    // After fixing mode, the only remaining warning would be low-severity "disableBypassPermissionsMode not set"
+    // which is not fixable — but since we're testing re-scan, let's use a clean case.
+    const root = mkdtempSync(join(tmpdir(), "cpm-audit-rescan-clean-"));
+    const claudeDir = join(root, "proj", ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    const settingsPath = join(claudeDir, "settings.json");
+    const fs = await import("fs/promises");
+    // bare Bash → fixable. After removing Bash from allow, no non-read allows → no "no deny" warning
+    await fs.writeFile(settingsPath, JSON.stringify({
+      permissions: { allow: ["Bash"], deny: ["Read(**/.env)"], disableBypassPermissionsMode: "disable" },
+    }));
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await auditCommand({ root, maxDepth: 2, includeGlobal: false, fix: true, yes: true });
+      const output = calls.join("\n");
+      expect(output).toMatch(/Applied \d+ fix/i);
+      // re-scan shows all clean
+      expect(output).toMatch(/All issues resolved/i);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("shows remaining issues after --fix when some issues are not auto-fixable", async () => {
+    // Project with: bypassPermissions mode (fixable) + valid allow/deny (so "no deny" LOW warning absent)
+    // After fixing mode, re-scan should have no remaining mode warning but may have others
+    // Use a setup where fixing ONE issue leaves another unfixable issue
+    const root = mkdtempSync(join(tmpdir(), "cpm-audit-rescan-remain-"));
+    const claudeDir = join(root, "proj", ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    const settingsPath = join(claudeDir, "settings.json");
+    const fs = await import("fs/promises");
+    // bypassPermissions (fixable) + Bash(safe allow) + no deny → "no deny" LOW remains after fix
+    await fs.writeFile(settingsPath, JSON.stringify({
+      permissions: { defaultMode: "bypassPermissions", allow: ["Bash(npm run *)"] },
+    }));
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await auditCommand({ root, maxDepth: 2, includeGlobal: false, fix: true, yes: true });
+      const output = calls.join("\n");
+      expect(output).toMatch(/Applied \d+ fix/i);
+      // re-scan should show remaining issues (no deny / disableBypassPermissionsMode)
+      expect(output).toMatch(/issue\(s\) still require attention/i);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("audit JSON output includes fixOp field for fixable issues", async () => {
+    // Verify fixOp is included in --json output (not stripped like the old code did)
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await auditCommand({ root: join(FIXTURES, "project-bypass"), maxDepth: 1, json: true, includeGlobal: false });
+    const json = JSON.parse(calls.join(""));
+    const withFixOp = json.issues.filter((i: Record<string, unknown>) => i.fixOp !== undefined);
+    expect(withFixOp.length).toBeGreaterThan(0);
+    // fixOp should have kind, scope, and either rule or mode
+    const modeOp = withFixOp.find((i: Record<string, unknown>) =>
+      (i.fixOp as Record<string, unknown>)?.kind === "mode"
+    );
+    expect(modeOp).toBeDefined();
+    expect((modeOp.fixOp as Record<string, unknown>).mode).toBe("default");
+  });
+});
+
+// ────────────────────────────────────────────────────────────
 // showCommand — --no-global
 // ────────────────────────────────────────────────────────────
 

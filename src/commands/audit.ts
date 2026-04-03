@@ -37,6 +37,37 @@ async function promptConfirm(question: string): Promise<boolean> {
   });
 }
 
+type IssueRow = {
+  project: string;
+  severity: string;
+  message: string;
+  rule?: string;
+  fix?: string;
+  fixOp?: FixOp;
+};
+
+function collectIssues(
+  projects: Awaited<ReturnType<typeof scan>>["projects"],
+  effectiveMinIdx: number
+): IssueRow[] {
+  const issues: IssueRow[] = [];
+  for (const project of projects) {
+    for (const w of project.effectivePermissions.warnings) {
+      if (SEVERITY_RANK[w.severity] <= effectiveMinIdx) {
+        issues.push({
+          project: project.rootPath,
+          severity: w.severity,
+          message: w.message,
+          rule: w.rule,
+          fix: w.fixCmd ? `${w.fixCmd} --project ${project.rootPath}` : undefined,
+          fixOp: w.fixOp,
+        });
+      }
+    }
+  }
+  return issues;
+}
+
 export async function auditCommand(options: ScanOptions & {
   json?: boolean;
   exitCode?: boolean;
@@ -53,33 +84,11 @@ export async function auditCommand(options: ScanOptions & {
     ? SEVERITY_RANK[options.minSeverity]
     : SEVERITY_ORDER.length - 1;
 
-  const allIssues: Array<{
-    project: string;
-    severity: string;
-    message: string;
-    rule?: string;
-    fix?: string;
-    fixOp?: FixOp;
-  }> = [];
+  const allIssues = collectIssues(result.projects, effectiveMinIdx);
 
-  for (const project of result.projects) {
-    for (const w of project.effectivePermissions.warnings) {
-      if (SEVERITY_RANK[w.severity] <= effectiveMinIdx) {
-        allIssues.push({
-          project: project.rootPath,
-          severity: w.severity,
-          message: w.message,
-          rule: w.rule,
-          fix: w.fixCmd ? `${w.fixCmd} --project ${project.rootPath}` : undefined,
-          fixOp: w.fixOp,
-        });
-      }
-    }
-  }
-
-  const exitWithCode = () => {
-    if (options.exitCode && allIssues.length > 0) {
-      const hasCritical = allIssues.some((i) => i.severity === "critical");
+  const exitWithCode = (issues: IssueRow[]) => {
+    if (options.exitCode && issues.length > 0) {
+      const hasCritical = issues.some((i) => i.severity === "critical");
       process.exit(hasCritical ? 2 : 1);
     }
   };
@@ -89,7 +98,6 @@ export async function auditCommand(options: ScanOptions & {
 
   // --json output (never applies fixes)
   if (options.json) {
-    const jsonIssues = allIssues.map(({ fixOp: _ignored, ...rest }) => rest);
     console.log(JSON.stringify({
       generatedAt: result.scannedAt.toISOString(),
       scanRoot: result.scanRoot,
@@ -98,10 +106,10 @@ export async function auditCommand(options: ScanOptions & {
       cleanProjectCount: cleanCount,
       issueCount: allIssues.length,
       minSeverity: options.minSeverity ?? "low",
-      issues: jsonIssues,
+      issues: allIssues,
       errors: result.errors,
     }, null, 2));
-    exitWithCode();
+    exitWithCode(allIssues);
     return;
   }
 
@@ -158,7 +166,7 @@ export async function auditCommand(options: ScanOptions & {
 
     if (fixable.length === 0) {
       console.log(chalk.yellow("\nNo auto-fixable issues found."));
-      exitWithCode();
+      exitWithCode(allIssues);
       return;
     }
 
@@ -185,7 +193,7 @@ export async function auditCommand(options: ScanOptions & {
     const proceed = options.yes || await confirmFn(chalk.yellow("\nApply fixes? [Y/n] "));
     if (!proceed) {
       console.log(chalk.gray("Aborted."));
-      exitWithCode();
+      exitWithCode(allIssues);
       return;
     }
 
@@ -209,11 +217,27 @@ export async function auditCommand(options: ScanOptions & {
     } else {
       console.log(chalk.yellow(`Applied ${successCount} fix(es); ${failCount} failed.`));
     }
-    if (unfixable.length > 0) {
-      console.log(chalk.gray(`Run \`cpm audit\` again to check remaining issues.`));
+
+    // Re-scan to show remaining issues and drive --exit-code
+    process.stderr.write(chalk.gray("Re-scanning after fixes...\n"));
+    const afterResult = await scan(options);
+    const remaining = collectIssues(afterResult.projects, effectiveMinIdx);
+
+    if (remaining.length === 0) {
+      console.log(chalk.green("✓ All issues resolved."));
+    } else {
+      const remAffected = new Set(remaining.map((i) => i.project)).size;
+      console.log(chalk.yellow(`\n${remaining.length} issue(s) still require attention in ${remAffected} project(s):`));
+      for (const issue of remaining) {
+        console.log(`  ${chalk.dim(collapseHome(issue.project))}`);
+        console.log(`    [${issue.severity.toUpperCase()}] ${issue.message}`);
+        if (issue.rule) console.log(`    Rule: ${chalk.italic(issue.rule)}`);
+      }
     }
+
+    exitWithCode(remaining);
     return;
   }
 
-  exitWithCode();
+  exitWithCode(allIssues);
 }

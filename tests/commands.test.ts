@@ -3126,6 +3126,33 @@ describe("auditCommand — text output", () => {
     }
   });
 
+  it("shows clean projects banner when some projects have issues and some don't", async () => {
+    // 2 projects: one with bare Bash allow (issues), one clean — exercising cleanCount > 0
+    const root = mkdtempSync(join(tmpdir(), "cpm-audit-clean-count-"));
+    const issueDir = join(root, "proj-issue", ".claude");
+    const cleanDir2 = join(root, "proj-clean", ".claude");
+    await mkdir(issueDir, { recursive: true });
+    await mkdir(cleanDir2, { recursive: true });
+    const fs = await import("fs/promises");
+    await fs.writeFile(join(issueDir, "settings.json"), JSON.stringify({
+      permissions: { allow: ["Bash"] },
+    }));
+    await fs.writeFile(join(cleanDir2, "settings.json"), JSON.stringify({
+      permissions: { allow: ["Bash(npm run *)"], deny: ["Read(**/.env)"], disableBypassPermissionsMode: "disable" },
+    }));
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await auditCommand({ root, maxDepth: 2, includeGlobal: false });
+      const output = calls.join("\n");
+      // audit.ts: cleanCount > 0 → "✓ X project(s) have no issues"
+      expect(output).toMatch(/✓.+1 project\(s\) have no issues/i);
+      expect(output).toMatch(/HIGH/i);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("shows Fix: hint line for mode warnings in text output", async () => {
     const calls: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
@@ -3288,6 +3315,56 @@ describe("auditCommand — --fix", () => {
       const output = calls.join("\n");
       // When no issues: shows "No issues found", --fix is irrelevant
       expect(output).toMatch(/No issues found/i);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("reports failed fixes when the settings dir is not writable", async () => {
+    // audit.ts: applyFixOp returns error → covers lines 194-196 (✗ path) and 207 (failCount > 0)
+    const root = mkdtempSync(join(tmpdir(), "cpm-audit-fix-readonly-"));
+    const claudeDir = join(root, "proj", ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    const settingsPath = join(claudeDir, "settings.json");
+    const fs = await import("fs/promises");
+    await fs.writeFile(settingsPath, JSON.stringify({ permissions: { allow: ["Bash"] } }));
+    // Make .claude dir read-only so write fails
+    await fs.chmod(claudeDir, 0o555);
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await auditCommand({ root, maxDepth: 2, includeGlobal: false, fix: true, yes: true });
+      const output = calls.join("\n");
+      // ✗ line + error message
+      expect(output).toContain("✗");
+      // failCount > 0: "Applied N fix(es); M failed"
+      expect(output).toMatch(/Applied \d+ fix\(es\); \d+ failed/i);
+    } finally {
+      await fs.chmod(claudeDir, 0o755);
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("aborts when user declines fix prompt (yes=false, _confirmFn returns false)", async () => {
+    // audit.ts: !proceed branch (lines 183-186) — uses _confirmFn injection to avoid ESM mocking
+    const root = mkdtempSync(join(tmpdir(), "cpm-audit-fix-abort-"));
+    const claudeDir = join(root, "proj", ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    const fs = await import("fs/promises");
+    const settingsPath = join(claudeDir, "settings.json");
+    await fs.writeFile(settingsPath, JSON.stringify({ permissions: { allow: ["Bash"] } }));
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await auditCommand({
+        root, maxDepth: 2, includeGlobal: false, fix: true, yes: false,
+        _confirmFn: async () => false,
+      });
+      const output = calls.join("\n");
+      expect(output).toMatch(/Aborted/i);
+      // File should NOT have been modified
+      const unchanged = JSON.parse(await fs.readFile(settingsPath, "utf8"));
+      expect(unchanged.permissions?.allow).toContain("Bash");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

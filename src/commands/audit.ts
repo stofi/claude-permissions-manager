@@ -43,6 +43,8 @@ export async function auditCommand(options: ScanOptions & {
   minSeverity?: WarningSeverity;
   fix?: boolean;
   yes?: boolean;
+  /** Override confirmation prompt for testing (avoids ESM readline mocking issues) */
+  _confirmFn?: (question: string) => Promise<boolean>;
 }): Promise<void> {
   process.stderr.write(chalk.gray("Scanning for Claude projects...\n"));
   const result = await scan(options);
@@ -179,7 +181,8 @@ export async function auditCommand(options: ScanOptions & {
       console.log(chalk.gray(`  (${unfixable.length} issue(s) require manual intervention)`));
     }
 
-    const proceed = options.yes || await promptConfirm(chalk.yellow("\nApply fixes? [Y/n] "));
+    const confirmFn = options._confirmFn ?? promptConfirm;
+    const proceed = options.yes || await confirmFn(chalk.yellow("\nApply fixes? [Y/n] "));
     if (!proceed) {
       console.log(chalk.gray("Aborted."));
       exitWithCode();

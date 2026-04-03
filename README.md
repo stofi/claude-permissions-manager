@@ -221,7 +221,7 @@ All `--json` outputs share these conventions:
 | `settingsFiles` | — | ✓ (incl. global) | ✓ (incl. global) | — |
 | `claudeMdFiles` | — | ✓ (objects) | ✓ (objects) | — |
 
-`cpm show --json` is the **detail view** for a single project. It nests `defaultMode`, `allow`, `deny`, `ask`, `isBypassDisabled`, `envVarNames`, and `additionalDirs` under an `effectivePermissions` key. It emits `warnings` as a full array of objects.
+`cpm show --json` is the **detail view** for a single project. It nests `defaultMode`, `allow`, `deny`, `ask`, `isBypassDisabled`, `envVarNames`, and `additionalDirs` under an `effectivePermissions` key. It emits `warnings` as a full array of objects (each warning may include `rule`, `fixCmd`, and `fixOp` fields). The text output also shows `Rule:` and `Fix:` lines under each warning — the same hints as `cpm audit`.
 
 `cpm list --json` is the **summary** format (compact, no `settingsFiles`/`claudeMdFiles`). Fields are flat at the project root. Use `cpm export --json` for the full data dump.
 

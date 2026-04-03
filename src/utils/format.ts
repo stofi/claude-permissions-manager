@@ -178,6 +178,8 @@ export function formatEffectivePermissions(
     lines.push(chalk.bold("Warnings:"));
     for (const w of perms.warnings) {
       lines.push(`  ${formatWarning(w)}`);
+      if (w.rule) lines.push(`    Rule: ${chalk.italic(w.rule)}`);
+      if (w.fixCmd) lines.push(`    Fix:  ${chalk.cyan(`${w.fixCmd} --project ${project.rootPath}`)}`);
     }
     lines.push("");
   }

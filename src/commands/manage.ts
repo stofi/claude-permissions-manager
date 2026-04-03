@@ -3,6 +3,7 @@ import { resolve } from "path";
 import {
   addRule,
   removeRule,
+  replaceRule,
   setMode,
   setBypassLock,
   clearAllRules,
@@ -598,6 +599,165 @@ export async function batchModeCommand(
   }
 
   console.log(chalk.green(`\n✓ Updated ${updated} project(s) to mode "${mode}"`));
+  if (errors.length > 0) {
+    console.log(chalk.red(`\n${errors.length} error(s):`));
+    for (const err of errors) console.log(chalk.red(`  ${err}`));
+    process.exit(1);
+  }
+}
+
+/** Replace one rule with another in a single project's settings file. */
+export async function replaceRuleCommand(
+  oldRule: string,
+  newRule: string,
+  opts: { project?: string; scope?: string; dryRun?: boolean }
+): Promise<void> {
+  const validOld = validateRule(oldRule);
+  if (!validOld.valid) {
+    console.error(chalk.red(`Invalid old rule: ${validOld.error}`));
+    process.exit(1);
+  }
+  const validNew = validateRule(newRule);
+  if (!validNew.valid) {
+    console.error(chalk.red(`Invalid new rule: ${validNew.error}`));
+    process.exit(1);
+  }
+  if (oldRule.trim() === newRule.trim()) {
+    console.error(chalk.red("Old and new rules are identical — nothing to replace."));
+    process.exit(1);
+  }
+
+  const scope = resolveScope(opts.scope);
+  const projectPath = resolveProject(opts.project);
+  const settingsPath = resolveSettingsPath(scope, projectPath);
+
+  const result = await replaceRule(oldRule.trim(), newRule.trim(), settingsPath, { dryRun: opts.dryRun ?? false });
+
+  if (opts.dryRun) {
+    console.log(chalk.cyan(`[dry-run] No files will be modified`));
+    if (!result.replaced) {
+      console.log(chalk.yellow(`  Rule "${oldRule}" not found — no change`));
+    } else {
+      console.log(`  Would replace "${chalk.bold(oldRule)}" → "${chalk.bold(newRule)}" in: ${result.replacedIn.join(", ")}`);
+    }
+    console.log(chalk.gray(`  target: ${collapseHome(settingsPath)} [${scope}]`));
+    return;
+  }
+
+  if (!result.replaced) {
+    console.log(chalk.yellow(`Rule "${oldRule}" not found in any list`));
+    console.log(chalk.gray(`  in: ${collapseHome(settingsPath)}`));
+  } else {
+    console.log(chalk.green(`✓ Replaced "${oldRule}" → "${newRule}" in: ${result.replacedIn.join(", ")}`));
+    console.log(chalk.gray(`  in: ${collapseHome(settingsPath)} [${scope}]`));
+  }
+}
+
+/** Replace one rule with another across all discovered projects at once. */
+export async function batchReplaceCommand(
+  oldRule: string,
+  newRule: string,
+  opts: ScanOptions & {
+    scope?: string;
+    dryRun?: boolean;
+    yes?: boolean;
+    _confirmFn?: (q: string) => Promise<boolean>;
+  }
+): Promise<void> {
+  const validOld = validateRule(oldRule);
+  if (!validOld.valid) {
+    console.error(chalk.red(`Invalid old rule: ${validOld.error}`));
+    process.exit(1);
+  }
+  const validNew = validateRule(newRule);
+  if (!validNew.valid) {
+    console.error(chalk.red(`Invalid new rule: ${validNew.error}`));
+    process.exit(1);
+  }
+  if (oldRule.trim() === newRule.trim()) {
+    console.error(chalk.red("Old and new rules are identical — nothing to replace."));
+    process.exit(1);
+  }
+
+  const scope = resolveScope(opts.scope);
+  if (scope === "user") {
+    console.log(chalk.yellow(`⚠ --scope user already applies globally.`));
+    console.log(chalk.yellow(`  Use: cpm replace "${oldRule}" "${newRule}" --scope user`));
+    return;
+  }
+
+  process.stderr.write(chalk.gray("Scanning for Claude projects...\n"));
+  const result = await scan(opts);
+  const { projects } = result;
+
+  if (projects.length === 0) {
+    console.log(chalk.yellow("No Claude projects found."));
+    return;
+  }
+
+  const old = oldRule.trim();
+  const nw = newRule.trim();
+
+  // Pre-check which projects have the old rule
+  const toReplace: Array<{ projectPath: string; lists: string[] }> = [];
+  const notPresent: string[] = [];
+  for (const project of projects) {
+    const settingsPath = resolveSettingsPath(scope, project.rootPath);
+    const check = await replaceRule(old, nw, settingsPath, { dryRun: true });
+    if (check.replaced) {
+      toReplace.push({ projectPath: project.rootPath, lists: check.replacedIn });
+    } else {
+      notPresent.push(project.rootPath);
+    }
+  }
+
+  if (toReplace.length === 0) {
+    console.log(chalk.yellow(`Rule "${old}" not found in any project.`));
+    return;
+  }
+
+  const arrow = `"${chalk.bold(old)}" → "${chalk.bold(nw)}"`;
+
+  if (opts.dryRun) {
+    console.log(chalk.cyan(`[dry-run] No files will be modified`));
+    console.log(`\nWould replace ${arrow} in ${toReplace.length} project(s):`);
+    for (const { projectPath, lists } of toReplace) {
+      console.log(`  ${collapseHome(projectPath)} ${chalk.dim("(" + lists.join(", ") + ")")}`);
+    }
+    if (notPresent.length > 0) {
+      console.log(chalk.gray(`\nSkipped ${notPresent.length} without rule.`));
+    }
+    return;
+  }
+
+  console.log(`\nWill replace ${arrow} in ${toReplace.length} project(s):`);
+  for (const { projectPath, lists } of toReplace) {
+    console.log(`  ${collapseHome(projectPath)} ${chalk.dim("(" + lists.join(", ") + ")")}`);
+  }
+  if (notPresent.length > 0) {
+    console.log(chalk.gray(`\nSkipped ${notPresent.length} without rule.`));
+  }
+
+  const confirmFn = opts._confirmFn ?? promptConfirm;
+  const proceed = opts.yes || await confirmFn(chalk.yellow("\nApply to all? [Y/n] "));
+  if (!proceed) {
+    console.log(chalk.gray("Aborted."));
+    return;
+  }
+
+  let replaced = 0;
+  const errors: string[] = [];
+  for (const { projectPath } of toReplace) {
+    const settingsPath = resolveSettingsPath(scope, projectPath);
+    try {
+      await replaceRule(old, nw, settingsPath);
+      replaced++;
+    } catch (e) {
+      errors.push(`${collapseHome(projectPath)}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  console.log(chalk.green(`\n✓ Replaced in ${replaced} project(s)`));
   if (errors.length > 0) {
     console.log(chalk.red(`\n${errors.length} error(s):`));
     for (const err of errors) console.log(chalk.red(`  ${err}`));

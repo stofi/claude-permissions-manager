@@ -1302,6 +1302,16 @@ describe("bypassLockCommand", () => {
     expect(output).toMatch(/dry.run/i);
     expect(output).toMatch(/enable/i);
   });
+
+  it("--dry-run off shows 'disable' in output (manage.ts:255 ternary false branch)", async () => {
+    // manage.ts:255: `enable ? "enable" : "disable"` — the "disable" branch
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    await bypassLockCommand(false, { project: tmpDir, scope: "project", dryRun: true });
+    const output = calls.join("\n");
+    expect(output).toMatch(/dry.run/i);
+    expect(output).toMatch(/disable/i);
+  });
 });
 
 // ────────────────────────────────────────────────────────────
@@ -3215,6 +3225,27 @@ describe("auditCommand — text output", () => {
     expect(output).toMatch(/Fix:/i);
     expect(output).toContain("cpm mode default --scope project");
     expect(output).toContain("project-bypass");
+  });
+
+  it("shows Fix: hint line for bypass-lock warning in text output", async () => {
+    // Project with allow+deny rules but no disableBypassPermissionsMode → LOW warning with fixCmd
+    const root = mkdtempSync(join(tmpdir(), "cpm-audit-fix-bypass-hint-"));
+    const claudeDir = join(root, "proj", ".claude");
+    await mkdir(claudeDir, { recursive: true });
+    const fs = await import("fs/promises");
+    await fs.writeFile(join(claudeDir, "settings.json"), JSON.stringify({
+      permissions: { allow: ["Bash(npm run *)"], deny: ["Read(**/.env)"] },
+    }));
+    const calls: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
+    try {
+      await auditCommand({ root, maxDepth: 2, includeGlobal: false });
+      const output = calls.join("\n");
+      expect(output).toMatch(/Fix:/i);
+      expect(output).toMatch(/cpm bypass-lock on --scope project/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("shows Fix: hint line for bare Bash allow warning in text output", async () => {

@@ -31,6 +31,7 @@ const COMMANDS = [
   "list",
   "stats",
   "search",
+  "rules",
   "show",
   "audit",
   "diff",
@@ -152,6 +153,10 @@ _cpm_completions() {
       COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --exact --type --scope" -- "\${cur}") )
       return 0
       ;;
+    rules)
+      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --type --top" -- "\${cur}") )
+      return 0
+      ;;
     ui)
       COMPREPLY=( \$(compgen -W "--root --depth --no-global" -- "\${cur}") )
       return 0
@@ -217,6 +222,8 @@ function zshScript(): string {
       ui: "Launch interactive TUI",
       list: "List all Claude projects",
       stats: "Show aggregate permission statistics",
+      search: "Find projects by rule pattern",
+      rules: "List unique rules ranked by frequency",
       show: "Show project permissions",
       audit: "Report risky permissions",
       diff: "Compare two projects",
@@ -336,6 +343,15 @@ ${commandDefs}
             '--exact[Exact rule match]' \\
             '--type[Only search in this rule list]:type:(allow deny ask)' \\
             '--scope[Only match rules in this scope]:scope:(local project user managed)'
+          ;;
+        rules)
+          _arguments \\
+            '--root[Root directory]:root:_directories' \\
+            '--depth[Max scan depth]:depth:' \\
+            '--json[Output as JSON]' \\
+            '--no-global[Skip user and managed global settings]' \\
+            '--type[Only show this rule list]:type:(allow deny ask)' \\
+            '--top[Show only top N rules by frequency]:n:'
           ;;
         ui)
           _arguments \\

@@ -63,7 +63,7 @@ export interface Warning {
   severity: WarningSeverity;
   message: string;
   rule?: string;
-  /** Suggested fix command (without --project <path>); append --project to get a runnable fix. */
+  /** Suggested fix command. For project/local scope: append `--project <path>` to get a runnable command. For user scope: already complete (no --project needed). */
   fixCmd?: string;
   /** Structured version of fixCmd for programmatic execution by `cpm audit --fix`. */
   fixOp?: FixOp;

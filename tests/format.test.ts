@@ -547,4 +547,40 @@ describe("formatEffectivePermissions — envVarNames / additionalDirs / warnings
     expect(out).not.toContain("Rule:");
     expect(out).not.toContain("Fix:");
   });
+
+  it("Fix line for project-scope warning includes --project path", () => {
+    const project = makeProject({
+      rootPath: "/home/user/my-project",
+      perms: {
+        warnings: [{
+          severity: "high",
+          message: "Bash is allowed without specifier",
+          rule: "Bash",
+          fixCmd: 'cpm reset "Bash" --scope project',
+          fixOp: { kind: "reset", rule: "Bash", scope: "project" },
+        }],
+      },
+    });
+    const out = stripAnsi(formatEffectivePermissions(project));
+    expect(out).toContain('cpm reset "Bash" --scope project --project /home/user/my-project');
+  });
+
+  it("Fix line for user-scope warning does NOT include --project path", () => {
+    // Bug fix: user-scope fix commands target ~/.claude/settings.json, --project is irrelevant
+    const project = makeProject({
+      rootPath: "/home/user/my-project",
+      perms: {
+        warnings: [{
+          severity: "critical",
+          message: "bypassPermissions mode is active",
+          fixCmd: "cpm mode default --scope user",
+          fixOp: { kind: "mode", mode: "default", scope: "user" },
+        }],
+      },
+    });
+    const out = stripAnsi(formatEffectivePermissions(project));
+    // Should show the command as-is, without --project
+    expect(out).toContain("cpm mode default --scope user");
+    expect(out).not.toContain("--project");
+  });
 });

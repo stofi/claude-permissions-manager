@@ -143,12 +143,37 @@ export async function auditCommand(options: ScanOptions & {
 
   for (const [severity, issues] of Object.entries(bySeverity)) {
     if (issues.length === 0) continue;
-    console.log(chalk.bold(`${severity.toUpperCase()} (${issues.length})`));
+
+    // Group by fix command — same fix means same logical issue (e.g. user-scope bypassPermissions
+    // affects all projects but needs only one fix). Unfixable issues are always shown individually.
+    type DisplayGroup = { message: string; fix?: string; rule?: string; firstProject: string; count: number };
+    const groups: DisplayGroup[] = [];
+    const fixToGroup = new Map<string, DisplayGroup>();
     for (const issue of issues) {
-      console.log(`  ${chalk.dim(collapseHome(issue.project))}`);
-      console.log(`    ${issue.message}`);
-      if (issue.rule) console.log(`    Rule: ${chalk.italic(issue.rule)}`);
-      if (issue.fix) console.log(`    Fix:  ${chalk.cyan(issue.fix)}`);
+      if (issue.fix) {
+        const existing = fixToGroup.get(issue.fix);
+        if (existing) {
+          existing.count++;
+          continue;
+        }
+        const g: DisplayGroup = { message: issue.message, fix: issue.fix, rule: issue.rule, firstProject: issue.project, count: 1 };
+        groups.push(g);
+        fixToGroup.set(issue.fix, g);
+      } else {
+        groups.push({ message: issue.message, fix: undefined, rule: issue.rule, firstProject: issue.project, count: 1 });
+      }
+    }
+
+    console.log(chalk.bold(`${severity.toUpperCase()} (${issues.length})`));
+    for (const g of groups) {
+      if (g.count > 1) {
+        console.log(`  ${chalk.gray(`[${g.count} projects]`)} ${g.message}`);
+      } else {
+        console.log(`  ${chalk.dim(collapseHome(g.firstProject))}`);
+        console.log(`    ${g.message}`);
+      }
+      if (g.rule) console.log(`    Rule: ${chalk.italic(g.rule)}`);
+      if (g.fix) console.log(`    Fix:  ${chalk.cyan(g.fix)}`);
     }
     console.log("");
   }

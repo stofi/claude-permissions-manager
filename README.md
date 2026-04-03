@@ -25,6 +25,8 @@ cpm list --min-severity critical   # Only show projects with critical warnings
 cpm list --sort warnings           # Sort by warning count (most warnings first)
 cpm list --sort name               # Sort alphabetically by path
 cpm list --sort mode               # Sort by permission mode
+cpm stats                   # Show aggregate statistics (modes, warnings, MCP usage)
+cpm stats --json            # Machine-readable statistics
 cpm show                    # Show permissions for current project (cwd)
 cpm show ~/my-project       # Show detailed permissions for a specific project
 cpm audit                   # Report risky permissions across all projects

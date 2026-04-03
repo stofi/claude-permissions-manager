@@ -25,6 +25,7 @@ import { formatEffectivePermissions } from "../src/utils/format.js";
 import type { ClaudeProject } from "../src/core/types.js";
 import { completionCommand } from "../src/commands/completion.js";
 import { editCommand } from "../src/commands/edit.js";
+import { statsCommand } from "../src/commands/stats.js";
 
 // ────────────────────────────────────────────────────────────
 // Helpers
@@ -5106,5 +5107,191 @@ describe("listCommand — --sort", () => {
     expect(output).toContain("proj-a");
     expect(output).toContain("proj-b");
     expect(output).toContain("proj-c");
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// statsCommand
+// ────────────────────────────────────────────────────────────
+
+describe("statsCommand — JSON output", () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), "cpm-stats-"));
+    // bypassPermissions project → critical warning
+    const bypassDir = join(root, "bypass-proj", ".claude");
+    await mkdir(bypassDir, { recursive: true });
+    await writeFile(
+      join(bypassDir, "settings.json"),
+      JSON.stringify({ permissions: { defaultMode: "bypassPermissions" } })
+    );
+    // acceptEdits project → medium warning; has an MCP server and allow rule
+    const acceptDir = join(root, "accept-proj", ".claude");
+    await mkdir(acceptDir, { recursive: true });
+    await writeFile(
+      join(acceptDir, "settings.json"),
+      JSON.stringify({
+        permissions: {
+          defaultMode: "acceptEdits",
+          disableBypassPermissionsMode: "disable",
+          allow: ["Bash(npm run *)"],
+        },
+      })
+    );
+    await writeFile(
+      join(root, "accept-proj", ".mcp.json"),
+      JSON.stringify({ mcpServers: { myserver: { command: "node", args: ["srv.js"] } } })
+    );
+    // clean project → no warnings, no rules
+    const cleanDir = join(root, "clean-proj", ".claude");
+    await mkdir(cleanDir, { recursive: true });
+    await writeFile(
+      join(cleanDir, "settings.json"),
+      JSON.stringify({ permissions: { disableBypassPermissionsMode: "disable" } })
+    );
+  });
+
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  async function captureStatsJson() {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await statsCommand({ root, maxDepth: 2, json: true, includeGlobal: false });
+    return JSON.parse(calls.map((a) => a.join("")).join(""));
+  }
+
+  it("JSON output has required top-level fields", async () => {
+    const json = await captureStatsJson();
+    expect(json).toHaveProperty("generatedAt");
+    expect(json).toHaveProperty("scanRoot");
+    expect(json).toHaveProperty("totalProjects");
+    expect(json).toHaveProperty("byMode");
+    expect(json).toHaveProperty("totalWarnings");
+    expect(json).toHaveProperty("warningsBySeverity");
+    expect(json).toHaveProperty("affectedProjects");
+    expect(json).toHaveProperty("cleanProjects");
+    expect(json).toHaveProperty("mcpServers");
+    expect(json).toHaveProperty("projectsWithRules");
+    expect(json).toHaveProperty("errors");
+  });
+
+  it("totalProjects is correct", async () => {
+    const json = await captureStatsJson();
+    expect(json.totalProjects).toBe(3);
+  });
+
+  it("byMode counts are correct", async () => {
+    const json = await captureStatsJson();
+    // bypass-proj: bypassPermissions, accept-proj: acceptEdits, clean-proj: default
+    expect(json.byMode.bypassPermissions).toBe(1);
+    expect(json.byMode.acceptEdits).toBe(1);
+    expect(json.byMode.default).toBe(1);
+  });
+
+  it("warningsBySeverity counts are correct", async () => {
+    const json = await captureStatsJson();
+    expect(typeof json.warningsBySeverity.critical).toBe("number");
+    expect(typeof json.warningsBySeverity.high).toBe("number");
+    expect(typeof json.warningsBySeverity.medium).toBe("number");
+    expect(typeof json.warningsBySeverity.low).toBe("number");
+    // bypass-proj → at least 1 critical warning
+    expect(json.warningsBySeverity.critical).toBeGreaterThanOrEqual(1);
+    // accept-proj → at least 1 medium warning (acceptEdits)
+    expect(json.warningsBySeverity.medium).toBeGreaterThanOrEqual(1);
+  });
+
+  it("affectedProjects + cleanProjects = totalProjects", async () => {
+    const json = await captureStatsJson();
+    expect(json.affectedProjects + json.cleanProjects).toBe(json.totalProjects);
+  });
+
+  it("totalWarnings is sum of warningsBySeverity", async () => {
+    const json = await captureStatsJson();
+    const severitySum = json.warningsBySeverity.critical +
+      json.warningsBySeverity.high +
+      json.warningsBySeverity.medium +
+      json.warningsBySeverity.low;
+    expect(json.totalWarnings).toBe(severitySum);
+  });
+
+  it("mcpServers.uniqueNames and projectsWithMcp are correct", async () => {
+    const json = await captureStatsJson();
+    expect(json.mcpServers.uniqueNames).toBe(1);    // "myserver" only
+    expect(json.mcpServers.projectsWithMcp).toBe(1); // only accept-proj
+  });
+
+  it("projectsWithRules counts projects with allow or deny rules", async () => {
+    const json = await captureStatsJson();
+    // accept-proj has allow rule; bypass-proj and clean-proj have none
+    expect(json.projectsWithRules).toBe(1);
+  });
+
+  it("cleanProjects is correct (only clean-proj has no warnings)", async () => {
+    const json = await captureStatsJson();
+    expect(json.cleanProjects).toBe(1);
+  });
+});
+
+describe("statsCommand — text output", () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), "cpm-stats-txt-"));
+    // bypass project → critical warning
+    const dir = join(root, "bypass", ".claude");
+    await mkdir(dir, { recursive: true });
+    await writeFile(
+      join(dir, "settings.json"),
+      JSON.stringify({ permissions: { defaultMode: "bypassPermissions" } })
+    );
+    // clean project
+    const cleanDir = join(root, "clean", ".claude");
+    await mkdir(cleanDir, { recursive: true });
+    await writeFile(
+      join(cleanDir, "settings.json"),
+      JSON.stringify({ permissions: { disableBypassPermissionsMode: "disable" } })
+    );
+  });
+
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it("text output includes total project count", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await statsCommand({ root, maxDepth: 2, includeGlobal: false });
+    const output = lines.join("\n");
+    expect(output).toMatch(/2 project/);
+  });
+
+  it("text output shows mode breakdown", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await statsCommand({ root, maxDepth: 2, includeGlobal: false });
+    const output = lines.join("\n");
+    expect(output).toMatch(/bypassPermissions/);
+    expect(output).toMatch(/Permission modes/i);
+  });
+
+  it("text output shows warning count", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await statsCommand({ root, maxDepth: 2, includeGlobal: false });
+    const output = lines.join("\n");
+    expect(output).toMatch(/Warnings?/i);
+    expect(output).toMatch(/critical/);
+  });
+
+  it("text output shows 'no projects found' for empty root", async () => {
+    const emptyRoot = mkdtempSync(join(tmpdir(), "cpm-stats-empty-"));
+    try {
+      const lines: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+      await statsCommand({ root: emptyRoot, maxDepth: 2, includeGlobal: false });
+      const output = lines.join("\n");
+      expect(output).toMatch(/No Claude projects found/);
+    } finally {
+      rmSync(emptyRoot, { recursive: true, force: true });
+    }
   });
 });

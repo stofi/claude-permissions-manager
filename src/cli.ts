@@ -4,6 +4,7 @@ import { Command, Option, Argument } from "commander";
 import { listCommand } from "./commands/list.js";
 import { showCommand } from "./commands/show.js";
 import { auditCommand } from "./commands/audit.js";
+import { statsCommand } from "./commands/stats.js";
 import { homeDir } from "./utils/paths.js";
 import { PermissionModeSchema } from "./core/schemas.js";
 import { WRITABLE_SCOPES } from "./core/types.js";
@@ -64,6 +65,15 @@ program
   .action(async (opts) => {
     const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
     await listCommand({ root, maxDepth: parseDepth(depth), json: opts.json, includeGlobal: g !== false, warningsOnly: opts.warnings, minSeverity: opts.minSeverity as import("./core/types.js").WarningSeverity | undefined, sort: opts.sort });
+  });
+
+program
+  .command("stats")
+  .description("Show aggregate permission statistics across all projects")
+  .option("--json", "Output as JSON")
+  .action(async (opts) => {
+    const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
+    await statsCommand({ root, maxDepth: parseDepth(depth), json: opts.json, includeGlobal: g !== false });
   });
 
 program

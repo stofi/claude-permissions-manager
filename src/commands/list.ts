@@ -4,14 +4,29 @@ import { formatProjectTable } from "../utils/format.js";
 import { collapseHome } from "../utils/paths.js";
 import type { ScanOptions } from "../core/discovery.js";
 
-export async function listCommand(options: ScanOptions & { json?: boolean; warningsOnly?: boolean }): Promise<void> {
+type SortField = "name" | "warnings" | "mode";
+
+function sortProjects(projects: Awaited<ReturnType<typeof scan>>["projects"], sort: SortField) {
+  return [...projects].sort((a, b) => {
+    if (sort === "name") return a.rootPath.localeCompare(b.rootPath);
+    if (sort === "warnings") return b.effectivePermissions.warnings.length - a.effectivePermissions.warnings.length;
+    // sort === "mode"
+    return a.effectivePermissions.defaultMode.localeCompare(b.effectivePermissions.defaultMode);
+  });
+}
+
+export async function listCommand(options: ScanOptions & { json?: boolean; warningsOnly?: boolean; sort?: string }): Promise<void> {
   process.stderr.write(chalk.gray("Scanning for Claude projects...\n"));
 
   const result = await scan(options);
 
-  const projects = options.warningsOnly
+  const filtered = options.warningsOnly
     ? result.projects.filter((p) => p.effectivePermissions.warnings.length > 0)
     : result.projects;
+
+  const projects = options.sort && (["name", "warnings", "mode"] as string[]).includes(options.sort)
+    ? sortProjects(filtered, options.sort as SortField)
+    : filtered;
 
   if (options.json) {
     const output = {

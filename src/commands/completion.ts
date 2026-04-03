@@ -29,6 +29,7 @@ const TOOLS = [
 const COMMANDS = [
   "ui",
   "list",
+  "stats",
   "show",
   "audit",
   "diff",
@@ -142,6 +143,10 @@ _cpm_completions() {
       COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --warnings --min-severity --sort" -- "\${cur}") )
       return 0
       ;;
+    stats)
+      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global" -- "\${cur}") )
+      return 0
+      ;;
     ui)
       COMPREPLY=( \$(compgen -W "--root --depth --no-global" -- "\${cur}") )
       return 0
@@ -206,6 +211,7 @@ function zshScript(): string {
     const desc: Record<string, string> = {
       ui: "Launch interactive TUI",
       list: "List all Claude projects",
+      stats: "Show aggregate permission statistics",
       show: "Show project permissions",
       audit: "Report risky permissions",
       diff: "Compare two projects",
@@ -307,6 +313,13 @@ ${commandDefs}
             '--warnings[Only show projects with warnings]' \\
             '--min-severity[Only show projects with warnings at or above severity]:severity:(critical high medium low)' \\
             '--sort[Sort projects by field]:sort:(name warnings mode)'
+          ;;
+        stats)
+          _arguments \\
+            '--root[Root directory]:root:_directories' \\
+            '--depth[Max scan depth]:depth:' \\
+            '--json[Output as JSON]' \\
+            '--no-global[Skip user and managed global settings]'
           ;;
         ui)
           _arguments \\

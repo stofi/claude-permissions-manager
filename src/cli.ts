@@ -59,10 +59,11 @@ program
   .description("List all discovered Claude projects and their permissions")
   .option("--json", "Output as JSON")
   .option("--warnings", "Only show projects that have permission warnings")
+  .addOption(new Option("--min-severity <level>", "Only show projects with warnings at or above this severity").choices(["critical", "high", "medium", "low"]))
   .addOption(new Option("--sort <field>", "Sort projects by field").choices(["name", "warnings", "mode"]))
   .action(async (opts) => {
     const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
-    await listCommand({ root, maxDepth: parseDepth(depth), json: opts.json, includeGlobal: g !== false, warningsOnly: opts.warnings, sort: opts.sort });
+    await listCommand({ root, maxDepth: parseDepth(depth), json: opts.json, includeGlobal: g !== false, warningsOnly: opts.warnings, minSeverity: opts.minSeverity as import("./core/types.js").WarningSeverity | undefined, sort: opts.sort });
   });
 
 program

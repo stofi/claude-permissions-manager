@@ -18,11 +18,13 @@ npx claude-permissions-manager
 
 ```bash
 cpm                         # Launch interactive TUI (when stdout is a TTY)
-cpm list                    # List all projects with their permission modes
-cpm list --warnings         # Only show projects that have permission warnings
-cpm list --sort warnings    # Sort by warning count (most warnings first)
-cpm list --sort name        # Sort alphabetically by path
-cpm list --sort mode        # Sort by permission mode
+cpm list                           # List all projects with their permission modes
+cpm list --warnings                # Only show projects that have permission warnings
+cpm list --min-severity high       # Only show projects with high or critical warnings
+cpm list --min-severity critical   # Only show projects with critical warnings
+cpm list --sort warnings           # Sort by warning count (most warnings first)
+cpm list --sort name               # Sort alphabetically by path
+cpm list --sort mode               # Sort by permission mode
 cpm show                    # Show permissions for current project (cwd)
 cpm show ~/my-project       # Show detailed permissions for a specific project
 cpm audit                   # Report risky permissions across all projects
@@ -125,6 +127,7 @@ Creates the file (empty `{}`) if it doesn't already exist, then opens it in `$VI
 --json             Output as JSON (list, show, audit, diff, export)
 --no-global        Skip user/managed global settings (list, show, audit, diff, export, ui)
 --sort <field>     Sort projects by: name | warnings | mode (list only; warnings = most warnings first)
+--min-severity     Only show/report issues at or above severity: critical | high | medium | low (list and audit)
 --exit-code        Exit 1 if issues found, 2 if critical issues (audit only — useful in CI)
 --fix              Auto-apply all available fix commands (audit only)
 --yes / -y         Skip confirmation prompt when using --fix (audit only)

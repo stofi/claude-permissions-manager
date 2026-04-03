@@ -2,7 +2,9 @@ import chalk from "chalk";
 import { scan } from "../core/discovery.js";
 import { formatProjectTable } from "../utils/format.js";
 import { collapseHome } from "../utils/paths.js";
+import { SEVERITY_ORDER } from "../core/types.js";
 import type { ScanOptions } from "../core/discovery.js";
+import type { WarningSeverity } from "../core/types.js";
 
 type SortField = "name" | "warnings" | "mode";
 
@@ -15,13 +17,24 @@ function sortProjects(projects: Awaited<ReturnType<typeof scan>>["projects"], so
   });
 }
 
-export async function listCommand(options: ScanOptions & { json?: boolean; warningsOnly?: boolean; sort?: string }): Promise<void> {
+export async function listCommand(options: ScanOptions & { json?: boolean; warningsOnly?: boolean; sort?: string; minSeverity?: WarningSeverity }): Promise<void> {
   process.stderr.write(chalk.gray("Scanning for Claude projects...\n"));
 
   const result = await scan(options);
 
-  const filtered = options.warningsOnly
-    ? result.projects.filter((p) => p.effectivePermissions.warnings.length > 0)
+  // --min-severity filters to projects with at least one warning at that level or higher.
+  // --warnings (without --min-severity) shows all projects with any warnings.
+  const minSevIdx = options.minSeverity !== undefined
+    ? SEVERITY_ORDER.indexOf(options.minSeverity)
+    : SEVERITY_ORDER.length - 1; // "low" (all severities)
+
+  const isWarningsFilter = options.warningsOnly || options.minSeverity !== undefined;
+  const filtered = isWarningsFilter
+    ? result.projects.filter((p) =>
+        p.effectivePermissions.warnings.some(
+          (w) => SEVERITY_ORDER.indexOf(w.severity) <= minSevIdx
+        )
+      )
     : result.projects;
 
   const projects = options.sort && (["name", "warnings", "mode"] as string[]).includes(options.sort)
@@ -33,6 +46,7 @@ export async function listCommand(options: ScanOptions & { json?: boolean; warni
       generatedAt: result.scannedAt.toISOString(),
       scanRoot: result.scanRoot,
       projectCount: projects.length,
+      minSeverity: options.minSeverity ?? null,
       projects: projects.map((p) => ({
         path: p.rootPath,
         mode: p.effectivePermissions.defaultMode,
@@ -68,8 +82,9 @@ export async function listCommand(options: ScanOptions & { json?: boolean; warni
     return;
   }
 
-  if (options.warningsOnly && projects.length === 0) {
-    console.log(chalk.green(`\n✓ No warnings found across ${result.projects.length} project(s).`));
+  if (isWarningsFilter && projects.length === 0) {
+    const filterNote = options.minSeverity ? ` at ${options.minSeverity}+ severity` : "";
+    console.log(chalk.green(`\n✓ No warnings${filterNote} found across ${result.projects.length} project(s).`));
     return;
   }
 
@@ -81,8 +96,9 @@ export async function listCommand(options: ScanOptions & { json?: boolean; warni
     console.log(chalk.dim(`Managed settings: ${collapseHome(result.global.managed.path)}`));
   }
 
-  const countLabel = options.warningsOnly
-    ? `${chalk.bold(projects.length)} of ${result.projects.length} project(s) have warnings`
+  const severityLabel = options.minSeverity ? `${options.minSeverity}+ ` : "";
+  const countLabel = isWarningsFilter
+    ? `${chalk.bold(projects.length)} of ${result.projects.length} project(s) have ${severityLabel}warnings`
     : `${chalk.bold(projects.length)} project(s)`;
   console.log(`\nFound ${countLabel}\n`);
   console.log(formatProjectTable(projects));

@@ -139,7 +139,7 @@ _cpm_completions() {
       return 0
       ;;
     list)
-      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --warnings --sort" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --warnings --min-severity --sort" -- "\${cur}") )
       return 0
       ;;
     ui)
@@ -305,6 +305,7 @@ ${commandDefs}
             '--json[Output as JSON]' \\
             '--no-global[Skip user and managed global settings]' \\
             '--warnings[Only show projects with warnings]' \\
+            '--min-severity[Only show projects with warnings at or above severity]:severity:(critical high medium low)' \\
             '--sort[Sort projects by field]:sort:(name warnings mode)'
           ;;
         ui)

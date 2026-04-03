@@ -4686,6 +4686,25 @@ describe("copyCommand", () => {
     expect(data.permissions.deny).toContain("Write");            // local scope deny
     expect(data.permissions.ask).toContain("Bash(git *)");       // local scope ask
   });
+
+  it("local-scope mode takes precedence over project-scope mode (copy.ts:57 sort false branch)", async () => {
+    // Source has defaultMode in BOTH settings.json (project scope, "acceptEdits") and
+    // settings.local.json (local scope, "plan"). The sort at copy.ts:57 places local first.
+    // The false branch `(a.scope === "local" ? -1 : 1)` fires for the project-scope element.
+    await writeFile(
+      join(srcDir, ".claude", "settings.local.json"),
+      JSON.stringify({ permissions: { defaultMode: "plan" } }),
+      "utf-8"
+    );
+    // srcDir/.claude/settings.json already has defaultMode: "acceptEdits" (from beforeEach)
+    vi.spyOn(console, "log").mockImplementation(() => { /* suppress */ });
+    await copyCommand(srcDir, dstDir, { yes: true });
+
+    const content = await readFile(join(dstDir, ".claude", "settings.local.json"), "utf-8");
+    const data = JSON.parse(content);
+    // Local scope mode "plan" wins over project scope mode "acceptEdits"
+    expect(data.permissions.defaultMode).toBe("plan");
+  });
 });
 
 // ────────────────────────────────────────────────────────────

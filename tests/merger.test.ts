@@ -990,6 +990,19 @@ describe("mergeSettingsFiles — Warning.fixCmd", () => {
     const w = result.warnings.find((w) => /disableBypassPermissionsMode/.test(w.message));
     expect(w?.fixCmd).toBe("cpm bypass-lock on --scope local");
   });
+
+  it("bypass-lock fixCmd falls back to 'local' when rules exist only in managed scope (merger.ts:93 ?? branch)", () => {
+    // Rules come ONLY from managed scope. settingsFiles.find() skips managed → returns undefined
+    // → undefined?.scope ?? "local" fires → fixCmd targets "local" as fallback scope.
+    const managed = makeFile("managed", {
+      permissions: { allow: ["Bash(npm run *)"], deny: ["Read(**/.env)"] },
+    });
+    const result = mergeSettingsFiles([managed]);
+    const w = result.warnings.find((w) => /disableBypassPermissionsMode/.test(w.message));
+    expect(w).toBeDefined();
+    expect(w?.fixCmd).toBe("cpm bypass-lock on --scope local");
+    expect(w?.fixOp).toEqual({ kind: "bypass-lock", enabled: true, scope: "local" });
+  });
 });
 
 describe("mergeSettingsFiles — non-string array element guards", () => {

@@ -618,7 +618,13 @@ describe("exportCommand — Markdown format", () => {
     );
     await writeFile(
       join(root, "my-proj", ".mcp.json"),
-      JSON.stringify({ mcpServers: { srv: { command: "node", args: ["s.js"] } } })
+      // Include both stdio and HTTP servers to cover type==="http" branch in toMarkdown
+      JSON.stringify({
+        mcpServers: {
+          srv: { command: "node", args: ["s.js"] },
+          httpSrv: { type: "http", url: "https://api.example.com/mcp" },
+        },
+      })
     );
     // Second project: no bypass lock (covers isBypassDisabled=false branch in toMarkdown)
     const dir2 = join(root, "plain-proj", ".claude");
@@ -6134,6 +6140,63 @@ describe("batchRemoveCommand — reset --all", () => {
     const out = lines.join("\n");
     expect(out).toMatch(/allow/);
   });
+
+  it("reports write errors and exits 1 when a project is not writable", async () => {
+    const claudeDir = join(root, "proj-a", ".claude");
+    chmodSync(claudeDir, 0o555);
+
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+
+    try {
+      await expect(
+        batchRemoveCommand("Bash(npm run *)", {
+          root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+        })
+      ).rejects.toThrow("exit:1");
+    } finally {
+      chmodSync(claudeDir, 0o755);
+      exitSpy.mockRestore();
+    }
+    expect(lines.join("\n")).toMatch(/1 error/i);
+  });
+
+  it("no 'Skipped' message in dry-run when all projects have the rule", async () => {
+    // Give proj-c the rule so notPresent is empty → covers if (notPresent.length > 0) false branch (dry-run)
+    await writeFile(
+      join(root, "proj-c", ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(npm run *)", "Read(*)"] } })
+    );
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchRemoveCommand("Bash(npm run *)", {
+      root, maxDepth: 2, includeGlobal: false, dryRun: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/\[dry-run\]/);
+    expect(out).toMatch(/3 project/);
+    expect(out).not.toMatch(/Skipped/);
+  });
+
+  it("no 'Skipped' message in normal mode when all projects have the rule", async () => {
+    // Give proj-c the rule so notPresent is empty → covers if (notPresent.length > 0) false branch (normal)
+    await writeFile(
+      join(root, "proj-c", ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(npm run *)", "Read(*)"] } })
+    );
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchRemoveCommand("Bash(npm run *)", {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/Removed from 3 project/);
+    expect(out).not.toMatch(/Skipped/);
+  });
 });
 
 describe("batchModeCommand — mode --all", () => {
@@ -6305,6 +6368,42 @@ describe("batchModeCommand — mode --all", () => {
     const out = lines.join("\n");
     // proj-a shows acceptEdits → default
     expect(out).toMatch(/acceptEdits.*→.*default/);
+  });
+
+  it("no 'Skipped' message when no project is already at target mode", async () => {
+    // All projects have acceptEdits/auto/default → none have "plan" → alreadySet empty
+    // covers if (alreadySet.length > 0) false branch in non-dry-run path
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchModeCommand("plan", {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/Updated 3 project/);
+    expect(out).not.toMatch(/Skipped/);
+  });
+
+  it("reports write errors and exits 1 when a project is not writable", async () => {
+    const claudeDir = join(root, "proj-a", ".claude");
+    chmodSync(claudeDir, 0o555);
+
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+
+    try {
+      await expect(
+        batchModeCommand("default", {
+          root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+        })
+      ).rejects.toThrow("exit:1");
+    } finally {
+      chmodSync(claudeDir, 0o755);
+      exitSpy.mockRestore();
+    }
+    expect(lines.join("\n")).toMatch(/1 error/i);
   });
 });
 
@@ -6518,5 +6617,80 @@ describe("batchReplaceCommand — replace --all", () => {
     } finally {
       rmSync(emptyRoot, { recursive: true, force: true });
     }
+  });
+
+  it("exits 1 on invalid old rule", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((c) => { throw new Error(`exit:${c}`); });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(
+      batchReplaceCommand("", "Read(*)", { root, maxDepth: 2, includeGlobal: false })
+    ).rejects.toThrow("exit:1");
+    exitSpy.mockRestore(); errSpy.mockRestore();
+  });
+
+  it("exits 1 on invalid new rule", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((c) => { throw new Error(`exit:${c}`); });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(
+      batchReplaceCommand("Bash(*)", "", { root, maxDepth: 2, includeGlobal: false })
+    ).rejects.toThrow("exit:1");
+    exitSpy.mockRestore(); errSpy.mockRestore();
+  });
+
+  it("reports write errors and exits 1 when a project is not writable", async () => {
+    const claudeDir = join(root, "proj-a", ".claude");
+    chmodSync(claudeDir, 0o555);
+
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+
+    try {
+      await expect(
+        batchReplaceCommand("Bash(npm run dev)", "Bash(npm run start)", {
+          root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+        })
+      ).rejects.toThrow("exit:1");
+    } finally {
+      chmodSync(claudeDir, 0o755);
+      exitSpy.mockRestore();
+    }
+    expect(lines.join("\n")).toMatch(/1 error/i);
+  });
+
+  it("no 'Skipped' message when all projects have the old rule (dry-run)", async () => {
+    // Give proj-c the old rule so notPresent is empty → covers if (notPresent.length > 0) false branch
+    await writeFile(
+      join(root, "proj-c", ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(npm run dev)", "Read(*)"] } })
+    );
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchReplaceCommand("Bash(npm run dev)", "Bash(npm run start)", {
+      root, maxDepth: 2, includeGlobal: false, dryRun: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/\[dry-run\]/);
+    expect(out).toMatch(/3 project/);
+    expect(out).not.toMatch(/Skipped/);
+  });
+
+  it("no 'Skipped' message when all projects have the old rule (normal mode)", async () => {
+    // Give proj-c the old rule so notPresent is empty → covers if (notPresent.length > 0) false branch
+    await writeFile(
+      join(root, "proj-c", ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(npm run dev)", "Read(*)"] } })
+    );
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchReplaceCommand("Bash(npm run dev)", "Bash(npm run start)", {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/Replaced in 3 project/);
+    expect(out).not.toMatch(/Skipped/);
   });
 });

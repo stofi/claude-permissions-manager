@@ -5,6 +5,7 @@ import { listCommand } from "./commands/list.js";
 import { showCommand } from "./commands/show.js";
 import { auditCommand } from "./commands/audit.js";
 import { statsCommand } from "./commands/stats.js";
+import { searchCommand } from "./commands/search.js";
 import { homeDir } from "./utils/paths.js";
 import { PermissionModeSchema } from "./core/schemas.js";
 import { WRITABLE_SCOPES } from "./core/types.js";
@@ -74,6 +75,21 @@ program
   .action(async (opts) => {
     const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
     await statsCommand({ root, maxDepth: parseDepth(depth), json: opts.json, includeGlobal: g !== false });
+  });
+
+program
+  .command("search <pattern>")
+  .description("Search for projects that have rules matching a pattern")
+  .option("--json", "Output as JSON")
+  .option("--exact", "Exact rule match (default: substring)")
+  .addOption(new Option("--type <type>", "Only search in this rule list").choices(["allow", "deny", "ask"]))
+  .addOption(new Option("--scope <scope>", "Only match rules in this scope").choices(["local", "project", "user", "managed"]))
+  .action(async (pattern, opts) => {
+    const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
+    await searchCommand(pattern, {
+      root, maxDepth: parseDepth(depth), json: opts.json, includeGlobal: g !== false,
+      exact: opts.exact, type: opts.type, scope: opts.scope,
+    });
   });
 
 program

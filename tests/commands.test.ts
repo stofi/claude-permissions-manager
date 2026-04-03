@@ -2,7 +2,7 @@
  * Integration tests for CLI commands: initCommand, exportCommand, listCommand, manage commands
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, symlinkSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync, symlinkSync, chmodSync } from "fs";
 import { readFile, mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -612,6 +612,7 @@ describe("exportCommand — Markdown format", () => {
           disableBypassPermissionsMode: "disable",
           allow: ["Bash(npm run *)"],
           deny: ["Read(**/.env)"],
+          ask: ["WebSearch(*)"],
         },
       })
     );
@@ -619,6 +620,10 @@ describe("exportCommand — Markdown format", () => {
       join(root, "my-proj", ".mcp.json"),
       JSON.stringify({ mcpServers: { srv: { command: "node", args: ["s.js"] } } })
     );
+    // Second project: no bypass lock (covers isBypassDisabled=false branch in toMarkdown)
+    const dir2 = join(root, "plain-proj", ".claude");
+    await mkdir(dir2, { recursive: true });
+    await writeFile(join(dir2, "settings.json"), JSON.stringify({ permissions: {} }));
   });
 
   afterEach(() => rmSync(root, { recursive: true, force: true }));
@@ -675,7 +680,7 @@ describe("exportCommand — Markdown format", () => {
     const md = await captureMarkdown();
     expect(md).toMatch(/Generated:/);
     expect(md).toMatch(/Scan root:/);
-    expect(md).toMatch(/Projects: 1/);
+    expect(md).toMatch(/Projects: 2/);
   });
 
   it("writes markdown to file when --output is set", async () => {
@@ -684,6 +689,12 @@ describe("exportCommand — Markdown format", () => {
     await exportCommand({ root, maxDepth: 2, format: "markdown", output: outFile, includeGlobal: false });
     const content = await readFile(outFile, "utf-8");
     expect(content).toMatch(/# Claude Permissions Report/);
+  });
+
+  it("output includes ask rules section when project has ask rules", async () => {
+    const md = await captureMarkdown();
+    expect(md).toMatch(/### Ask rules/);
+    expect(md).toMatch(/`WebSearch\(\*\)`/);
   });
 });
 
@@ -5723,6 +5734,38 @@ describe("rulesCommand", () => {
     const out = await captureRulesText({ top: 1 });
     expect(out).toMatch(/top 1/);
   });
+
+  it("text output includes 'ask' label for ask-type rules", async () => {
+    // Override proj-a with only ask rules so --type ask filter works
+    await writeFile(
+      join(root, "proj-a", ".claude", "settings.json"),
+      JSON.stringify({ permissions: { ask: ["WebFetch(*)"] } })
+    );
+    const out = await captureRulesText({ type: "ask" });
+    expect(out).toMatch(/ask/);
+    expect(out).toMatch(/WebFetch/);
+  });
+
+  it("text output for large scan (>20 projects) does not show per-project paths", async () => {
+    const bigRoot = mkdtempSync(join(tmpdir(), "cpm-rules-big-"));
+    try {
+      for (let i = 0; i < 21; i++) {
+        const dir = join(bigRoot, `proj-${i}`, ".claude");
+        await mkdir(dir, { recursive: true });
+        await writeFile(join(dir, "settings.json"), JSON.stringify({ permissions: { allow: ["Bash(*)"] } }));
+      }
+      const lines: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+      vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      await rulesCommand({ root: bigRoot, maxDepth: 2, includeGlobal: false });
+      const out = lines.join("\n");
+      expect(out).toMatch(/21 project/);
+      // Individual project paths suppressed for large scans
+      expect(out).not.toMatch(/proj-0/);
+    } finally {
+      rmSync(bigRoot, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("batchAddCommand — allow --all", () => {
@@ -5870,5 +5913,61 @@ describe("batchAddCommand — allow --all", () => {
     } finally {
       rmSync(emptyRoot, { recursive: true, force: true });
     }
+  });
+
+  it("--dry-run shows 'Skipped N already-present' when some projects already have rule", async () => {
+    // proj-a already has the rule; proj-b does not
+    await writeFile(
+      join(root, "proj-a", ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(npm run *)"] } })
+    );
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchAddCommand("Bash(npm run *)", "allow", {
+      root, maxDepth: 2, includeGlobal: false, dryRun: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/\[dry-run\]/);
+    expect(out).toMatch(/Skipped 1 already-present/);
+    expect(out).toMatch(/proj-b/);
+  });
+
+  it("works with ask list", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchAddCommand("WebFetch(*)", "ask", {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/Added to 2 project/);
+    for (const name of ["proj-a", "proj-b"]) {
+      const file = JSON.parse(await readFile(join(root, name, ".claude", "settings.json"), "utf-8"));
+      expect(file.permissions?.ask).toContain("WebFetch(*)");
+    }
+  });
+
+  it("reports write errors and exits 1 when a project is not writable", async () => {
+    // Make proj-a's .claude directory read-only (no write permission)
+    const claudeDir = join(root, "proj-a", ".claude");
+    chmodSync(claudeDir, 0o555);
+
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+
+    try {
+      await expect(
+        batchAddCommand("Bash(npm run *)", "allow", {
+          root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+        })
+      ).rejects.toThrow("exit:1");
+    } finally {
+      chmodSync(claudeDir, 0o755);
+      exitSpy.mockRestore();
+    }
+    expect(lines.join("\n")).toMatch(/1 error/i);
   });
 });

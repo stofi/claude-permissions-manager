@@ -138,10 +138,17 @@ program
   .description('Add a rule to the allow list (e.g. cpm allow "Bash(npm run *)")')
   .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
+  .option("--all", "Apply to all discovered projects")
+  .option("--yes", "Skip confirmation prompt (with --all)")
   .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (rule, opts) => {
-    const { allowCommand } = await import("./commands/manage.js");
-    await allowCommand(rule, { ...opts, dryRun: opts.dryRun });
+    const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
+    const { allowCommand, batchAddCommand } = await import("./commands/manage.js");
+    if (opts.all) {
+      await batchAddCommand(rule, "allow", { root, maxDepth: parseDepth(depth), includeGlobal: g !== false, ...opts, dryRun: opts.dryRun });
+    } else {
+      await allowCommand(rule, { ...opts, dryRun: opts.dryRun });
+    }
   });
 
 program
@@ -149,10 +156,17 @@ program
   .description('Add a rule to the deny list (e.g. cpm deny "Read(**/.env)")')
   .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
+  .option("--all", "Apply to all discovered projects")
+  .option("--yes", "Skip confirmation prompt (with --all)")
   .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (rule, opts) => {
-    const { denyCommand } = await import("./commands/manage.js");
-    await denyCommand(rule, { ...opts, dryRun: opts.dryRun });
+    const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
+    const { denyCommand, batchAddCommand } = await import("./commands/manage.js");
+    if (opts.all) {
+      await batchAddCommand(rule, "deny", { root, maxDepth: parseDepth(depth), includeGlobal: g !== false, ...opts, dryRun: opts.dryRun });
+    } else {
+      await denyCommand(rule, { ...opts, dryRun: opts.dryRun });
+    }
   });
 
 program
@@ -160,10 +174,17 @@ program
   .description('Add a rule to the ask list (always prompt for confirmation)')
   .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
+  .option("--all", "Apply to all discovered projects")
+  .option("--yes", "Skip confirmation prompt (with --all)")
   .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (rule, opts) => {
-    const { askCommand } = await import("./commands/manage.js");
-    await askCommand(rule, { ...opts, dryRun: opts.dryRun });
+    const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
+    const { askCommand, batchAddCommand } = await import("./commands/manage.js");
+    if (opts.all) {
+      await batchAddCommand(rule, "ask", { root, maxDepth: parseDepth(depth), includeGlobal: g !== false, ...opts, dryRun: opts.dryRun });
+    } else {
+      await askCommand(rule, { ...opts, dryRun: opts.dryRun });
+    }
   });
 
 program

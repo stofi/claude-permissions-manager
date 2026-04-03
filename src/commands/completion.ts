@@ -173,7 +173,7 @@ _cpm_completions() {
       if [[ "\${cur}" != -* ]]; then
         COMPREPLY=( \$(compgen -W "${toolList}" -- "\${cur}") )
       else
-        COMPREPLY=( \$(compgen -W "--scope --project --dry-run" -- "\${cur}") )
+        COMPREPLY=( \$(compgen -W "--scope --project --dry-run --all --yes --root --depth" -- "\${cur}") )
       fi
       return 0
       ;;
@@ -296,6 +296,10 @@ ${commandDefs}
             '--scope[Settings scope]:scope:(${scopeList})' \\
             '--project[Project path]:project:_directories' \\
             '--dry-run[Preview without writing]' \\
+            '--all[Apply to all discovered projects]' \\
+            '--yes[Skip confirmation prompt (with --all)]' \\
+            '--root[Root directory for --all scan]:root:_directories' \\
+            '--depth[Max scan depth for --all]:depth:' \\
             '1:rule:(${toolList})'
           ;;
         reset)

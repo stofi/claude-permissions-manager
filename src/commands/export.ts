@@ -6,7 +6,7 @@ import { collapseHome } from "../utils/paths.js";
 import type { ScanOptions } from "../core/discovery.js";
 import type { ClaudeProject, SettingsFile } from "../core/types.js";
 
-type ExportFormat = "json" | "csv";
+type ExportFormat = "json" | "csv" | "markdown";
 
 /** Safely coerce a possibly-corrupt settings field to a string array */
 function toStringArray(val: unknown): string[] {
@@ -54,6 +54,75 @@ function projectToJsonRecord(project: ClaudeProject, globalFiles: SettingsFile[]
   };
 }
 
+function toMarkdown(projects: ClaudeProject[], scanRoot: string, generatedAt: Date): string {
+  const lines: string[] = [];
+  lines.push(`# Claude Permissions Report`);
+  lines.push(``);
+  lines.push(`Generated: ${generatedAt.toISOString()}`);
+  lines.push(`Scan root: \`${collapseHome(scanRoot)}\``);
+  lines.push(`Projects: ${projects.length}`);
+
+  for (const project of projects) {
+    const perms = project.effectivePermissions;
+    lines.push(``);
+    lines.push(`---`);
+    lines.push(``);
+    lines.push(`## \`${collapseHome(project.rootPath)}\``);
+    lines.push(``);
+    lines.push(`**Mode**: \`${perms.defaultMode}\`  `);
+    lines.push(`**Bypass locked**: ${perms.isBypassDisabled ? "yes" : "no"}`);
+
+    if (perms.allow.length > 0) {
+      lines.push(``);
+      lines.push(`### Allow rules`);
+      for (const r of perms.allow) {
+        lines.push(`- \`${r.raw}\` _(${r.scope})_`);
+      }
+    }
+
+    if (perms.deny.length > 0) {
+      lines.push(``);
+      lines.push(`### Deny rules`);
+      for (const r of perms.deny) {
+        lines.push(`- \`${r.raw}\` _(${r.scope})_`);
+      }
+    }
+
+    if (perms.ask.length > 0) {
+      lines.push(``);
+      lines.push(`### Ask rules`);
+      for (const r of perms.ask) {
+        lines.push(`- \`${r.raw}\` _(${r.scope})_`);
+      }
+    }
+
+    if (perms.mcpServers.length > 0) {
+      lines.push(``);
+      lines.push(`### MCP servers`);
+      for (const s of perms.mcpServers) {
+        const type = s.type ?? "stdio";
+        const approval = s.approvalState ?? "pending";
+        const detail = type === "http" ? `http, ${approval}` : `stdio, ${approval}`;
+        lines.push(`- \`${s.name}\` — ${detail} _(${s.scope})_`);
+      }
+    }
+
+    if (perms.warnings.length > 0) {
+      lines.push(``);
+      lines.push(`### Warnings`);
+      for (const w of perms.warnings) {
+        lines.push(`- **${w.severity}**: ${w.message}`);
+        if (w.fixCmd) {
+          lines.push(`  Fix: \`${w.fixCmd}\``);
+        }
+      }
+    }
+  }
+
+  lines.push(``);
+  return lines.join("\n");
+}
+
 function toCsv(projects: ClaudeProject[]): string {
   const headers = [
     "path",
@@ -87,8 +156,8 @@ export async function exportCommand(
   options: ScanOptions & { format?: string; output?: string }
 ): Promise<void> {
   const format = (options.format ?? "json") as ExportFormat;
-  if (format !== "json" && format !== "csv") {
-    console.error(chalk.red(`Unknown format "${format}". Use: json, csv`));
+  if (format !== "json" && format !== "csv" && format !== "markdown") {
+    console.error(chalk.red(`Unknown format "${format}". Use: json, csv, markdown`));
     process.exit(1);
   }
 
@@ -144,6 +213,8 @@ export async function exportCommand(
       errors: result.errors,
     };
     output = JSON.stringify(data, null, 2);
+  } else if (format === "markdown") {
+    output = toMarkdown(result.projects, result.scanRoot, result.scannedAt);
   } else {
     output = toCsv(result.projects);
   }

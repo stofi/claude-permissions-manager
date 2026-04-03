@@ -41,7 +41,9 @@ cpm diff <path1> <path2>    # Compare two projects side by side
 cpm copy <source> <target>  # Copy project-level permissions to another project
 cpm export                  # Dump all permissions as JSON (stdout)
 cpm export --format csv     # Dump as CSV
+cpm export --format markdown  # Generate a Markdown report
 cpm export --output out.json  # Write to file
+cpm export --format markdown --output report.md  # Markdown report to file
 ```
 
 ### Initialize a project
@@ -137,7 +139,7 @@ Creates the file (empty `{}`) if it doesn't already exist, then opens it in `$VI
 --fix              Auto-apply all available fix commands (audit only)
 --yes / -y         Skip confirmation prompt when using --fix (audit only)
 --dry-run          Preview what would be written without modifying files (allow, deny, ask, reset, mode, init, copy)
---format <fmt>     Output format: json|csv (export only, default: json)
+--format <fmt>     Output format: json|csv|markdown (export only, default: json)
 --output <file>    Write output to file instead of stdout (export only)
 --exact            Exact rule match instead of substring (search only)
 --type <type>      Only search in this rule list: allow | deny | ask (search only)

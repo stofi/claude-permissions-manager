@@ -4908,6 +4908,116 @@ describe("listCommand — --warningsOnly", () => {
 });
 
 // ────────────────────────────────────────────────────────────
+// listCommand — --min-severity
+// ────────────────────────────────────────────────────────────
+
+describe("listCommand — --min-severity", () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), "cpm-list-minsev-"));
+    // bypass project → CRITICAL warning
+    const bypassDir = join(root, "bypass-proj", ".claude");
+    await mkdir(bypassDir, { recursive: true });
+    await writeFile(
+      join(bypassDir, "settings.json"),
+      JSON.stringify({ permissions: { defaultMode: "bypassPermissions" } })
+    );
+    // acceptEdits project → MEDIUM warning
+    const mediumDir = join(root, "medium-proj", ".claude");
+    await mkdir(mediumDir, { recursive: true });
+    await writeFile(
+      join(mediumDir, "settings.json"),
+      JSON.stringify({ permissions: { defaultMode: "acceptEdits", disableBypassPermissionsMode: "disable" } })
+    );
+    // clean project → no warnings
+    const cleanDir = join(root, "clean-proj", ".claude");
+    await mkdir(cleanDir, { recursive: true });
+    await writeFile(
+      join(cleanDir, "settings.json"),
+      JSON.stringify({ permissions: { disableBypassPermissionsMode: "disable" } })
+    );
+  });
+
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it("--min-severity critical shows only projects with critical warnings", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await listCommand({ root, maxDepth: 2, json: true, includeGlobal: false, minSeverity: "critical" });
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    // Only bypass-proj has a critical warning
+    expect(json.projectCount).toBe(1);
+    expect(json.projects[0].path).toMatch(/bypass-proj/);
+    expect(json.minSeverity).toBe("critical");
+  });
+
+  it("--min-severity medium shows critical and medium projects", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await listCommand({ root, maxDepth: 2, json: true, includeGlobal: false, minSeverity: "medium" });
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    // bypass-proj (critical) + medium-proj (medium), not clean-proj
+    expect(json.projectCount).toBe(2);
+    expect(json.minSeverity).toBe("medium");
+    const paths = json.projects.map((p: { path: string }) => p.path);
+    expect(paths.some((p: string) => p.includes("bypass-proj"))).toBe(true);
+    expect(paths.some((p: string) => p.includes("medium-proj"))).toBe(true);
+    expect(paths.some((p: string) => p.includes("clean-proj"))).toBe(false);
+  });
+
+  it("JSON minSeverity is null when --min-severity is not set", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await listCommand({ root, maxDepth: 2, json: true, includeGlobal: false });
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(json.projectCount).toBe(3);
+    expect(json.minSeverity).toBeNull();
+  });
+
+  it("text output shows 'critical+ warnings' label with --min-severity critical", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await listCommand({ root, maxDepth: 2, json: false, includeGlobal: false, minSeverity: "critical" });
+    const output = lines.join("\n");
+    expect(output).toMatch(/1 of 3 project.*critical.*warning/i);
+  });
+
+  it("text output shows 'No warnings at critical+ severity' when no projects match", async () => {
+    // Use a root with only medium-severity projects
+    const medOnly = mkdtempSync(join(tmpdir(), "cpm-list-medonly-"));
+    try {
+      const dir = join(medOnly, "medium-only", ".claude");
+      await mkdir(dir, { recursive: true });
+      await writeFile(
+        join(dir, "settings.json"),
+        JSON.stringify({ permissions: { defaultMode: "acceptEdits", disableBypassPermissionsMode: "disable" } })
+      );
+      const lines: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+      await listCommand({ root: medOnly, maxDepth: 2, json: false, includeGlobal: false, minSeverity: "critical" });
+      const output = lines.join("\n");
+      expect(output).toMatch(/No warnings at critical\+ severity/);
+    } finally {
+      rmSync(medOnly, { recursive: true, force: true });
+    }
+  });
+
+  it("--min-severity works with --sort warnings (most-critical-first)", async () => {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    await listCommand({ root, maxDepth: 2, json: true, includeGlobal: false, minSeverity: "medium", sort: "warnings" });
+    const json = JSON.parse(calls.map((a) => a.join("")).join(""));
+    expect(json.projectCount).toBe(2);
+    // bypass-proj has more warnings (critical + others) than medium-proj
+    const paths = json.projects.map((p: { path: string }) => p.path);
+    const bypassIdx = paths.findIndex((p: string) => p.includes("bypass-proj"));
+    const mediumIdx = paths.findIndex((p: string) => p.includes("medium-proj"));
+    expect(bypassIdx).toBeLessThan(mediumIdx);
+  });
+});
+
+// ────────────────────────────────────────────────────────────
 // listCommand — --sort
 // ────────────────────────────────────────────────────────────
 

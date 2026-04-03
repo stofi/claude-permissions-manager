@@ -404,3 +404,99 @@ export async function batchAddCommand(
     process.exit(1);
   }
 }
+
+/** Remove a specific rule from all discovered projects at once. */
+export async function batchRemoveCommand(
+  rule: string,
+  opts: ScanOptions & {
+    scope?: string;
+    dryRun?: boolean;
+    yes?: boolean;
+    _confirmFn?: (q: string) => Promise<boolean>;
+  }
+): Promise<void> {
+  if (!rule || rule.trim() === "") {
+    console.error(chalk.red("Rule cannot be empty"));
+    process.exit(1);
+  }
+
+  const scope = resolveScope(opts.scope);
+  if (scope === "user") {
+    console.log(chalk.yellow(`⚠ --scope user already applies globally.`));
+    console.log(chalk.yellow(`  Use: cpm reset "${rule}" --scope user`));
+    return;
+  }
+
+  process.stderr.write(chalk.gray("Scanning for Claude projects...\n"));
+  const result = await scan(opts);
+  const { projects } = result;
+
+  if (projects.length === 0) {
+    console.log(chalk.yellow("No Claude projects found."));
+    return;
+  }
+
+  // Pre-check which projects contain the rule
+  const toRemove: Array<{ projectPath: string; lists: RuleList[] }> = [];
+  const notPresent: string[] = [];
+  for (const project of projects) {
+    const settingsPath = resolveSettingsPath(scope, project.rootPath);
+    const check = await removeRule(rule, settingsPath, undefined, { dryRun: true });
+    if (check.removed) {
+      toRemove.push({ projectPath: project.rootPath, lists: check.removedFrom });
+    } else {
+      notPresent.push(project.rootPath);
+    }
+  }
+
+  if (toRemove.length === 0) {
+    console.log(chalk.yellow(`Rule "${rule}" not found in any project.`));
+    return;
+  }
+
+  if (opts.dryRun) {
+    console.log(chalk.cyan(`[dry-run] No files will be modified`));
+    console.log(`\nWould remove "${chalk.bold(rule)}" from ${toRemove.length} project(s):`);
+    for (const { projectPath, lists } of toRemove) {
+      console.log(`  ${collapseHome(projectPath)} ${chalk.dim("(" + lists.join(", ") + ")")}`);
+    }
+    if (notPresent.length > 0) {
+      console.log(chalk.gray(`\nSkipped ${notPresent.length} without rule.`));
+    }
+    return;
+  }
+
+  console.log(`\nWill remove "${chalk.bold(rule)}" from ${toRemove.length} project(s):`);
+  for (const { projectPath, lists } of toRemove) {
+    console.log(`  ${collapseHome(projectPath)} ${chalk.dim("(" + lists.join(", ") + ")")}`);
+  }
+  if (notPresent.length > 0) {
+    console.log(chalk.gray(`\nSkipped ${notPresent.length} without rule.`));
+  }
+
+  const confirmFn = opts._confirmFn ?? promptConfirm;
+  const proceed = opts.yes || await confirmFn(chalk.yellow("\nApply to all? [Y/n] "));
+  if (!proceed) {
+    console.log(chalk.gray("Aborted."));
+    return;
+  }
+
+  let removed = 0;
+  const errors: string[] = [];
+  for (const { projectPath } of toRemove) {
+    const settingsPath = resolveSettingsPath(scope, projectPath);
+    try {
+      await removeRule(rule, settingsPath);
+      removed++;
+    } catch (e) {
+      errors.push(`${collapseHome(projectPath)}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  console.log(chalk.green(`\n✓ Removed from ${removed} project(s)`));
+  if (errors.length > 0) {
+    console.log(chalk.red(`\n${errors.length} error(s):`));
+    for (const err of errors) console.log(chalk.red(`  ${err}`));
+    process.exit(1);
+  }
+}

@@ -230,7 +230,7 @@ function zshScript(): string {
       allow: "Add allow rule",
       deny: "Add deny rule",
       ask: "Add ask rule",
-      reset: "Remove rule(s)",
+      reset: "Remove rule (--all = batch across projects)",
       mode: "Set default mode",
       "bypass-lock": "Enable/disable bypass-permissions lock",
       copy: "Copy permissions to another project",

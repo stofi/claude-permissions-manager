@@ -189,15 +189,18 @@ program
 
 program
   .command("reset [rule]")
-  .description("Remove a rule from its list, or --all to clear all rules")
+  .description("Remove a rule, or --all to clear all rules / remove rule from all projects")
   .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
-  .option("--all", "Clear all permission rules")
+  .option("--all", "With rule: remove from all projects. Without rule: clear all rules in project")
   .option("--yes", "Skip confirmation prompt (with --all)")
   .option("--dry-run", "Preview what would be removed without modifying any files")
   .action(async (rule, opts) => {
-    const { resetRuleCommand, resetAllCommand } = await import("./commands/manage.js");
-    if (opts.all) {
+    const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
+    const { resetRuleCommand, resetAllCommand, batchRemoveCommand } = await import("./commands/manage.js");
+    if (opts.all && rule) {
+      await batchRemoveCommand(rule, { root, maxDepth: parseDepth(depth), includeGlobal: g !== false, ...opts, dryRun: opts.dryRun });
+    } else if (opts.all) {
       await resetAllCommand({ ...opts, dryRun: opts.dryRun });
     } else if (rule) {
       await resetRuleCommand(rule, { ...opts, dryRun: opts.dryRun });

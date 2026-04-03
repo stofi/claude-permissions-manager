@@ -28,7 +28,7 @@ import { editCommand } from "../src/commands/edit.js";
 import { statsCommand } from "../src/commands/stats.js";
 import { searchCommand } from "../src/commands/search.js";
 import { rulesCommand } from "../src/commands/rules.js";
-import { batchAddCommand } from "../src/commands/manage.js";
+import { batchAddCommand, batchRemoveCommand } from "../src/commands/manage.js";
 
 // ────────────────────────────────────────────────────────────
 // Helpers
@@ -5969,5 +5969,169 @@ describe("batchAddCommand — allow --all", () => {
       exitSpy.mockRestore();
     }
     expect(lines.join("\n")).toMatch(/1 error/i);
+  });
+});
+
+describe("batchRemoveCommand — reset --all", () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), "cpm-batch-rm-"));
+
+    // proj-a: has Bash(npm run *) in allow list
+    const dirA = join(root, "proj-a", ".claude");
+    await mkdir(dirA, { recursive: true });
+    await writeFile(
+      join(dirA, "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(npm run *)", "Read(*)"] } })
+    );
+
+    // proj-b: has Bash(npm run *) in allow list
+    const dirB = join(root, "proj-b", ".claude");
+    await mkdir(dirB, { recursive: true });
+    await writeFile(
+      join(dirB, "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(npm run *)"] } })
+    );
+
+    // proj-c: does NOT have Bash(npm run *)
+    const dirC = join(root, "proj-c", ".claude");
+    await mkdir(dirC, { recursive: true });
+    await writeFile(join(dirC, "settings.json"), JSON.stringify({ permissions: { allow: ["Read(*)"] } }));
+  });
+
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it("--yes removes rule from all matching projects", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchRemoveCommand("Bash(npm run *)", {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/Removed from 2 project/);
+    // proj-a should no longer have Bash(npm run *)
+    const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(fileA.permissions?.allow).not.toContain("Bash(npm run *)");
+    expect(fileA.permissions?.allow).toContain("Read(*)"); // other rule preserved
+    // proj-b should no longer have Bash(npm run *)
+    const fileB = JSON.parse(await readFile(join(root, "proj-b", ".claude", "settings.json"), "utf-8"));
+    expect(fileB.permissions?.allow).not.toContain("Bash(npm run *)");
+    // proj-c (no rule) untouched
+    const fileC = JSON.parse(await readFile(join(root, "proj-c", ".claude", "settings.json"), "utf-8"));
+    expect(fileC.permissions?.allow).toContain("Read(*)");
+  });
+
+  it("shows 'Skipped N without rule' for projects that don't have the rule", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchRemoveCommand("Bash(npm run *)", {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    expect(lines.join("\n")).toMatch(/Skipped 1 without rule/);
+  });
+
+  it("--dry-run shows preview without modifying files", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchRemoveCommand("Bash(npm run *)", {
+      root, maxDepth: 2, includeGlobal: false, dryRun: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/\[dry-run\]/);
+    expect(out).toMatch(/proj-a/);
+    expect(out).toMatch(/proj-b/);
+    // Files unchanged
+    const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(fileA.permissions?.allow).toContain("Bash(npm run *)");
+  });
+
+  it("--dry-run shows 'Skipped N without rule' in preview", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchRemoveCommand("Bash(npm run *)", {
+      root, maxDepth: 2, includeGlobal: false, dryRun: true, scope: "project",
+    });
+    expect(lines.join("\n")).toMatch(/Skipped 1 without rule/);
+  });
+
+  it("shows 'not found in any project' when no projects have the rule", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchRemoveCommand("NonExistent(*)", {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    expect(lines.join("\n")).toMatch(/not found in any project/i);
+  });
+
+  it("aborts when user declines confirmation", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchRemoveCommand("Bash(npm run *)", {
+      root, maxDepth: 2, includeGlobal: false, scope: "project",
+      _confirmFn: async () => false,
+    });
+    expect(lines.join("\n")).toMatch(/Aborted/i);
+    // Files unchanged
+    const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(fileA.permissions?.allow).toContain("Bash(npm run *)");
+  });
+
+  it("rejects empty rule", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(
+      batchRemoveCommand("", { root, maxDepth: 2, includeGlobal: false })
+    ).rejects.toThrow("exit:1");
+    exitSpy.mockRestore();
+    errSpy.mockRestore();
+  });
+
+  it("warns and returns when --scope user is specified", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchRemoveCommand("Bash(npm run *)", {
+      root, maxDepth: 2, includeGlobal: false, scope: "user",
+    });
+    expect(lines.join("\n")).toMatch(/user.*already applies/i);
+  });
+
+  it("shows no projects found when root is empty", async () => {
+    const emptyRoot = mkdtempSync(join(tmpdir(), "cpm-batch-rm-empty-"));
+    try {
+      const lines: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+      vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      await batchRemoveCommand("Bash(npm run *)", {
+        root: emptyRoot, maxDepth: 2, includeGlobal: false,
+      });
+      expect(lines.join("\n")).toMatch(/No Claude projects found/i);
+    } finally {
+      rmSync(emptyRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("shows list names in output (allow, deny, ask)", async () => {
+    // proj-a has rule in both allow and ask lists
+    await writeFile(
+      join(root, "proj-a", ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(npm run *)"], ask: ["Bash(npm run *)"] } })
+    );
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchRemoveCommand("Bash(npm run *)", {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    // The output should mention the lists the rule was found in
+    const out = lines.join("\n");
+    expect(out).toMatch(/allow/);
   });
 });

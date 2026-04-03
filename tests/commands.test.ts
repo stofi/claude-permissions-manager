@@ -26,6 +26,7 @@ import type { ClaudeProject } from "../src/core/types.js";
 import { completionCommand } from "../src/commands/completion.js";
 import { editCommand } from "../src/commands/edit.js";
 import { statsCommand } from "../src/commands/stats.js";
+import { searchCommand } from "../src/commands/search.js";
 
 // ────────────────────────────────────────────────────────────
 // Helpers
@@ -5292,6 +5293,145 @@ describe("statsCommand — text output", () => {
       expect(output).toMatch(/No Claude projects found/);
     } finally {
       rmSync(emptyRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("searchCommand", () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), "cpm-search-"));
+
+    // proj-a: allow Bash(npm run *), deny Read(**/.env)
+    const dirA = join(root, "proj-a", ".claude");
+    await mkdir(dirA, { recursive: true });
+    await writeFile(
+      join(dirA, "settings.json"),
+      JSON.stringify({
+        permissions: {
+          allow: ["Bash(npm run *)"],
+          deny: ["Read(**/.env)"],
+        },
+      })
+    );
+
+    // proj-b: allow WebFetch(*), ask Bash(git *)
+    const dirB = join(root, "proj-b", ".claude");
+    await mkdir(dirB, { recursive: true });
+    await writeFile(
+      join(dirB, "settings.json"),
+      JSON.stringify({
+        permissions: {
+          allow: ["WebFetch(*)"],
+          ask: ["Bash(git *)"],
+        },
+      })
+    );
+  });
+
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  async function captureSearch(
+    pattern: string,
+    opts: Record<string, unknown> = {}
+  ): Promise<string[]> {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await searchCommand(pattern, { root, maxDepth: 2, includeGlobal: false, ...opts });
+    return lines;
+  }
+
+  async function captureSearchJson(
+    pattern: string,
+    opts: Record<string, unknown> = {}
+  ): Promise<Record<string, unknown>> {
+    const calls: unknown[][] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await searchCommand(pattern, { root, maxDepth: 2, includeGlobal: false, json: true, ...opts });
+    return JSON.parse(calls.map((a) => a.join("")).join(""));
+  }
+
+  it("finds matching rules across projects (text output)", async () => {
+    const lines = await captureSearch("bash");
+    const output = lines.join("\n");
+    expect(output).toMatch(/Bash/i);
+    // both proj-a (allow Bash) and proj-b (ask Bash) should appear
+    expect(output).toMatch(/proj-a/);
+    expect(output).toMatch(/proj-b/);
+  });
+
+  it("shows 'no rules found' when pattern has no match", async () => {
+    const lines = await captureSearch("nonexistent-tool-xyz");
+    const output = lines.join("\n");
+    expect(output).toMatch(/No rules matching/i);
+  });
+
+  it("--type allow limits search to allow list only", async () => {
+    const lines = await captureSearch("bash", { type: "allow" });
+    const output = lines.join("\n");
+    // proj-a allow Bash matches; proj-b ask Bash should NOT appear
+    expect(output).toMatch(/proj-a/);
+    expect(output).not.toMatch(/proj-b/);
+  });
+
+  it("--type deny limits search to deny list", async () => {
+    const lines = await captureSearch("read", { type: "deny" });
+    const output = lines.join("\n");
+    expect(output).toMatch(/Read/i);
+    expect(output).not.toMatch(/Bash/);
+  });
+
+  it("--exact matches only exact rules", async () => {
+    // exact match for the full rule string
+    const linesExact = await captureSearch("Bash(npm run *)", { exact: true });
+    expect(linesExact.join("\n")).toMatch(/proj-a/);
+
+    // exact match for substring should not match
+    const linesMiss = await captureSearch("bash", { exact: true });
+    expect(linesMiss.join("\n")).toMatch(/No rules matching/i);
+  });
+
+  it("JSON output has required fields", async () => {
+    const json = await captureSearchJson("bash");
+    expect(json).toHaveProperty("pattern", "bash");
+    expect(json).toHaveProperty("exact", false);
+    expect(json).toHaveProperty("typeFilter", null);
+    expect(json).toHaveProperty("scopeFilter", null);
+    expect(json).toHaveProperty("matchCount");
+    expect(json).toHaveProperty("projectCount");
+    expect(json).toHaveProperty("matches");
+    expect(Array.isArray(json.matches)).toBe(true);
+  });
+
+  it("JSON matches include project, type, rule, scope", async () => {
+    const json = await captureSearchJson("npm");
+    const matches = json.matches as Array<Record<string, string>>;
+    expect(matches.length).toBeGreaterThan(0);
+    const m = matches[0];
+    expect(m).toHaveProperty("project");
+    expect(m).toHaveProperty("type");
+    expect(m).toHaveProperty("rule");
+    expect(m).toHaveProperty("scope");
+  });
+
+  it("JSON matchCount and projectCount are correct for specific match", async () => {
+    // "env" only matches deny Read(**/.env) in proj-a → 1 match, 1 project
+    const json = await captureSearchJson("env");
+    expect(json.matchCount).toBe(1);
+    expect(json.projectCount).toBe(1);
+  });
+
+  it("--scope filters by rule scope", async () => {
+    // proj-a settings.json is project-scope by default (not settings.local.json)
+    // All rules written to settings.json are project-scoped
+    const json = await captureSearchJson("bash", { scope: "project" });
+    const matches = json.matches as Array<Record<string, string>>;
+    // every match should have scope=project
+    for (const m of matches) {
+      expect(m.scope).toBe("project");
     }
   });
 });

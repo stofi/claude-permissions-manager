@@ -30,6 +30,7 @@ const COMMANDS = [
   "ui",
   "list",
   "stats",
+  "search",
   "show",
   "audit",
   "diff",
@@ -145,6 +146,10 @@ _cpm_completions() {
       ;;
     stats)
       COMPREPLY=( \$(compgen -W "--root --depth --json --no-global" -- "\${cur}") )
+      return 0
+      ;;
+    search)
+      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --exact --type --scope" -- "\${cur}") )
       return 0
       ;;
     ui)
@@ -320,6 +325,17 @@ ${commandDefs}
             '--depth[Max scan depth]:depth:' \\
             '--json[Output as JSON]' \\
             '--no-global[Skip user and managed global settings]'
+          ;;
+        search)
+          _arguments \\
+            '1:pattern:' \\
+            '--root[Root directory]:root:_directories' \\
+            '--depth[Max scan depth]:depth:' \\
+            '--json[Output as JSON]' \\
+            '--no-global[Skip user and managed global settings]' \\
+            '--exact[Exact rule match]' \\
+            '--type[Only search in this rule list]:type:(allow deny ask)' \\
+            '--scope[Only match rules in this scope]:scope:(local project user managed)'
           ;;
         ui)
           _arguments \\

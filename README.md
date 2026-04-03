@@ -94,6 +94,19 @@ cpm mode default --all --scope project --dry-run  # preview
 cpm mode default --all --scope project --yes      # apply
 ```
 
+### Replace / rename a rule
+
+```bash
+# Replace a rule in one project (useful after tool renames or typo fixes)
+cpm replace "Bash(npm run dev)" "Bash(npm run start)" --project ~/my-project --scope project
+
+# Batch: replace a rule across ALL discovered projects
+cpm replace "Bash(npm run dev)" "Bash(npm run start)" --all --scope project --dry-run  # preview
+cpm replace "Bash(npm run dev)" "Bash(npm run start)" --all --scope project --yes      # apply
+```
+
+The rule is replaced in whichever list (allow/deny/ask) it currently lives in. If the new rule already exists in the same list, it is deduplicated automatically.
+
 ### Copy permissions between projects
 
 ```bash

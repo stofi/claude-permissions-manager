@@ -211,6 +211,24 @@ program
   });
 
 program
+  .command("replace <old> <new>")
+  .description("Replace one rule with another (rename a rule across projects)")
+  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
+  .option("--project <path>", "Project path for local/project scope (default: cwd)")
+  .option("--all", "Apply to all discovered projects")
+  .option("--yes", "Skip confirmation prompt (with --all)")
+  .option("--dry-run", "Preview what would be replaced without modifying any files")
+  .action(async (oldRule: string, newRule: string, opts) => {
+    const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
+    const { replaceRuleCommand, batchReplaceCommand } = await import("./commands/manage.js");
+    if (opts.all) {
+      await batchReplaceCommand(oldRule, newRule, { root, maxDepth: parseDepth(depth), includeGlobal: g !== false, ...opts, dryRun: opts.dryRun });
+    } else {
+      await replaceRuleCommand(oldRule, newRule, { ...opts, dryRun: opts.dryRun });
+    }
+  });
+
+program
   .command("mode")
   .addArgument(new Argument("<mode>", "Permission mode").choices(PermissionModeSchema.options))
   .description(`Set defaultMode: ${PermissionModeSchema.options.join("|")}`)

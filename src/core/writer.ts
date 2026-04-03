@@ -164,6 +164,44 @@ export async function removeRule(
   return { removed: true, removedFrom };
 }
 
+/** Replace one rule with another across all lists in the target settings file */
+export async function replaceRule(
+  oldRaw: string,
+  newRaw: string,
+  settingsPath: string,
+  options?: { dryRun?: boolean }
+): Promise<{ replaced: boolean; replacedIn: RuleList[] }> {
+  oldRaw = oldRaw.trim();
+  newRaw = newRaw.trim();
+  const data = await readSettingsOrEmpty(settingsPath);
+  const perms = data.permissions ?? {};
+
+  const lists: RuleList[] = ["allow", "deny", "ask"];
+  const replacedIn: RuleList[] = [];
+  const newPerms = { ...perms };
+
+  for (const list of lists) {
+    const existing = Array.isArray(perms[list]) ? perms[list] : [];
+    if (existing.includes(oldRaw)) {
+      // Replace old with new; deduplicate if new is already present
+      const without = existing.filter((r) => r !== oldRaw);
+      newPerms[list] = without.includes(newRaw) ? without : [...without, newRaw];
+      replacedIn.push(list);
+    }
+  }
+
+  if (replacedIn.length === 0) {
+    return { replaced: false, replacedIn: [] };
+  }
+
+  if (options?.dryRun) {
+    return { replaced: true, replacedIn };
+  }
+
+  await writeSettingsAtomic(settingsPath, { ...data, permissions: newPerms });
+  return { replaced: true, replacedIn };
+}
+
 /** Set the defaultMode in the target settings file */
 export async function setMode(
   mode: PermissionMode,

@@ -6,6 +6,7 @@ import { tmpdir } from "os";
 import {
   addRule,
   removeRule,
+  replaceRule,
   setMode,
   setBypassLock,
   clearAllRules,
@@ -659,5 +660,103 @@ describe("writeSettingsAtomic — error handling", () => {
       vi.doUnmock("fs/promises");
       vi.resetModules();
     }
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// replaceRule
+// ────────────────────────────────────────────────────────────
+
+describe("replaceRule", () => {
+  let tmpDir: string;
+  let settingsPath: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "cpm-replace-"));
+    settingsPath = join(tmpDir, "settings.json");
+  });
+
+  afterEach(() => rmSync(tmpDir, { recursive: true, force: true }));
+
+  it("replaces rule in allow list", async () => {
+    writeFileSync(settingsPath, JSON.stringify({ permissions: { allow: ["Bash(npm run dev)"] } }));
+    const result = await replaceRule("Bash(npm run dev)", "Bash(npm run start)", settingsPath);
+    expect(result.replaced).toBe(true);
+    expect(result.replacedIn).toContain("allow");
+    const data = JSON.parse(await readFile(settingsPath, "utf-8"));
+    expect(data.permissions.allow).toContain("Bash(npm run start)");
+    expect(data.permissions.allow).not.toContain("Bash(npm run dev)");
+  });
+
+  it("replaces rule in deny list", async () => {
+    writeFileSync(settingsPath, JSON.stringify({ permissions: { deny: ["Read(**/.env)"] } }));
+    const result = await replaceRule("Read(**/.env)", "Read(**/.secret)", settingsPath);
+    expect(result.replaced).toBe(true);
+    expect(result.replacedIn).toContain("deny");
+    const data = JSON.parse(await readFile(settingsPath, "utf-8"));
+    expect(data.permissions.deny).toContain("Read(**/.secret)");
+  });
+
+  it("replaces rule in ask list", async () => {
+    writeFileSync(settingsPath, JSON.stringify({ permissions: { ask: ["WebFetch(*)"] } }));
+    const result = await replaceRule("WebFetch(*)", "WebSearch(*)", settingsPath);
+    expect(result.replaced).toBe(true);
+    expect(result.replacedIn).toContain("ask");
+  });
+
+  it("replaces rule in multiple lists simultaneously", async () => {
+    writeFileSync(settingsPath, JSON.stringify({
+      permissions: { allow: ["Bash(npm run dev)"], ask: ["Bash(npm run dev)"] }
+    }));
+    const result = await replaceRule("Bash(npm run dev)", "Bash(npm run start)", settingsPath);
+    expect(result.replaced).toBe(true);
+    expect(result.replacedIn).toContain("allow");
+    expect(result.replacedIn).toContain("ask");
+    const data = JSON.parse(await readFile(settingsPath, "utf-8"));
+    expect(data.permissions.allow).toContain("Bash(npm run start)");
+    expect(data.permissions.ask).toContain("Bash(npm run start)");
+  });
+
+  it("returns replaced=false when old rule not present", async () => {
+    writeFileSync(settingsPath, JSON.stringify({ permissions: { allow: ["Read(*)"] } }));
+    const result = await replaceRule("Bash(npm run dev)", "Bash(npm run start)", settingsPath);
+    expect(result.replaced).toBe(false);
+    expect(result.replacedIn).toHaveLength(0);
+  });
+
+  it("does not write file when old rule not present", async () => {
+    const original = JSON.stringify({ permissions: { allow: ["Read(*)"] } });
+    writeFileSync(settingsPath, original);
+    await replaceRule("Bash(npm run dev)", "Bash(npm run start)", settingsPath);
+    const data = await readFile(settingsPath, "utf-8");
+    expect(data.trim()).toBe(original.trim());
+  });
+
+  it("deduplicates when new rule is already present", async () => {
+    writeFileSync(settingsPath, JSON.stringify({
+      permissions: { allow: ["Bash(npm run dev)", "Bash(npm run start)"] }
+    }));
+    const result = await replaceRule("Bash(npm run dev)", "Bash(npm run start)", settingsPath);
+    expect(result.replaced).toBe(true);
+    const data = JSON.parse(await readFile(settingsPath, "utf-8"));
+    // Should have exactly one "Bash(npm run start)", no "Bash(npm run dev)"
+    expect(data.permissions.allow.filter((r: string) => r === "Bash(npm run start)")).toHaveLength(1);
+    expect(data.permissions.allow).not.toContain("Bash(npm run dev)");
+  });
+
+  it("dry-run returns result without writing", async () => {
+    writeFileSync(settingsPath, JSON.stringify({ permissions: { allow: ["Bash(npm run dev)"] } }));
+    const result = await replaceRule("Bash(npm run dev)", "Bash(npm run start)", settingsPath, { dryRun: true });
+    expect(result.replaced).toBe(true);
+    expect(result.replacedIn).toContain("allow");
+    // File unchanged
+    const data = JSON.parse(await readFile(settingsPath, "utf-8"));
+    expect(data.permissions.allow).toContain("Bash(npm run dev)");
+    expect(data.permissions.allow).not.toContain("Bash(npm run start)");
+  });
+
+  it("works when settings file does not exist (returns replaced=false)", async () => {
+    const result = await replaceRule("Bash(*)", "Read(*)", join(tmpDir, "nonexistent.json"));
+    expect(result.replaced).toBe(false);
   });
 });

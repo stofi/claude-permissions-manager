@@ -28,7 +28,7 @@ import { editCommand } from "../src/commands/edit.js";
 import { statsCommand } from "../src/commands/stats.js";
 import { searchCommand } from "../src/commands/search.js";
 import { rulesCommand } from "../src/commands/rules.js";
-import { batchAddCommand, batchRemoveCommand, batchModeCommand } from "../src/commands/manage.js";
+import { batchAddCommand, batchRemoveCommand, batchModeCommand, replaceRuleCommand, batchReplaceCommand } from "../src/commands/manage.js";
 
 // ────────────────────────────────────────────────────────────
 // Helpers
@@ -6305,5 +6305,218 @@ describe("batchModeCommand — mode --all", () => {
     const out = lines.join("\n");
     // proj-a shows acceptEdits → default
     expect(out).toMatch(/acceptEdits.*→.*default/);
+  });
+});
+
+describe("replaceRuleCommand — single project", () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), "cpm-replace-cmd-"));
+    await mkdir(join(tmpDir, ".claude"), { recursive: true });
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(npm run dev)", "Read(*)"] } })
+    );
+  });
+
+  afterEach(() => rmSync(tmpDir, { recursive: true, force: true }));
+
+  it("replaces rule in project settings", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await replaceRuleCommand("Bash(npm run dev)", "Bash(npm run start)", {
+      project: tmpDir, scope: "project",
+    });
+    expect(lines.join("\n")).toMatch(/Replaced/i);
+    const data = JSON.parse(await readFile(join(tmpDir, ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions.allow).toContain("Bash(npm run start)");
+    expect(data.permissions.allow).not.toContain("Bash(npm run dev)");
+    expect(data.permissions.allow).toContain("Read(*)"); // other rule preserved
+  });
+
+  it("reports 'not found' when old rule absent", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await replaceRuleCommand("NonExistent(*)", "Bash(npm run start)", {
+      project: tmpDir, scope: "project",
+    });
+    expect(lines.join("\n")).toMatch(/not found/i);
+  });
+
+  it("--dry-run shows preview without modifying files", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await replaceRuleCommand("Bash(npm run dev)", "Bash(npm run start)", {
+      project: tmpDir, scope: "project", dryRun: true,
+    });
+    expect(lines.join("\n")).toMatch(/\[dry-run\]/);
+    const data = JSON.parse(await readFile(join(tmpDir, ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions.allow).toContain("Bash(npm run dev)"); // unchanged
+  });
+
+  it("--dry-run reports 'not found' when old rule absent", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    await replaceRuleCommand("NoSuchTool(*)", "Read(*)", {
+      project: tmpDir, scope: "project", dryRun: true,
+    });
+    expect(lines.join("\n")).toMatch(/not found/i);
+  });
+
+  it("exits 1 on invalid old rule", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((c) => { throw new Error(`exit:${c}`); });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(replaceRuleCommand("", "Read(*)", { project: tmpDir })).rejects.toThrow("exit:1");
+    exitSpy.mockRestore(); errSpy.mockRestore();
+  });
+
+  it("exits 1 on invalid new rule", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((c) => { throw new Error(`exit:${c}`); });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(replaceRuleCommand("Read(*)", "", { project: tmpDir })).rejects.toThrow("exit:1");
+    exitSpy.mockRestore(); errSpy.mockRestore();
+  });
+
+  it("exits 1 when old and new rules are identical", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((c) => { throw new Error(`exit:${c}`); });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(replaceRuleCommand("Read(*)", "Read(*)", { project: tmpDir })).rejects.toThrow("exit:1");
+    exitSpy.mockRestore(); errSpy.mockRestore();
+  });
+});
+
+describe("batchReplaceCommand — replace --all", () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), "cpm-batch-replace-"));
+
+    // proj-a: has old rule in allow
+    const dirA = join(root, "proj-a", ".claude");
+    await mkdir(dirA, { recursive: true });
+    await writeFile(
+      join(dirA, "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(npm run dev)", "Read(*)"] } })
+    );
+
+    // proj-b: has old rule in allow
+    const dirB = join(root, "proj-b", ".claude");
+    await mkdir(dirB, { recursive: true });
+    await writeFile(
+      join(dirB, "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(npm run dev)"] } })
+    );
+
+    // proj-c: does NOT have old rule
+    const dirC = join(root, "proj-c", ".claude");
+    await mkdir(dirC, { recursive: true });
+    await writeFile(join(dirC, "settings.json"), JSON.stringify({ permissions: { allow: ["Read(*)"] } }));
+  });
+
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it("--yes replaces rule in all matching projects", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchReplaceCommand("Bash(npm run dev)", "Bash(npm run start)", {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/Replaced in 2 project/);
+    for (const name of ["proj-a", "proj-b"]) {
+      const file = JSON.parse(await readFile(join(root, name, ".claude", "settings.json"), "utf-8"));
+      expect(file.permissions?.allow).toContain("Bash(npm run start)");
+      expect(file.permissions?.allow).not.toContain("Bash(npm run dev)");
+    }
+    // proj-a's Read(*) should be preserved
+    const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(fileA.permissions?.allow).toContain("Read(*)");
+  });
+
+  it("skips projects that don't have the old rule", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchReplaceCommand("Bash(npm run dev)", "Bash(npm run start)", {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    expect(lines.join("\n")).toMatch(/Skipped 1 without rule/);
+    // proj-c unchanged
+    const fileC = JSON.parse(await readFile(join(root, "proj-c", ".claude", "settings.json"), "utf-8"));
+    expect(fileC.permissions?.allow).toContain("Read(*)");
+  });
+
+  it("--dry-run shows preview without modifying files", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchReplaceCommand("Bash(npm run dev)", "Bash(npm run start)", {
+      root, maxDepth: 2, includeGlobal: false, dryRun: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/\[dry-run\]/);
+    expect(out).toMatch(/proj-a/);
+    // Files unchanged
+    const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(fileA.permissions?.allow).toContain("Bash(npm run dev)");
+  });
+
+  it("shows 'not found in any project' when no projects have the rule", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchReplaceCommand("NonExistent(*)", "Bash(npm run start)", {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    expect(lines.join("\n")).toMatch(/not found in any project/i);
+  });
+
+  it("aborts when user declines confirmation", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchReplaceCommand("Bash(npm run dev)", "Bash(npm run start)", {
+      root, maxDepth: 2, includeGlobal: false, scope: "project",
+      _confirmFn: async () => false,
+    });
+    expect(lines.join("\n")).toMatch(/Aborted/i);
+    const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(fileA.permissions?.allow).toContain("Bash(npm run dev)");
+  });
+
+  it("exits 1 on identical old/new rules", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((c) => { throw new Error(`exit:${c}`); });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(
+      batchReplaceCommand("Read(*)", "Read(*)", { root, maxDepth: 2, includeGlobal: false })
+    ).rejects.toThrow("exit:1");
+    exitSpy.mockRestore(); errSpy.mockRestore();
+  });
+
+  it("warns when --scope user is specified", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchReplaceCommand("Bash(npm run dev)", "Bash(npm run start)", {
+      root, maxDepth: 2, includeGlobal: false, scope: "user",
+    });
+    expect(lines.join("\n")).toMatch(/user.*already applies/i);
+  });
+
+  it("shows no projects found when root is empty", async () => {
+    const emptyRoot = mkdtempSync(join(tmpdir(), "cpm-replace-empty-"));
+    try {
+      const lines: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+      vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      await batchReplaceCommand("Bash(*)", "Read(*)", {
+        root: emptyRoot, maxDepth: 2, includeGlobal: false,
+      });
+      expect(lines.join("\n")).toMatch(/No Claude projects found/i);
+    } finally {
+      rmSync(emptyRoot, { recursive: true, force: true });
+    }
   });
 });

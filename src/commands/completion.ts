@@ -39,6 +39,7 @@ const COMMANDS = [
   "deny",
   "ask",
   "reset",
+  "replace",
   "mode",
   "bypass-lock",
   "copy",
@@ -185,6 +186,14 @@ _cpm_completions() {
       fi
       return 0
       ;;
+    replace)
+      if [[ "\${cur}" != -* ]]; then
+        COMPREPLY=( \$(compgen -W "${toolList}" -- "\${cur}") )
+      else
+        COMPREPLY=( \$(compgen -W "--scope --project --all --yes --dry-run --root --depth" -- "\${cur}") )
+      fi
+      return 0
+      ;;
     init)
       COMPREPLY=( \$(compgen -W "--project --scope --preset --mode --yes --dry-run" -- "\${cur}") )
       return 0
@@ -231,6 +240,7 @@ function zshScript(): string {
       deny: "Add deny rule",
       ask: "Add ask rule",
       reset: "Remove rule (--all = batch across projects)",
+      replace: "Replace/rename a rule (--all = batch across projects)",
       mode: "Set default mode (--all = batch across projects)",
       "bypass-lock": "Enable/disable bypass-permissions lock",
       copy: "Copy permissions to another project",
@@ -314,6 +324,18 @@ ${commandDefs}
             '--yes[Skip confirmation]' \\
             '--dry-run[Preview without writing]' \\
             '1:rule:(${toolList})'
+          ;;
+        replace)
+          _arguments \\
+            '--scope[Settings scope]:scope:(${scopeList})' \\
+            '--project[Project path]:project:_directories' \\
+            '--all[Apply to all discovered projects]' \\
+            '--yes[Skip confirmation]' \\
+            '--dry-run[Preview without writing]' \\
+            '--root[Scan root path]:root:_directories' \\
+            '--depth[Max scan depth]:depth:' \\
+            '1:old-rule:(${toolList})' \\
+            '2:new-rule:(${toolList})'
           ;;
         init)
           _arguments \\

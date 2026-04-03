@@ -28,7 +28,7 @@ import { editCommand } from "../src/commands/edit.js";
 import { statsCommand } from "../src/commands/stats.js";
 import { searchCommand } from "../src/commands/search.js";
 import { rulesCommand } from "../src/commands/rules.js";
-import { batchAddCommand, batchRemoveCommand } from "../src/commands/manage.js";
+import { batchAddCommand, batchRemoveCommand, batchModeCommand } from "../src/commands/manage.js";
 
 // ────────────────────────────────────────────────────────────
 // Helpers
@@ -6133,5 +6133,177 @@ describe("batchRemoveCommand — reset --all", () => {
     // The output should mention the lists the rule was found in
     const out = lines.join("\n");
     expect(out).toMatch(/allow/);
+  });
+});
+
+describe("batchModeCommand — mode --all", () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), "cpm-batch-mode-"));
+
+    // proj-a: mode acceptEdits
+    const dirA = join(root, "proj-a", ".claude");
+    await mkdir(dirA, { recursive: true });
+    await writeFile(
+      join(dirA, "settings.json"),
+      JSON.stringify({ permissions: { defaultMode: "acceptEdits" } })
+    );
+
+    // proj-b: mode auto
+    const dirB = join(root, "proj-b", ".claude");
+    await mkdir(dirB, { recursive: true });
+    await writeFile(
+      join(dirB, "settings.json"),
+      JSON.stringify({ permissions: { defaultMode: "auto" } })
+    );
+
+    // proj-c: no mode set (defaults to "default")
+    const dirC = join(root, "proj-c", ".claude");
+    await mkdir(dirC, { recursive: true });
+    await writeFile(join(dirC, "settings.json"), JSON.stringify({ permissions: {} }));
+  });
+
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it("--yes updates all projects to the target mode", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchModeCommand("default", {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/Updated 2 project/);
+    // proj-a and proj-b updated; proj-c already "default"
+    for (const name of ["proj-a", "proj-b"]) {
+      const file = JSON.parse(await readFile(join(root, name, ".claude", "settings.json"), "utf-8"));
+      expect(file.permissions?.defaultMode).toBe("default");
+    }
+  });
+
+  it("skips projects already at the target mode", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchModeCommand("acceptEdits", {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/Skipped 1 already set to "acceptEdits"/);
+    expect(out).toMatch(/Updated 2 project/);
+  });
+
+  it("shows 'all already have mode' when nothing to update", async () => {
+    // Set all projects to "default" first
+    for (const name of ["proj-a", "proj-b", "proj-c"]) {
+      await writeFile(
+        join(root, name, ".claude", "settings.json"),
+        JSON.stringify({ permissions: { defaultMode: "default" } })
+      );
+    }
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchModeCommand("default", {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    expect(lines.join("\n")).toMatch(/already have mode "default"/i);
+  });
+
+  it("--dry-run shows preview without modifying files", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchModeCommand("default", {
+      root, maxDepth: 2, includeGlobal: false, dryRun: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/\[dry-run\]/);
+    expect(out).toMatch(/proj-a/);
+    // Files unchanged
+    const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(fileA.permissions?.defaultMode).toBe("acceptEdits");
+  });
+
+  it("--dry-run shows 'Skipped N already set' when some match", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchModeCommand("acceptEdits", {
+      root, maxDepth: 2, includeGlobal: false, dryRun: true, scope: "project",
+    });
+    expect(lines.join("\n")).toMatch(/Skipped 1 already set/);
+  });
+
+  it("aborts when user declines confirmation", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchModeCommand("default", {
+      root, maxDepth: 2, includeGlobal: false, scope: "project",
+      _confirmFn: async () => false,
+    });
+    expect(lines.join("\n")).toMatch(/Aborted/i);
+    // proj-a unchanged
+    const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(fileA.permissions?.defaultMode).toBe("acceptEdits");
+  });
+
+  it("rejects invalid mode", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(
+      batchModeCommand("bogusMode", { root, maxDepth: 2, includeGlobal: false })
+    ).rejects.toThrow("exit:1");
+    exitSpy.mockRestore();
+    errSpy.mockRestore();
+  });
+
+  it("warns when --scope user is specified", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchModeCommand("default", {
+      root, maxDepth: 2, includeGlobal: false, scope: "user",
+    });
+    expect(lines.join("\n")).toMatch(/user.*already applies/i);
+  });
+
+  it("shows no projects found when root is empty", async () => {
+    const emptyRoot = mkdtempSync(join(tmpdir(), "cpm-batch-mode-empty-"));
+    try {
+      const lines: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+      vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      await batchModeCommand("default", {
+        root: emptyRoot, maxDepth: 2, includeGlobal: false,
+      });
+      expect(lines.join("\n")).toMatch(/No Claude projects found/i);
+    } finally {
+      rmSync(emptyRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("shows warning for bypassPermissions mode", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchModeCommand("bypassPermissions", {
+      root, maxDepth: 2, includeGlobal: false, dryRun: true, scope: "project",
+    });
+    expect(lines.join("\n")).toMatch(/WARNING.*bypassPermissions/i);
+  });
+
+  it("shows current → target mode in output", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchModeCommand("default", {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    // proj-a shows acceptEdits → default
+    expect(out).toMatch(/acceptEdits.*→.*default/);
   });
 });

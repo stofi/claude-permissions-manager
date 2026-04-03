@@ -216,10 +216,17 @@ program
   .description(`Set defaultMode: ${PermissionModeSchema.options.join("|")}`)
   .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
+  .option("--all", "Apply to all discovered projects")
+  .option("--yes", "Skip confirmation prompt (with --all)")
   .option("--dry-run", "Preview what would be written without modifying any files")
   .action(async (mode, opts) => {
-    const { modeCommand } = await import("./commands/manage.js");
-    await modeCommand(mode, { ...opts, dryRun: opts.dryRun });
+    const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
+    const { modeCommand, batchModeCommand } = await import("./commands/manage.js");
+    if (opts.all) {
+      await batchModeCommand(mode, { root, maxDepth: parseDepth(depth), includeGlobal: g !== false, ...opts, dryRun: opts.dryRun });
+    } else {
+      await modeCommand(mode, { ...opts, dryRun: opts.dryRun });
+    }
   });
 
 program

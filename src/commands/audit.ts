@@ -61,7 +61,10 @@ function collectIssues(
           severity: w.severity,
           message: w.message,
           rule: w.rule,
-          fix: w.fixCmd ? `${w.fixCmd} --project ${project.rootPath}` : undefined,
+          // User-scope fixes resolve to ~/.claude/settings.json regardless of project — no --project needed
+          fix: w.fixCmd
+            ? (w.fixOp?.scope === "user" ? w.fixCmd : `${w.fixCmd} --project ${project.rootPath}`)
+            : undefined,
           fixOp: w.fixOp,
         });
       }
@@ -172,11 +175,13 @@ export async function auditCommand(options: ScanOptions & {
       return;
     }
 
-    // Deduplicate by (project, kind, rule/mode, scope)
+    // Deduplicate by (resolved settings file path, op) — user-scope ops share ~/.claude/settings.json
+    // across all projects, so they should only be applied once.
     const seen = new Set<string>();
     const uniqueFixes: Array<{ project: string; fixOp: FixOp; fix: string }> = [];
     for (const issue of fixable) {
-      const key = JSON.stringify({ project: issue.project, op: issue.fixOp });
+      const settingsFile = resolveSettingsPath(issue.fixOp!.scope, issue.project);
+      const key = JSON.stringify({ settingsFile, op: issue.fixOp });
       if (!seen.has(key)) {
         seen.add(key);
         uniqueFixes.push({ project: issue.project, fixOp: issue.fixOp!, fix: issue.fix! });

@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import type { ClaudeProject, PermissionMode, Warning, WarningSeverity, SettingsFile } from "../core/types.js";
+import { SEVERITY_ORDER } from "../core/types.js";
 import { collapseHome } from "./paths.js";
 
 const MODE_LABELS: Record<PermissionMode, string> = {
@@ -57,9 +58,14 @@ export function formatProjectRow(project: ClaudeProject): string {
   const askLabel = `${perms.ask.length} ask`.padEnd(6);
   const ask = perms.ask.length > 0 ? chalk.yellow(askLabel) : chalk.gray(askLabel);
   const bypassLock = perms.isBypassDisabled ? chalk.green("[locked] ") : "";
-  const warnings = perms.warnings.length > 0
-    ? chalk.yellow(`⚠ ${perms.warnings.length}`)
-    : "";
+  let warnings = "";
+  if (perms.warnings.length > 0) {
+    const maxSev = perms.warnings.reduce<WarningSeverity>((max, w) =>
+      SEVERITY_ORDER.indexOf(w.severity) < SEVERITY_ORDER.indexOf(max) ? w.severity : max,
+      perms.warnings[0].severity
+    );
+    warnings = SEVERITY_COLORS[maxSev](`⚠ ${perms.warnings.length}`);
+  }
 
   return `${path} ${mode} ${allow} ${deny} ${ask} ${bypassLock}${warnings}`;
 }

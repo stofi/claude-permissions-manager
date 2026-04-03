@@ -76,10 +76,14 @@ cpm deny "Read(**/.env)" --all --scope project --dry-run  # preview
 cpm deny "Read(**/.env)" --all --scope project --yes      # apply
 cpm allow "Bash(git *)"  --all --scope local              # local scope to all
 
-# Remove a rule
+# Remove a rule from one project
 cpm reset "Bash(npm run *)" --project ~/my-project --scope project
 
-# Clear all rules (with confirmation)
+# Batch: remove a rule from ALL discovered projects at once
+cpm reset "Bash(npm run *)" --all --scope project --dry-run  # preview
+cpm reset "Bash(npm run *)" --all --scope project --yes      # apply
+
+# Clear all rules from one project (with confirmation)
 cpm reset --all --yes --project ~/my-project --scope project
 
 # Set permission mode
@@ -146,8 +150,8 @@ Creates the file (empty `{}`) if it doesn't already exist, then opens it in `$VI
 --min-severity     Only show/report issues at or above severity: critical | high | medium | low (list and audit)
 --exit-code        Exit 1 if issues found, 2 if critical issues (audit only — useful in CI)
 --fix              Auto-apply all available fix commands (audit only)
---all              Apply to all discovered projects (allow, deny, ask)
---yes / -y         Skip confirmation prompt (--fix for audit; --all for allow/deny/ask; --all for reset)
+--all              Apply to all discovered projects (allow, deny, ask, reset <rule>); or clear all rules in one project (reset without rule)
+--yes / -y         Skip confirmation prompt (--fix for audit; --all for allow/deny/ask/reset)
 --dry-run          Preview what would be written without modifying files (allow, deny, ask, reset, mode, init, copy)
 --format <fmt>     Output format: json|csv|markdown (export only, default: json)
 --output <file>    Write output to file instead of stdout (export only)

@@ -500,3 +500,107 @@ export async function batchRemoveCommand(
     process.exit(1);
   }
 }
+
+/** Set defaultMode across all discovered projects at once. */
+export async function batchModeCommand(
+  mode: string,
+  opts: ScanOptions & {
+    scope?: string;
+    dryRun?: boolean;
+    yes?: boolean;
+    _confirmFn?: (q: string) => Promise<boolean>;
+  }
+): Promise<void> {
+  if (!VALID_MODES.includes(mode as PermissionMode)) {
+    console.error(chalk.red(`Invalid mode "${mode}". Valid modes: ${VALID_MODES.join(", ")}`));
+    process.exit(1);
+  }
+
+  const scope = resolveScope(opts.scope);
+  if (scope === "user") {
+    console.log(chalk.yellow(`⚠ --scope user already applies to all projects globally.`));
+    console.log(chalk.yellow(`  Use: cpm mode ${mode} --scope user`));
+    return;
+  }
+
+  if (mode === "bypassPermissions") {
+    console.log(chalk.red.bold("⚠ WARNING: bypassPermissions disables ALL permission checks."));
+    console.log(chalk.red("  Claude can read, write, and execute anything without asking."));
+  }
+
+  process.stderr.write(chalk.gray("Scanning for Claude projects...\n"));
+  const result = await scan(opts);
+  const { projects } = result;
+
+  if (projects.length === 0) {
+    console.log(chalk.yellow("No Claude projects found."));
+    return;
+  }
+
+  // Pre-check which projects need updating
+  const toUpdate: Array<{ projectPath: string; currentMode: string }> = [];
+  const alreadySet: string[] = [];
+  for (const project of projects) {
+    const settingsPath = resolveSettingsPath(scope, project.rootPath);
+    const data = await readSettingsOrEmpty(settingsPath);
+    const currentMode = data.permissions?.defaultMode ?? "default";
+    if (currentMode === mode) {
+      alreadySet.push(project.rootPath);
+    } else {
+      toUpdate.push({ projectPath: project.rootPath, currentMode });
+    }
+  }
+
+  if (toUpdate.length === 0) {
+    console.log(chalk.yellow(`All ${projects.length} project(s) already have mode "${mode}".`));
+    return;
+  }
+
+  const modeLabel = chalk.bold(mode);
+
+  if (opts.dryRun) {
+    console.log(chalk.cyan(`[dry-run] No files will be modified`));
+    console.log(`\nWould set mode to ${modeLabel} in ${toUpdate.length} project(s):`);
+    for (const { projectPath, currentMode } of toUpdate) {
+      console.log(`  ${collapseHome(projectPath)} ${chalk.dim(`(${currentMode} → ${mode})`)}`);
+    }
+    if (alreadySet.length > 0) {
+      console.log(chalk.gray(`\nSkipped ${alreadySet.length} already set to "${mode}".`));
+    }
+    return;
+  }
+
+  console.log(`\nWill set mode to ${modeLabel} in ${toUpdate.length} project(s):`);
+  for (const { projectPath, currentMode } of toUpdate) {
+    console.log(`  ${collapseHome(projectPath)} ${chalk.dim(`(${currentMode} → ${mode})`)}`);
+  }
+  if (alreadySet.length > 0) {
+    console.log(chalk.gray(`\nSkipped ${alreadySet.length} already set to "${mode}".`));
+  }
+
+  const confirmFn = opts._confirmFn ?? promptConfirm;
+  const proceed = opts.yes || await confirmFn(chalk.yellow("\nApply to all? [Y/n] "));
+  if (!proceed) {
+    console.log(chalk.gray("Aborted."));
+    return;
+  }
+
+  let updated = 0;
+  const errors: string[] = [];
+  for (const { projectPath } of toUpdate) {
+    const settingsPath = resolveSettingsPath(scope, projectPath);
+    try {
+      await setMode(mode as PermissionMode, settingsPath);
+      updated++;
+    } catch (e) {
+      errors.push(`${collapseHome(projectPath)}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  console.log(chalk.green(`\n✓ Updated ${updated} project(s) to mode "${mode}"`));
+  if (errors.length > 0) {
+    console.log(chalk.red(`\n${errors.length} error(s):`));
+    for (const err of errors) console.log(chalk.red(`  ${err}`));
+    process.exit(1);
+  }
+}

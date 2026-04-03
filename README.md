@@ -86,8 +86,12 @@ cpm reset "Bash(npm run *)" --all --scope project --yes      # apply
 # Clear all rules from one project (with confirmation)
 cpm reset --all --yes --project ~/my-project --scope project
 
-# Set permission mode
+# Set permission mode for one project
 cpm mode acceptEdits --project ~/my-project --scope project
+
+# Batch: set mode across ALL discovered projects at once
+cpm mode default --all --scope project --dry-run  # preview
+cpm mode default --all --scope project --yes      # apply
 ```
 
 ### Copy permissions between projects
@@ -150,8 +154,8 @@ Creates the file (empty `{}`) if it doesn't already exist, then opens it in `$VI
 --min-severity     Only show/report issues at or above severity: critical | high | medium | low (list and audit)
 --exit-code        Exit 1 if issues found, 2 if critical issues (audit only — useful in CI)
 --fix              Auto-apply all available fix commands (audit only)
---all              Apply to all discovered projects (allow, deny, ask, reset <rule>); or clear all rules in one project (reset without rule)
---yes / -y         Skip confirmation prompt (--fix for audit; --all for allow/deny/ask/reset)
+--all              Apply to all discovered projects (allow, deny, ask, reset <rule>, mode); or clear all rules in one project (reset without rule)
+--yes / -y         Skip confirmation prompt (--fix for audit; --all for allow/deny/ask/reset/mode)
 --dry-run          Preview what would be written without modifying files (allow, deny, ask, reset, mode, init, copy)
 --format <fmt>     Output format: json|csv|markdown (export only, default: json)
 --output <file>    Write output to file instead of stdout (export only)

@@ -117,7 +117,7 @@ _cpm_completions() {
       if [[ "\${cur}" != -* ]]; then
         COMPREPLY=( \$(compgen -W "${modeList}" -- "\${cur}") )
       else
-        COMPREPLY=( \$(compgen -W "--scope --project --dry-run" -- "\${cur}") )
+        COMPREPLY=( \$(compgen -W "--scope --project --all --yes --dry-run --root --depth" -- "\${cur}") )
       fi
       return 0
       ;;
@@ -231,7 +231,7 @@ function zshScript(): string {
       deny: "Add deny rule",
       ask: "Add ask rule",
       reset: "Remove rule (--all = batch across projects)",
-      mode: "Set default mode",
+      mode: "Set default mode (--all = batch across projects)",
       "bypass-lock": "Enable/disable bypass-permissions lock",
       copy: "Copy permissions to another project",
       export: "Export permissions data",
@@ -275,7 +275,11 @@ ${commandDefs}
           _arguments \\
             '--scope[Settings scope]:scope:(${scopeList})' \\
             '--project[Project path]:project:_directories' \\
+            '--all[Apply to all discovered projects]' \\
+            '--yes[Skip confirmation]' \\
             '--dry-run[Preview without writing]' \\
+            '--root[Scan root path]:root:_directories' \\
+            '--depth[Max scan depth]:depth:' \\
             '1:mode:(${modeList})'
           ;;
         show)

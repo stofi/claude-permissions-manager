@@ -3129,11 +3129,11 @@ describe("auditCommand — text output", () => {
   it("shows Fix: hint line for mode warnings in text output", async () => {
     const calls: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
-    // project-bypass has bypassPermissions mode → fixCmd: "cpm mode default --scope local"
+    // project-bypass uses settings.json (scope "project") → fixCmd: "cpm mode default --scope project"
     await auditCommand({ root: join(FIXTURES, "project-bypass"), maxDepth: 1, includeGlobal: false });
     const output = calls.join("\n");
     expect(output).toMatch(/Fix:/i);
-    expect(output).toContain("cpm mode default --scope local");
+    expect(output).toContain("cpm mode default --scope project");
     expect(output).toContain("project-bypass");
   });
 
@@ -3142,6 +3142,7 @@ describe("auditCommand — text output", () => {
     const claudeDir = join(root, "proj", ".claude");
     await mkdir(claudeDir, { recursive: true });
     await import("fs/promises").then((fs) =>
+      // settings.json has scope "project" → rule.scope = "project"
       fs.writeFile(join(claudeDir, "settings.json"), JSON.stringify({
         permissions: { allow: ["Bash"] },
       }))
@@ -3152,7 +3153,7 @@ describe("auditCommand — text output", () => {
       await auditCommand({ root, maxDepth: 2, includeGlobal: false });
       const output = calls.join("\n");
       expect(output).toMatch(/Fix:/i);
-      expect(output).toContain('cpm reset "Bash"');
+      expect(output).toContain('cpm reset "Bash" --scope project');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -3162,11 +3163,12 @@ describe("auditCommand — text output", () => {
     const calls: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args) => { calls.push(args.join("")); });
     // project-bypass has bypassPermissions (fixCmd) + bare Bash allow (fixCmd)
+    // settings.json = scope "project", so fix hints include --scope project
     await auditCommand({ root: join(FIXTURES, "project-bypass"), maxDepth: 1, json: true, includeGlobal: false });
     const json = JSON.parse(calls.join(""));
     const issuesWithFix = json.issues.filter((i: Record<string, unknown>) => i.fix !== undefined);
     expect(issuesWithFix.length).toBeGreaterThan(0);
-    const modeFix = json.issues.find((i: Record<string, unknown>) => typeof i.fix === "string" && (i.fix as string).includes("mode default"));
+    const modeFix = json.issues.find((i: Record<string, unknown>) => typeof i.fix === "string" && (i.fix as string).includes("mode default --scope project"));
     expect(modeFix).toBeDefined();
     // fix should include --project with an absolute path
     expect(modeFix.fix).toMatch(/--project .+project-bypass/);

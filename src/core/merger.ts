@@ -39,11 +39,20 @@ function detectWarnings(
 ): Warning[] {
   const warnings: Warning[] = [];
 
+  // Find which scope actually set the effective mode (highest priority first)
+  const modeScope =
+    settingsFiles.find(
+      (f) =>
+        f.exists &&
+        f.data?.permissions?.defaultMode &&
+        PermissionModeSchema.safeParse(f.data.permissions.defaultMode).success
+    )?.scope ?? "local";
+
   if (permissions.defaultMode === "bypassPermissions") {
     warnings.push({
       severity: "critical",
       message: "bypassPermissions mode is active — all permission checks disabled",
-      fixCmd: "cpm mode default --scope local",
+      fixCmd: `cpm mode default --scope ${modeScope}`,
     });
   }
 
@@ -51,7 +60,7 @@ function detectWarnings(
     warnings.push({
       severity: "high",
       message: "dontAsk mode is active — Claude executes actions without asking permission (deny rules still apply)",
-      fixCmd: "cpm mode default --scope local",
+      fixCmd: `cpm mode default --scope ${modeScope}`,
     });
   }
 
@@ -59,7 +68,7 @@ function detectWarnings(
     warnings.push({
       severity: "medium",
       message: "acceptEdits mode is active — file edits are accepted without confirmation prompts",
-      fixCmd: "cpm mode default --scope local",
+      fixCmd: `cpm mode default --scope ${modeScope}`,
     });
   }
 
@@ -85,7 +94,7 @@ function detectWarnings(
         severity: "high",
         message: 'Wildcard "*" in allow list — all tools permitted without prompting',
         rule: rule.raw,
-        fixCmd: 'cpm reset "*"',
+        fixCmd: `cpm reset "*" --scope ${rule.scope}`,
       });
     }
     if (rule.tool === "Bash" && !rule.specifier) {
@@ -93,7 +102,7 @@ function detectWarnings(
         severity: "high",
         message: "Bash is allowed without any specifier — all shell commands permitted",
         rule: rule.raw,
-        fixCmd: 'cpm reset "Bash"',
+        fixCmd: `cpm reset "Bash" --scope ${rule.scope}`,
       });
     }
     if (rule.tool === "Write" && !rule.specifier) {
@@ -101,7 +110,7 @@ function detectWarnings(
         severity: "high",
         message: "Write is allowed without any specifier — all file writes permitted",
         rule: rule.raw,
-        fixCmd: 'cpm reset "Write"',
+        fixCmd: `cpm reset "Write" --scope ${rule.scope}`,
       });
     }
     if (rule.tool === "Edit" && !rule.specifier) {
@@ -109,7 +118,7 @@ function detectWarnings(
         severity: "high",
         message: "Edit is allowed without any specifier — all file edits permitted",
         rule: rule.raw,
-        fixCmd: 'cpm reset "Edit"',
+        fixCmd: `cpm reset "Edit" --scope ${rule.scope}`,
       });
     }
     if (rule.tool === "WebFetch" && !rule.specifier) {
@@ -117,7 +126,7 @@ function detectWarnings(
         severity: "medium",
         message: "WebFetch is allowed without any URL specifier — arbitrary URLs can be fetched",
         rule: rule.raw,
-        fixCmd: 'cpm reset "WebFetch"',
+        fixCmd: `cpm reset "WebFetch" --scope ${rule.scope}`,
       });
     }
     if (rule.tool === "WebSearch" && !rule.specifier) {
@@ -125,7 +134,7 @@ function detectWarnings(
         severity: "medium",
         message: "WebSearch is allowed without any query specifier — arbitrary web searches can be performed",
         rule: rule.raw,
-        fixCmd: 'cpm reset "WebSearch"',
+        fixCmd: `cpm reset "WebSearch" --scope ${rule.scope}`,
       });
     }
     // Check for sensitive paths in allow
@@ -141,7 +150,7 @@ function detectWarnings(
         severity: "medium",
         message: `Sensitive path in allow rule: ${rule.raw}`,
         rule: rule.raw,
-        fixCmd: `cpm reset "${rule.raw}"`,
+        fixCmd: `cpm reset "${rule.raw}" --scope ${rule.scope}`,
       });
     }
   }

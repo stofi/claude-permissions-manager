@@ -228,12 +228,18 @@ All `--json` outputs share these conventions:
   "projectCount": 3, "affectedProjectCount": 2, "cleanProjectCount": 1,
   "issueCount": 4, "minSeverity": "low",
   "issues": [
-    { "project": "/path/to/project", "severity": "high", "message": "...", "rule": "Bash" }
+    {
+      "project": "/path/to/project",
+      "severity": "high",
+      "message": "Bash is allowed without any specifier — all shell commands permitted",
+      "rule": "Bash",
+      "fix": "cpm reset \"Bash\" --scope project --project /path/to/project"
+    }
   ],
   "errors": []
 }
 ```
-`affectedProjectCount` is the number of projects that have at least one issue. `cleanProjectCount` is projects with no issues. `minSeverity` reflects the `--min-severity` option used (default `"low"`).
+`affectedProjectCount` is the number of projects that have at least one issue. `cleanProjectCount` is projects with no issues. `minSeverity` reflects the `--min-severity` option used (default `"low"`). `fix` is the exact `cpm` command to resolve the issue (omitted when no automated fix is available).
 
 `cpm diff --json` structure:
 ```json

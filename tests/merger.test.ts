@@ -922,32 +922,46 @@ describe("mergeSettingsFiles — Warning.fixCmd", () => {
     expect(w?.fixCmd).toBe("cpm mode default --scope local");
   });
 
-  it("bare Bash allow warning includes fixCmd", () => {
+  it("bare Bash allow warning includes fixCmd with scope", () => {
     const f = makeFile("local", { permissions: { allow: ["Bash"], deny: ["Read(**/.env)"] } });
     const result = mergeSettingsFiles([f]);
     const w = result.warnings.find((w) => /Bash is allowed without/.test(w.message));
-    expect(w?.fixCmd).toBe('cpm reset "Bash"');
+    expect(w?.fixCmd).toBe('cpm reset "Bash" --scope local');
   });
 
-  it("bare Write allow warning includes fixCmd", () => {
+  it("bare Write allow warning includes fixCmd with scope", () => {
     const f = makeFile("local", { permissions: { allow: ["Write"] } });
     const result = mergeSettingsFiles([f]);
     const w = result.warnings.find((w) => /Write is allowed without/.test(w.message));
-    expect(w?.fixCmd).toBe('cpm reset "Write"');
+    expect(w?.fixCmd).toBe('cpm reset "Write" --scope local');
   });
 
-  it("wildcard allow warning includes fixCmd", () => {
+  it("wildcard allow warning includes fixCmd with scope", () => {
     const f = makeFile("local", { permissions: { allow: ["*"] } });
     const result = mergeSettingsFiles([f]);
     const w = result.warnings.find((w) => /Wildcard.*allow list/.test(w.message));
-    expect(w?.fixCmd).toBe('cpm reset "*"');
+    expect(w?.fixCmd).toBe('cpm reset "*" --scope local');
   });
 
-  it("sensitive path allow warning includes fixCmd with the specific rule", () => {
+  it("sensitive path allow warning includes fixCmd with scope and rule", () => {
     const f = makeFile("local", { permissions: { allow: ["Read(~/.ssh/id_rsa)"] } });
     const result = mergeSettingsFiles([f]);
     const w = result.warnings.find((w) => /Sensitive path/.test(w.message));
-    expect(w?.fixCmd).toBe('cpm reset "Read(~/.ssh/id_rsa)"');
+    expect(w?.fixCmd).toBe('cpm reset "Read(~/.ssh/id_rsa)" --scope local');
+  });
+
+  it("mode fixCmd uses actual scope when mode is set in project scope file", () => {
+    const f = makeFile("project", { permissions: { defaultMode: "bypassPermissions", allow: ["Bash(*)"] } });
+    const result = mergeSettingsFiles([f]);
+    const w = result.warnings.find((w) => w.severity === "critical");
+    expect(w?.fixCmd).toBe("cpm mode default --scope project");
+  });
+
+  it("rule fixCmd uses actual scope when rule is in project scope file", () => {
+    const f = makeFile("project", { permissions: { allow: ["Bash"] } });
+    const result = mergeSettingsFiles([f]);
+    const w = result.warnings.find((w) => /Bash is allowed without/.test(w.message));
+    expect(w?.fixCmd).toBe('cpm reset "Bash" --scope project');
   });
 
   it("warnings without a clear fix action have no fixCmd", () => {

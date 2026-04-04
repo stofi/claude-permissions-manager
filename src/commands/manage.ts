@@ -857,3 +857,100 @@ export async function batchBypassLockCommand(
     process.exit(1);
   }
 }
+
+/** Clear ALL permission rules from ALL discovered projects at once. */
+export async function batchResetAllCommand(
+  opts: ScanOptions & {
+    scope?: string;
+    dryRun?: boolean;
+    yes?: boolean;
+    _confirmFn?: (q: string) => Promise<boolean>;
+  }
+): Promise<void> {
+  const scope = resolveScope(opts.scope);
+
+  if (scope === "user") {
+    console.log(chalk.yellow(`⚠ --scope user would clear rules from ~/.claude/settings.json globally.`));
+    console.log(chalk.yellow(`  Use: cpm reset-all --scope user --yes`));
+    return;
+  }
+
+  process.stderr.write(chalk.gray("Scanning for Claude projects...\n"));
+  const result = await scan(opts);
+  const projects = result.projects;
+
+  if (projects.length === 0) {
+    console.log(chalk.yellow("No Claude projects found."));
+    return;
+  }
+
+  // Pre-check: which projects have any rules to clear?
+  type ProjectRuleCounts = { projectPath: string; allow: number; deny: number; ask: number; total: number };
+  const toReset: ProjectRuleCounts[] = [];
+  const alreadyEmpty: string[] = [];
+
+  for (const p of projects) {
+    const settingsPath = resolveSettingsPath(scope, p.rootPath);
+    const existing = await readSettingsOrEmpty(settingsPath);
+    const perms = existing.permissions;
+    const allowCount = Array.isArray(perms?.allow) ? perms.allow.length : 0;
+    const denyCount = Array.isArray(perms?.deny) ? perms.deny.length : 0;
+    const askCount = Array.isArray(perms?.ask) ? perms.ask.length : 0;
+    const total = allowCount + denyCount + askCount;
+    if (total > 0) {
+      toReset.push({ projectPath: p.rootPath, allow: allowCount, deny: denyCount, ask: askCount, total });
+    } else {
+      alreadyEmpty.push(p.rootPath);
+    }
+  }
+
+  if (toReset.length === 0) {
+    console.log(chalk.yellow(`\nAll ${alreadyEmpty.length} project(s) already have no rules.`));
+    return;
+  }
+
+  const totalRules = toReset.reduce((sum, p) => sum + p.total, 0);
+  console.log(chalk.red.bold(`\n⚠ This will clear ALL permission rules from ${toReset.length} project(s) (${totalRules} rules total):`));
+  for (const p of toReset) {
+    const parts = [
+      p.allow > 0 ? `${p.allow} allow` : "",
+      p.deny > 0 ? `${p.deny} deny` : "",
+      p.ask > 0 ? `${p.ask} ask` : "",
+    ].filter(Boolean).join(", ");
+    console.log(`  ${collapseHome(p.projectPath)} ${chalk.dim(`(${parts})`)}`);
+  }
+  if (alreadyEmpty.length > 0) {
+    console.log(chalk.gray(`\nSkipped ${alreadyEmpty.length} already empty.`));
+  }
+
+  if (opts.dryRun) {
+    console.log(chalk.cyan(`\n[dry-run] No files will be modified`));
+    return;
+  }
+
+  const confirmFn = opts._confirmFn ?? promptConfirm;
+  const proceed = opts.yes || await confirmFn(chalk.red("\nClear all rules in all listed projects? [Y/n] "));
+  if (!proceed) {
+    console.log(chalk.gray("Aborted."));
+    return;
+  }
+
+  let cleared = 0;
+  const errors: string[] = [];
+  for (const { projectPath } of toReset) {
+    const settingsPath = resolveSettingsPath(scope, projectPath);
+    try {
+      await clearAllRules(settingsPath);
+      cleared++;
+    } catch (e) {
+      errors.push(`${collapseHome(projectPath)}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  console.log(chalk.green(`\n✓ Cleared all rules in ${cleared} project(s)`));
+  if (errors.length > 0) {
+    console.log(chalk.red(`\n${errors.length} error(s):`));
+    for (const err of errors) console.log(chalk.red(`  ${err}`));
+    process.exit(1);
+  }
+}

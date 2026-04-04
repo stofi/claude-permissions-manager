@@ -28,7 +28,7 @@ import { editCommand } from "../src/commands/edit.js";
 import { statsCommand } from "../src/commands/stats.js";
 import { searchCommand } from "../src/commands/search.js";
 import { rulesCommand } from "../src/commands/rules.js";
-import { batchAddCommand, batchRemoveCommand, batchModeCommand, replaceRuleCommand, batchReplaceCommand, batchBypassLockCommand } from "../src/commands/manage.js";
+import { batchAddCommand, batchRemoveCommand, batchModeCommand, replaceRuleCommand, batchReplaceCommand, batchBypassLockCommand, batchResetAllCommand } from "../src/commands/manage.js";
 import { copyCommand, batchCopyCommand } from "../src/commands/copy.js";
 
 // ────────────────────────────────────────────────────────────
@@ -7238,5 +7238,173 @@ describe("batchBypassLockCommand — bypass-lock --all", () => {
     const out = lines.join("\n");
     expect(out).toMatch(/enabled in 3 project/i);
     expect(out).not.toMatch(/Skipped/);
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// batchResetAllCommand — reset --all (no rule)
+// ────────────────────────────────────────────────────────────
+
+describe("batchResetAllCommand — reset --all", () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), "cpm-batch-reset-all-"));
+    for (const name of ["proj-a", "proj-b", "proj-c"]) {
+      const dir = join(root, name, ".claude");
+      await mkdir(dir, { recursive: true });
+      await writeFile(
+        join(dir, "settings.json"),
+        JSON.stringify({ permissions: { allow: ["Bash(npm run *)", "Read(*)"], deny: ["Write(**)"] } })
+      );
+    }
+  });
+
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it("--yes clears all rules from all projects", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchResetAllCommand({ root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project" });
+    const out = lines.join("\n");
+    expect(out).toMatch(/Cleared all rules in 3 project/i);
+    for (const name of ["proj-a", "proj-b", "proj-c"]) {
+      const data = JSON.parse(await readFile(join(root, name, ".claude", "settings.json"), "utf-8"));
+      expect(data.permissions?.allow).toEqual([]);
+      expect(data.permissions?.deny).toEqual([]);
+    }
+  });
+
+  it("--dry-run shows preview without modifying files", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchResetAllCommand({ root, maxDepth: 2, includeGlobal: false, dryRun: true, scope: "project" });
+    const out = lines.join("\n");
+    expect(out).toMatch(/\[dry-run\]/);
+    expect(out).toMatch(/3 project/);
+    // Files unchanged
+    const data = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions?.allow).toContain("Bash(npm run *)");
+  });
+
+  it("aborts when user declines confirmation", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchResetAllCommand({
+      root, maxDepth: 2, includeGlobal: false, scope: "project",
+      _confirmFn: async () => false,
+    });
+    expect(lines.join("\n")).toMatch(/Aborted/i);
+    const data = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions?.allow).toContain("Bash(npm run *)");
+  });
+
+  it("applies when user confirms via prompt (no --yes)", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchResetAllCommand({
+      root, maxDepth: 2, includeGlobal: false, scope: "project",
+      _confirmFn: async () => true,
+    });
+    expect(lines.join("\n")).toMatch(/Cleared all rules in 3 project/i);
+  });
+
+  it("shows ask rules in preview and counts them correctly", async () => {
+    // Covers Array.isArray(perms.ask) true arm and `p.ask > 0` ternary true arm
+    // Also covers `p.allow > 0` false arm and `p.deny > 0` false arm
+    // by using a project that has only ask rules
+    await writeFile(
+      join(root, "proj-a", ".claude", "settings.json"),
+      JSON.stringify({ permissions: { ask: ["Read(**)"] } })
+    );
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchResetAllCommand({ root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project" });
+    const out = lines.join("\n");
+    expect(out).toMatch(/1 ask/);
+    expect(out).toMatch(/Cleared all rules in 3 project/i);
+  });
+
+  it("skips projects that already have no rules", async () => {
+    // Make proj-a empty
+    await writeFile(
+      join(root, "proj-a", ".claude", "settings.json"),
+      JSON.stringify({ permissions: {} })
+    );
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchResetAllCommand({ root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project" });
+    const out = lines.join("\n");
+    expect(out).toMatch(/Cleared all rules in 2 project/i);
+    expect(out).toMatch(/Skipped 1 already empty/i);
+  });
+
+  it("shows 'all projects already have no rules' when nothing to do", async () => {
+    // Make all projects empty
+    for (const name of ["proj-a", "proj-b", "proj-c"]) {
+      await writeFile(
+        join(root, name, ".claude", "settings.json"),
+        JSON.stringify({ permissions: {} })
+      );
+    }
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchResetAllCommand({ root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project" });
+    const out = lines.join("\n");
+    expect(out).toMatch(/already have no rules/i);
+  });
+
+  it("shows 'no projects found' when root is empty", async () => {
+    const emptyRoot = mkdtempSync(join(tmpdir(), "cpm-empty-"));
+    try {
+      const lines: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+      vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      await batchResetAllCommand({ root: emptyRoot, maxDepth: 2, includeGlobal: false, yes: true, scope: "project" });
+      expect(lines.join("\n")).toMatch(/No Claude projects found/i);
+    } finally {
+      rmSync(emptyRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("warns and returns when --scope user is specified", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchResetAllCommand({ root, maxDepth: 2, includeGlobal: false, scope: "user" });
+    expect(lines.join("\n")).toMatch(/user.*would clear/i);
+  });
+
+  it("exits 1 on invalid scope", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    await expect(
+      batchResetAllCommand({ root, maxDepth: 2, includeGlobal: false, scope: "invalid" })
+    ).rejects.toThrow("exit:1");
+    exitSpy.mockRestore();
+  });
+
+  it("reports write errors and exits 1 when a target project is not writable", async () => {
+    const lockedDir = join(root, "proj-a", ".claude");
+    chmodSync(lockedDir, 0o555);
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    try {
+      await expect(
+        batchResetAllCommand({ root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project" })
+      ).rejects.toThrow("exit:1");
+      expect(lines.join("\n")).toMatch(/error/i);
+    } finally {
+      chmodSync(lockedDir, 0o755);
+      exitSpy.mockRestore();
+    }
   });
 });

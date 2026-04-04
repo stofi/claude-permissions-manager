@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createRequire } from "module";
 import { Command, Option, Argument } from "commander";
+import chalk from "chalk";
 import { listCommand } from "./commands/list.js";
 import { showCommand } from "./commands/show.js";
 import { auditCommand } from "./commands/audit.js";
@@ -248,14 +249,24 @@ program
   });
 
 program
-  .command("copy <source> <target>")
+  .command("copy <source> [target]")
   .description("Copy project-level permissions from one project to another (merges into target)")
   .addOption(new Option("--scope <scope>", "Target scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
+  .option("--all", "Copy to all discovered projects")
   .option("--dry-run", "Show what would be copied without making changes")
   .option("--yes", "Skip confirmation prompt")
-  .action(async (source: string, target: string, opts: { scope?: string; dryRun?: boolean; yes?: boolean }) => {
-    const { copyCommand } = await import("./commands/copy.js");
-    await copyCommand(source, target, { ...opts, dryRun: opts.dryRun });
+  .action(async (source: string, target: string | undefined, opts: { scope?: string; all?: boolean; dryRun?: boolean; yes?: boolean }) => {
+    const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
+    if (opts.all) {
+      const { batchCopyCommand } = await import("./commands/copy.js");
+      await batchCopyCommand(source, { root, maxDepth: parseDepth(depth), includeGlobal: g !== false, ...opts, dryRun: opts.dryRun });
+    } else if (target) {
+      const { copyCommand } = await import("./commands/copy.js");
+      await copyCommand(source, target, { ...opts, dryRun: opts.dryRun });
+    } else {
+      console.error(chalk.red("Error: must specify a <target> path or use --all to copy to all projects."));
+      process.exit(1);
+    }
   });
 
 program

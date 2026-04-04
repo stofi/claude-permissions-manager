@@ -32,6 +32,7 @@ const COMMANDS = [
   "stats",
   "search",
   "rules",
+  "mcp",
   "show",
   "audit",
   "diff",
@@ -247,6 +248,7 @@ function zshScript(): string {
       stats: "Show aggregate permission statistics",
       search: "Find projects by rule pattern",
       rules: "List unique rules ranked by frequency",
+      mcp: "List MCP servers across projects with approval states",
       show: "Show project permissions",
       audit: "Report risky permissions",
       diff: "Compare two projects",
@@ -409,6 +411,15 @@ ${commandDefs}
             '--no-global[Skip user and managed global settings]' \\
             '--type[Only show this rule list]:type:(allow deny ask)' \\
             '--top[Show only top N rules by frequency]:n:'
+          ;;
+        mcp)
+          _arguments \\
+            '--root[Root directory]:root:_directories' \\
+            '--depth[Max scan depth]:depth:' \\
+            '--json[Output as JSON]' \\
+            '--no-global[Skip user and managed global settings]' \\
+            '--type[Filter by server type]:type:(stdio http)' \\
+            '--approval[Filter by approval state]:state:(approved denied pending)'
           ;;
         ui)
           _arguments \\

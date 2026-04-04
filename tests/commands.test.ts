@@ -7735,3 +7735,189 @@ describe("batchDedupCommand", () => {
     }
   });
 });
+
+// ────────────────────────────────────────────────────────────
+// mcpCommand
+// ────────────────────────────────────────────────────────────
+
+import { mcpCommand } from "../src/commands/mcp.js";
+
+describe("mcpCommand", () => {
+  let root: string;
+  const lines: string[] = [];
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), "cpm-mcp-"));
+    lines.length = 0;
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join(" ")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  async function makeProject(
+    name: string,
+    mcpServers: Record<string, object>
+  ): Promise<string> {
+    const dir = join(root, name);
+    mkdirSync(join(dir, ".claude"), { recursive: true });
+    await writeFile(join(dir, ".claude", "settings.json"), JSON.stringify({}));
+    await writeFile(join(dir, ".mcp.json"), JSON.stringify({ mcpServers }));
+    return dir;
+  }
+
+  it("lists MCP servers across projects ranked by frequency", async () => {
+    await makeProject("proj-a", {
+      github: { command: "npx", args: ["-y", "@mcp/server-github"] },
+      filesystem: { command: "npx", args: ["-y", "@mcp/server-filesystem"] },
+    });
+    await makeProject("proj-b", {
+      github: { command: "npx", args: ["-y", "@mcp/server-github"] },
+    });
+    await mcpCommand(undefined, { root, maxDepth: 2, includeGlobal: false });
+    const out = lines.join("\n");
+    expect(out).toMatch(/github/);
+    expect(out).toMatch(/filesystem/);
+    // github appears in 2 projects, should be listed first
+    expect(out.indexOf("github")).toBeLessThan(out.indexOf("filesystem"));
+  });
+
+  it("shows 'no MCP servers found' when no projects have MCP", async () => {
+    mkdirSync(join(root, "empty", ".claude"), { recursive: true });
+    await writeFile(join(root, "empty", ".claude", "settings.json"), JSON.stringify({}));
+    await mcpCommand(undefined, { root, maxDepth: 2, includeGlobal: false });
+    expect(lines.join("\n")).toMatch(/no mcp servers found/i);
+  });
+
+  it("shows 'not found' when filtering by non-existent server name", async () => {
+    await makeProject("proj-a", {
+      github: { command: "npx", args: [] },
+    });
+    await mcpCommand("nonexistent", { root, maxDepth: 2, includeGlobal: false });
+    expect(lines.join("\n")).toMatch(/no mcp server named "nonexistent"/i);
+  });
+
+  it("detail view: shows single server with per-project details", async () => {
+    await makeProject("proj-a", {
+      github: { command: "npx", args: ["-y", "@mcp/server-github"], env: { GITHUB_TOKEN: "secret" } },
+    });
+    await mcpCommand("github", { root, maxDepth: 2, includeGlobal: false });
+    const out = lines.join("\n");
+    expect(out).toMatch(/MCP server: github/i);
+    expect(out).toMatch(/1 project/i);
+  });
+
+  it("--json outputs structured result", async () => {
+    await makeProject("proj-a", {
+      github: { command: "npx", args: ["-y", "@mcp/server-github"] },
+    });
+    await mcpCommand(undefined, { root, maxDepth: 2, includeGlobal: false, json: true });
+    const output = JSON.parse(lines.join(""));
+    expect(output.uniqueServerCount).toBe(1);
+    expect(output.servers[0].name).toBe("github");
+    expect(output.servers[0].projectCount).toBe(1);
+  });
+
+  it("--json with name filter shows only matching server", async () => {
+    await makeProject("proj-a", {
+      github: { command: "npx", args: [] },
+      filesystem: { command: "npx", args: [] },
+    });
+    await mcpCommand("github", { root, maxDepth: 2, includeGlobal: false, json: true });
+    const output = JSON.parse(lines.join(""));
+    expect(output.uniqueServerCount).toBe(1);
+    expect(output.servers[0].name).toBe("github");
+    expect(output.nameFilter).toBe("github");
+  });
+
+  it("--type stdio filters to stdio servers only", async () => {
+    await makeProject("proj-a", {
+      github: { command: "npx", args: [] },
+      webserver: { type: "http", url: "https://example.com/mcp" },
+    });
+    await mcpCommand(undefined, { root, maxDepth: 2, includeGlobal: false, type: "stdio" });
+    const out = lines.join("\n");
+    expect(out).toMatch(/github/);
+    expect(out).not.toMatch(/webserver/);
+  });
+
+  it("--type http filters to http servers only", async () => {
+    await makeProject("proj-a", {
+      github: { command: "npx", args: [] },
+      webserver: { type: "http", url: "https://example.com/mcp" },
+    });
+    await mcpCommand(undefined, { root, maxDepth: 2, includeGlobal: false, type: "http" });
+    const out = lines.join("\n");
+    expect(out).not.toMatch(/github/);
+    expect(out).toMatch(/webserver/);
+  });
+
+  it("--approval pending filters to pending-only servers", async () => {
+    // MCP servers in .mcp.json without approval state default to 'pending'
+    await makeProject("proj-a", {
+      github: { command: "npx", args: [] },
+    });
+    await mcpCommand(undefined, { root, maxDepth: 2, includeGlobal: false, approval: "pending" });
+    const out = lines.join("\n");
+    expect(out).toMatch(/github/);
+  });
+
+  it("--approval approved returns no servers when all are pending", async () => {
+    await makeProject("proj-a", {
+      github: { command: "npx", args: [] },
+    });
+    await mcpCommand(undefined, { root, maxDepth: 2, includeGlobal: false, approval: "approved" });
+    expect(lines.join("\n")).toMatch(/no mcp servers found/i);
+  });
+
+  it("--json typeFilter and approvalFilter fields reflect options", async () => {
+    await makeProject("proj-a", { github: { command: "npx", args: [] } });
+    await mcpCommand(undefined, { root, maxDepth: 2, includeGlobal: false, json: true, type: "stdio", approval: "pending" });
+    const output = JSON.parse(lines.join(""));
+    expect(output.typeFilter).toBe("stdio");
+    expect(output.approvalFilter).toBe("pending");
+  });
+
+  it("detail view shows url for http servers", async () => {
+    await makeProject("proj-a", {
+      webserver: { type: "http", url: "https://example.com/mcp" },
+    });
+    await mcpCommand("webserver", { root, maxDepth: 2, includeGlobal: false });
+    const out = lines.join("\n");
+    expect(out).toMatch(/url: https:\/\/example\.com\/mcp/);
+  });
+
+  it("--json with http server shows null command and empty args (covers ??null/??[] branches)", async () => {
+    await makeProject("proj-a", {
+      webserver: { type: "http", url: "https://example.com/mcp" },
+    });
+    await mcpCommand(undefined, { root, maxDepth: 2, includeGlobal: false, json: true });
+    const output = JSON.parse(lines.join(""));
+    const server = output.servers[0];
+    expect(server.name).toBe("webserver");
+    expect(server.projects[0].command).toBeNull();
+    expect(server.projects[0].args).toEqual([]);
+  });
+
+  it("detail view with command and empty args (covers args.length=0 branch)", async () => {
+    await makeProject("proj-a", {
+      minimal: { command: "myserver" },  // no args
+    });
+    await mcpCommand("minimal", { root, maxDepth: 2, includeGlobal: false });
+    const out = lines.join("\n");
+    expect(out).toMatch(/command: myserver/);
+  });
+
+  it("detail view with no command and no url shows blank connection (covers empty connStr branch)", async () => {
+    // Broken/minimal server entry with neither command nor url
+    await makeProject("proj-a", {
+      brokenserver: { type: "stdio" },
+    });
+    await mcpCommand("brokenserver", { root, maxDepth: 2, includeGlobal: false });
+    const out = lines.join("\n");
+    expect(out).toMatch(/brokenserver/);
+  });
+});

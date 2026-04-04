@@ -24,10 +24,17 @@ export interface DedupConflict {
   lists: string[];
 }
 
+export interface DedupConflictResolution {
+  rule: string;
+  removedFrom: RuleList;
+  keptIn: RuleList;
+}
+
 export interface DedupResult {
   settingsPath: string;
   removed: DedupRemoval[];
   conflicts: DedupConflict[];
+  resolvedConflicts: DedupConflictResolution[];
 }
 
 function resolveProject(projectOpt?: string): string {
@@ -93,8 +100,51 @@ function findConflicts(allow: string[], deny: string[], ask: string[]): DedupCon
   return conflicts;
 }
 
+/**
+ * Resolve cross-list conflicts by removing the "loser" rule from its list.
+ * Precedence: deny > allow > ask
+ * - deny + allow → remove from allow
+ * - deny + ask → remove from ask
+ * - allow + ask (no deny) → remove from ask
+ */
+function resolveConflictsList(
+  allow: string[], deny: string[], ask: string[]
+): {
+  resolvedAllow: string[];
+  resolvedAsk: string[];
+  resolutions: DedupConflictResolution[];
+} {
+  const resolutions: DedupConflictResolution[] = [];
+  const denySet = new Set(deny.map((r) => r.toLowerCase()));
+  const allowSet = new Set(allow.map((r) => r.toLowerCase()));
+
+  // deny beats allow — remove from allow
+  const resolvedAllow = allow.filter((rule) => {
+    if (denySet.has(rule.toLowerCase())) {
+      resolutions.push({ rule, removedFrom: "allow", keptIn: "deny" });
+      return false;
+    }
+    return true;
+  });
+
+  // deny beats ask; allow beats ask — remove from ask
+  const resolvedAsk = ask.filter((rule) => {
+    if (denySet.has(rule.toLowerCase())) {
+      resolutions.push({ rule, removedFrom: "ask", keptIn: "deny" });
+      return false;
+    }
+    if (allowSet.has(rule.toLowerCase())) {
+      resolutions.push({ rule, removedFrom: "ask", keptIn: "allow" });
+      return false;
+    }
+    return true;
+  });
+
+  return { resolvedAllow, resolvedAsk, resolutions };
+}
+
 /** Compute dedup result for a single settings file without writing anything */
-export async function computeDedup(settingsPath: string): Promise<DedupResult> {
+export async function computeDedup(settingsPath: string, fixConflicts = false): Promise<DedupResult> {
   const existing = await readSettingsOrEmpty(settingsPath);
   const perms = existing.permissions ?? {};
   const allow = Array.isArray(perms.allow) ? (perms.allow as string[]) : [];
@@ -110,12 +160,23 @@ export async function computeDedup(settingsPath: string): Promise<DedupResult> {
   for (const rule of removedDeny) removed.push({ list: "deny", rule });
   for (const rule of removedAsk) removed.push({ list: "ask", rule });
 
-  const conflicts = findConflicts(dedupedAllow, dedupedDeny, dedupedAsk);
-  return { settingsPath, removed, conflicts };
+  let resolvedConflicts: DedupConflictResolution[] = [];
+  let finalAllow = dedupedAllow;
+  let finalAsk = dedupedAsk;
+
+  if (fixConflicts) {
+    const res = resolveConflictsList(dedupedAllow, dedupedDeny, dedupedAsk);
+    resolvedConflicts = res.resolutions;
+    finalAllow = res.resolvedAllow;
+    finalAsk = res.resolvedAsk;
+  }
+
+  const conflicts = findConflicts(finalAllow, dedupedDeny, finalAsk);
+  return { settingsPath, removed, conflicts, resolvedConflicts };
 }
 
 /** Apply a computed dedup result, writing the cleaned settings file */
-async function applyDedup(result: DedupResult): Promise<void> {
+async function applyDedup(result: DedupResult, fixConflicts = false): Promise<void> {
   const existing = await readSettingsOrEmpty(result.settingsPath);
   const perms = existing.permissions ?? {};
   const allow = Array.isArray(perms.allow) ? (perms.allow as string[]) : [];
@@ -126,12 +187,20 @@ async function applyDedup(result: DedupResult): Promise<void> {
   const { deduped: dedupedDeny } = deduplicateList(deny);
   const { deduped: dedupedAsk } = deduplicateList(ask);
 
+  let finalAllow = dedupedAllow;
+  let finalAsk = dedupedAsk;
+  if (fixConflicts) {
+    const res = resolveConflictsList(dedupedAllow, dedupedDeny, dedupedAsk);
+    finalAllow = res.resolvedAllow;
+    finalAsk = res.resolvedAsk;
+  }
+
   const updatedPerms: Record<string, unknown> = { ...perms };
-  if (dedupedAllow.length) updatedPerms.allow = dedupedAllow;
+  if (finalAllow.length) updatedPerms.allow = finalAllow;
   else delete updatedPerms.allow;
   if (dedupedDeny.length) updatedPerms.deny = dedupedDeny;
   else delete updatedPerms.deny;
-  if (dedupedAsk.length) updatedPerms.ask = dedupedAsk;
+  if (finalAsk.length) updatedPerms.ask = finalAsk;
   else delete updatedPerms.ask;
 
   await writeSettings({ ...existing, permissions: updatedPerms as typeof perms }, result.settingsPath);
@@ -142,6 +211,12 @@ function printDedupResult(result: DedupResult, prefix = ""): void {
     for (const { list, rule } of result.removed) {
       const listColor = list === "allow" ? chalk.green : list === "deny" ? chalk.red : chalk.yellow;
       console.log(`${prefix}  ${chalk.dim("remove duplicate")} ${listColor(list)}  ${rule}`);
+    }
+  }
+  if (result.resolvedConflicts.length > 0) {
+    for (const { rule, removedFrom, keptIn } of result.resolvedConflicts) {
+      const fromColor = removedFrom === "allow" ? chalk.green : removedFrom === "deny" ? chalk.red : chalk.yellow;
+      console.log(`${prefix}  ${chalk.cyan("fix conflict")}    remove from ${fromColor(removedFrom)}  ${rule}  ${chalk.dim(`(${keptIn} wins)`)}`);
     }
   }
   if (result.conflicts.length > 0) {
@@ -158,26 +233,30 @@ export async function dedupCommand(opts: {
   dryRun?: boolean;
   yes?: boolean;
   json?: boolean;
+  fixConflicts?: boolean;
   _confirmFn?: (q: string) => Promise<boolean>;
 }): Promise<void> {
   const scope = resolveScope(opts.scope);
   const projectPath = resolveProject(opts.project);
   const settingsPath = resolveSettingsPath(scope, projectPath);
 
-  const result = await computeDedup(settingsPath);
+  const result = await computeDedup(settingsPath, opts.fixConflicts);
+  const totalChanges = result.removed.length + result.resolvedConflicts.length;
 
   if (opts.json) {
     console.log(JSON.stringify({
       settingsPath: collapseHome(settingsPath),
       removedCount: result.removed.length,
       conflictCount: result.conflicts.length,
+      resolvedConflictCount: result.resolvedConflicts.length,
       removed: result.removed,
       conflicts: result.conflicts,
+      resolvedConflicts: result.resolvedConflicts,
     }, null, 2));
     return;
   }
 
-  if (result.removed.length === 0 && result.conflicts.length === 0) {
+  if (totalChanges === 0 && result.conflicts.length === 0) {
     console.log(chalk.green(`✓ No duplicates found in ${collapseHome(settingsPath)}`));
     return;
   }
@@ -185,28 +264,39 @@ export async function dedupCommand(opts: {
   console.log(`\n${collapseHome(settingsPath)} [${scope}]:`);
   printDedupResult(result);
 
-  if (result.removed.length === 0) {
-    // Only conflicts — nothing to write
-    console.log(chalk.yellow(`\n⚠ ${result.conflicts.length} conflict(s) found. Resolve manually with cpm allow/deny/reset.`));
+  if (totalChanges === 0) {
+    // Only unresolved conflicts — nothing to write
+    console.log(chalk.yellow(`\n⚠ ${result.conflicts.length} conflict(s) found. Use --fix-conflicts to auto-resolve, or cpm allow/deny/reset.`));
     return;
   }
 
   if (opts.dryRun) {
-    console.log(chalk.cyan(`\n[dry-run] Would remove ${result.removed.length} duplicate(s). No files modified.`));
+    const parts: string[] = [];
+    if (result.removed.length) parts.push(`${result.removed.length} duplicate(s)`);
+    if (result.resolvedConflicts.length) parts.push(`${result.resolvedConflicts.length} conflict(s)`);
+    console.log(chalk.cyan(`\n[dry-run] Would remove ${parts.join(", ")}. No files modified.`));
     return;
   }
 
   const confirmFn = opts._confirmFn ?? promptConfirm;
-  const proceed = opts.yes || await confirmFn(chalk.yellow(`\nRemove ${result.removed.length} duplicate(s)? [Y/n] `));
+  const parts: string[] = [];
+  if (result.removed.length) parts.push(`${result.removed.length} duplicate(s)`);
+  if (result.resolvedConflicts.length) parts.push(`resolve ${result.resolvedConflicts.length} conflict(s)`);
+  const proceed = opts.yes || await confirmFn(chalk.yellow(`\nRemove ${parts.join(", ")}? [Y/n] `));
   if (!proceed) {
     console.log(chalk.gray("Aborted."));
     return;
   }
 
-  await applyDedup(result);
-  console.log(chalk.green(`\n✓ Removed ${result.removed.length} duplicate(s) from ${collapseHome(settingsPath)}`));
+  await applyDedup(result, opts.fixConflicts);
+
+  const doneMsg: string[] = [];
+  if (result.removed.length) doneMsg.push(`Removed ${result.removed.length} duplicate(s)`);
+  if (result.resolvedConflicts.length) doneMsg.push(`resolved ${result.resolvedConflicts.length} conflict(s)`);
+  console.log(chalk.green(`\n✓ ${doneMsg.join(", ")} in ${collapseHome(settingsPath)}`));
+
   if (result.conflicts.length > 0) {
-    console.log(chalk.yellow(`⚠ ${result.conflicts.length} conflict(s) remain. Resolve manually with cpm allow/deny/reset.`));
+    console.log(chalk.yellow(`⚠ ${result.conflicts.length} conflict(s) remain. Use --fix-conflicts to auto-resolve.`));
   }
 }
 
@@ -217,6 +307,7 @@ export async function batchDedupCommand(
     dryRun?: boolean;
     yes?: boolean;
     json?: boolean;
+    fixConflicts?: boolean;
     _confirmFn?: (q: string) => Promise<boolean>;
   }
 ): Promise<void> {
@@ -239,55 +330,59 @@ export async function batchDedupCommand(
   const results: (DedupResult & { projectPath: string })[] = [];
   for (const project of projects) {
     const settingsPath = resolveSettingsPath(scope, project.rootPath);
-    const result = await computeDedup(settingsPath);
+    const result = await computeDedup(settingsPath, opts.fixConflicts);
     results.push({ ...result, projectPath: project.rootPath });
   }
 
-  const withDuplicates = results.filter((r) => r.removed.length > 0);
+  const withChanges = results.filter((r) => r.removed.length > 0 || r.resolvedConflicts.length > 0);
   const withConflicts = results.filter((r) => r.conflicts.length > 0);
-  const totalRemoved = withDuplicates.reduce((sum, r) => sum + r.removed.length, 0);
+  const totalRemoved = withChanges.reduce((sum, r) => sum + r.removed.length + r.resolvedConflicts.length, 0);
 
   if (opts.json) {
     console.log(JSON.stringify({
       projectCount: projects.length,
-      projectsWithDuplicates: withDuplicates.length,
-      totalDuplicatesRemoved: totalRemoved,
+      projectsWithChanges: withChanges.length,
+      totalChanges: totalRemoved,
       results: results.map((r) => ({
         project: collapseHome(r.projectPath),
         settingsPath: collapseHome(r.settingsPath),
         removedCount: r.removed.length,
         conflictCount: r.conflicts.length,
+        resolvedConflictCount: r.resolvedConflicts.length,
         removed: r.removed,
         conflicts: r.conflicts,
+        resolvedConflicts: r.resolvedConflicts,
       })),
     }, null, 2));
     return;
   }
 
-  if (withDuplicates.length === 0 && withConflicts.length === 0) {
+  if (withChanges.length === 0 && withConflicts.length === 0) {
     console.log(chalk.green(`✓ No duplicates found across ${projects.length} project(s).`));
     return;
   }
 
-  console.log(`\nFound duplicates in ${chalk.bold(withDuplicates.length)} of ${projects.length} project(s):`);
-  for (const r of withDuplicates) {
-    console.log(`\n  ${chalk.bold(collapseHome(r.projectPath))}`);
-    printDedupResult(r, " ");
+  if (withChanges.length > 0) {
+    console.log(`\nFound changes in ${chalk.bold(withChanges.length)} of ${projects.length} project(s):`);
+    for (const r of withChanges) {
+      console.log(`\n  ${chalk.bold(collapseHome(r.projectPath))}`);
+      printDedupResult(r, " ");
+    }
   }
-  if (withConflicts.length > 0 && withDuplicates.length === 0) {
-    console.log(`\nConflicts found in ${chalk.bold(withConflicts.length)} project(s) — resolve manually.`);
+  if (withConflicts.length > 0 && withChanges.length === 0) {
+    console.log(`\nConflicts found in ${chalk.bold(withConflicts.length)} project(s) — use --fix-conflicts to auto-resolve.`);
   }
 
-  if (withDuplicates.length === 0) return;
+  if (withChanges.length === 0) return;
 
   if (opts.dryRun) {
-    console.log(chalk.cyan(`\n[dry-run] Would remove ${totalRemoved} duplicate(s) from ${withDuplicates.length} project(s). No files modified.`));
+    console.log(chalk.cyan(`\n[dry-run] Would make ${totalRemoved} change(s) across ${withChanges.length} project(s). No files modified.`));
     return;
   }
 
   const confirmFn = opts._confirmFn ?? promptConfirm;
   const proceed = opts.yes || await confirmFn(
-    chalk.yellow(`\nRemove ${totalRemoved} duplicate(s) from ${withDuplicates.length} project(s)? [Y/n] `)
+    chalk.yellow(`\nApply ${totalRemoved} change(s) to ${withChanges.length} project(s)? [Y/n] `)
   );
   if (!proceed) {
     console.log(chalk.gray("Aborted."));
@@ -296,21 +391,21 @@ export async function batchDedupCommand(
 
   let successCount = 0;
   const errors: string[] = [];
-  for (const r of withDuplicates) {
+  for (const r of withChanges) {
     try {
-      await applyDedup(r);
+      await applyDedup(r, opts.fixConflicts);
       successCount++;
     } catch (e) {
       errors.push(`${collapseHome(r.projectPath)}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
-  console.log(chalk.green(`\n✓ Removed duplicates from ${successCount} project(s).`));
+  console.log(chalk.green(`\n✓ Updated ${successCount} project(s).`));
   if (errors.length > 0) {
     console.log(chalk.red(`\n✗ ${errors.length} error(s):`));
     for (const err of errors) console.log(chalk.red(`  ${err}`));
   }
   if (withConflicts.length > 0) {
-    console.log(chalk.yellow(`\n⚠ ${withConflicts.length} project(s) have cross-list conflicts. Resolve manually.`));
+    console.log(chalk.yellow(`\n⚠ ${withConflicts.length} project(s) have cross-list conflicts. Use --fix-conflicts to auto-resolve.`));
   }
 }

@@ -643,6 +643,66 @@ describe("mergeSettingsFiles — warning detection", () => {
     expect(conflict).toBeDefined();
   });
 
+  it("allow+deny same scope: fixCmd is cpm dedup --fix-conflicts, no fixOp", () => {
+    const f = makeFile("project", { permissions: { allow: ["Read"], deny: ["Read"] } });
+    const result = mergeSettingsFiles([f]);
+    const conflict = result.warnings.find((w) => w.message.includes("both allow and deny"));
+    expect(conflict).toBeDefined();
+    expect(conflict!.fixCmd).toBe("cpm dedup --fix-conflicts --scope project");
+    expect(conflict!.fixOp).toBeUndefined();
+  });
+
+  it("allow+deny cross-scope: fixCmd is cpm reset, fixOp is reset op (covers merger.ts:270-281 branch)", () => {
+    // allow in local, deny in project → different scopes
+    const local = makeFile("local", { permissions: { allow: ["Bash"] } });
+    const project = makeFile("project", { permissions: { deny: ["Bash"] } });
+    const result = mergeSettingsFiles([local, project]);
+    const conflict = result.warnings.find((w) => w.message.includes("both allow and deny"));
+    expect(conflict).toBeDefined();
+    expect(conflict!.fixCmd).toBe(`cpm reset "Bash" --scope local`);
+    expect(conflict!.fixOp).toEqual({ kind: "reset", rule: "Bash", scope: "local" });
+  });
+
+  it("ask+deny same scope: fixCmd is cpm dedup --fix-conflicts, no fixOp", () => {
+    const f = makeFile("project", { permissions: { ask: ["WebFetch(*)"], deny: ["WebFetch(*)"] } });
+    const result = mergeSettingsFiles([f]);
+    const conflict = result.warnings.find((w) => w.message.includes("both ask and deny"));
+    expect(conflict).toBeDefined();
+    expect(conflict!.fixCmd).toBe("cpm dedup --fix-conflicts --scope project");
+    expect(conflict!.fixOp).toBeUndefined();
+  });
+
+  it("ask+deny cross-scope: fixCmd is cpm reset, fixOp is reset op (covers merger.ts:270-281 !sameScope branch)", () => {
+    // ask in local, deny in project → different scopes
+    const local = makeFile("local", { permissions: { ask: ["Glob(*)"] } });
+    const project = makeFile("project", { permissions: { deny: ["Glob(*)"] } });
+    const result = mergeSettingsFiles([local, project]);
+    const conflict = result.warnings.find((w) => w.message.includes("both ask and deny"));
+    expect(conflict).toBeDefined();
+    expect(conflict!.fixCmd).toBe(`cpm reset "Glob(*)" --scope local`);
+    expect(conflict!.fixOp).toEqual({ kind: "reset", rule: "Glob(*)", scope: "local" });
+  });
+
+  it("allow+ask same scope: fixCmd is cpm dedup --fix-conflicts, no fixOp", () => {
+    const f = makeFile("project", { permissions: { allow: ["Edit(*)"], ask: ["Edit(*)"] } });
+    const result = mergeSettingsFiles([f]);
+    const conflict = result.warnings.find((w) => w.message.includes("both allow and ask"));
+    expect(conflict).toBeDefined();
+    expect(conflict!.fixCmd).toBe("cpm dedup --fix-conflicts --scope project");
+    expect(conflict!.fixOp).toBeUndefined();
+  });
+
+  it("allow+ask cross-scope: fixCmd is cpm reset (ask scope), fixOp is reset op (covers merger.ts:292-303 !sameScope branch)", () => {
+    // allow in project, ask in local → different scopes
+    const project = makeFile("project", { permissions: { allow: ["Write(**)"] } });
+    const local = makeFile("local", { permissions: { ask: ["Write(**)"] } });
+    const result = mergeSettingsFiles([project, local]);
+    const conflict = result.warnings.find((w) => w.message.includes("both allow and ask"));
+    expect(conflict).toBeDefined();
+    expect(conflict!.fixCmd).toBe(`cpm reset "Write(**)" --scope local`);
+    expect(conflict!.fixOp).toEqual({ kind: "reset", rule: "Write(**)", scope: "local" });
+  });
+
   it("emits low warning when bare tool deny overrides specific allow rule", () => {
     const f = makeFile("project", {
       permissions: {

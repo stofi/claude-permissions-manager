@@ -411,12 +411,13 @@ program
   .option("--yes", "Skip confirmation prompt")
   .option("--dry-run", "Preview what would be removed without modifying any files")
   .option("--json", "Output as JSON")
+  .option("--fix-conflicts", "Auto-resolve cross-list conflicts (deny > allow > ask precedence)")
   .action(async (opts) => {
     const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
     if (opts.all) {
-      await batchDedupCommand({ root, maxDepth: parseDepth(depth), includeGlobal: g !== false, scope: opts.scope, dryRun: opts.dryRun, yes: opts.yes, json: opts.json });
+      await batchDedupCommand({ root, maxDepth: parseDepth(depth), includeGlobal: g !== false, scope: opts.scope, dryRun: opts.dryRun, yes: opts.yes, json: opts.json, fixConflicts: opts.fixConflicts });
     } else {
-      await dedupCommand({ project: opts.project, scope: opts.scope, dryRun: opts.dryRun, yes: opts.yes, json: opts.json });
+      await dedupCommand({ project: opts.project, scope: opts.scope, dryRun: opts.dryRun, yes: opts.yes, json: opts.json, fixConflicts: opts.fixConflicts });
     }
   });
 

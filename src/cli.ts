@@ -9,6 +9,7 @@ import { statsCommand } from "./commands/stats.js";
 import { searchCommand } from "./commands/search.js";
 import { homeDir } from "./utils/paths.js";
 import { dedupCommand, batchDedupCommand } from "./commands/dedup.js";
+import { mcpCommand } from "./commands/mcp.js";
 import { PermissionModeSchema } from "./core/schemas.js";
 import { WRITABLE_SCOPES } from "./core/types.js";
 
@@ -358,6 +359,24 @@ program
       includeGlobal: g !== false,
       type: opts.type,
       top: opts.top !== undefined ? parseInt(opts.top, 10) : undefined,
+    });
+  });
+
+program
+  .command("mcp [name]")
+  .description("List MCP servers across projects (optionally filter by server name)")
+  .option("--json", "Output as JSON")
+  .addOption(new Option("--type <type>", "Only show servers of this type").choices(["stdio", "http"]))
+  .addOption(new Option("--approval <state>", "Only show servers with this approval state").choices(["approved", "denied", "pending"]))
+  .action(async (name, opts) => {
+    const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
+    await mcpCommand(name, {
+      root,
+      maxDepth: parseDepth(depth),
+      json: opts.json,
+      includeGlobal: g !== false,
+      type: opts.type,
+      approval: opts.approval,
     });
   });
 

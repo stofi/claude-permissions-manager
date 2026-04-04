@@ -34,6 +34,9 @@ cpm rules                   # List all unique rules ranked by frequency across p
 cpm rules --type allow      # Only allow rules
 cpm rules --top 10          # Show top 10 most common rules
 cpm rules --json            # Machine-readable output
+cpm mcp                     # List all MCP servers across projects with approval states
+cpm mcp github              # Show which projects use the "github" MCP server
+cpm mcp --approval pending  # Only show servers awaiting approval
 cpm show                    # Show permissions for current project (cwd)
 cpm show ~/my-project       # Show detailed permissions for a specific project
 cpm audit                   # Report risky permissions across all projects
@@ -53,6 +56,12 @@ cpm export --format markdown  # Generate a Markdown report
 cpm export --output out.json  # Write to file
 cpm export --format markdown --output report.md  # Markdown report to file
 ```
+
+### List MCP servers
+
+
+
+`cpm mcp` reads MCP server definitions from `.mcp.json`, `.claude/settings.json` (`mcpServers` key), and `~/.claude.json` (global + per-project approval states). Approval states are: `approved`, `denied`, `pending` (no decision yet).
 
 ### Initialize a project
 

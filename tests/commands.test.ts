@@ -28,7 +28,7 @@ import { editCommand } from "../src/commands/edit.js";
 import { statsCommand } from "../src/commands/stats.js";
 import { searchCommand } from "../src/commands/search.js";
 import { rulesCommand } from "../src/commands/rules.js";
-import { batchAddCommand, batchRemoveCommand, batchModeCommand, replaceRuleCommand, batchReplaceCommand } from "../src/commands/manage.js";
+import { batchAddCommand, batchRemoveCommand, batchModeCommand, replaceRuleCommand, batchReplaceCommand, batchBypassLockCommand } from "../src/commands/manage.js";
 import { copyCommand, batchCopyCommand } from "../src/commands/copy.js";
 
 // ────────────────────────────────────────────────────────────
@@ -6986,6 +6986,178 @@ describe("batchReplaceCommand — replace --all", () => {
     });
     const out = lines.join("\n");
     expect(out).toMatch(/Replaced in 3 project/);
+    expect(out).not.toMatch(/Skipped/);
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// batchBypassLockCommand — bypass-lock --all
+// ────────────────────────────────────────────────────────────
+
+describe("batchBypassLockCommand — bypass-lock --all", () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), "cpm-batch-bypass-lock-"));
+    for (const name of ["proj-a", "proj-b", "proj-c"]) {
+      const dir = join(root, name, ".claude");
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "settings.json"), JSON.stringify({ permissions: {} }));
+    }
+  });
+
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it("--yes enables bypass-lock on all projects", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchBypassLockCommand(true, { root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project" });
+    const out = lines.join("\n");
+    expect(out).toMatch(/bypass.permissions lock enabled in 3 project/i);
+    for (const name of ["proj-a", "proj-b", "proj-c"]) {
+      const data = JSON.parse(await readFile(join(root, name, ".claude", "settings.json"), "utf-8"));
+      expect(data.permissions?.disableBypassPermissionsMode).toBe("disable");
+    }
+  });
+
+  it("--yes disables bypass-lock on all projects", async () => {
+    // Pre-enable on all
+    for (const name of ["proj-a", "proj-b", "proj-c"]) {
+      await writeFile(
+        join(root, name, ".claude", "settings.json"),
+        JSON.stringify({ permissions: { disableBypassPermissionsMode: "disable" } })
+      );
+    }
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchBypassLockCommand(false, { root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project" });
+    const out = lines.join("\n");
+    expect(out).toMatch(/bypass.permissions lock disabled in 3 project/i);
+    for (const name of ["proj-a", "proj-b", "proj-c"]) {
+      const data = JSON.parse(await readFile(join(root, name, ".claude", "settings.json"), "utf-8"));
+      expect(data.permissions?.disableBypassPermissionsMode).toBeUndefined();
+    }
+  });
+
+  it("--dry-run shows preview without modifying files", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchBypassLockCommand(true, { root, maxDepth: 2, includeGlobal: false, dryRun: true, scope: "project" });
+    const out = lines.join("\n");
+    expect(out).toMatch(/\[dry-run\]/);
+    // Files must be unchanged
+    for (const name of ["proj-a", "proj-b", "proj-c"]) {
+      const data = JSON.parse(await readFile(join(root, name, ".claude", "settings.json"), "utf-8"));
+      expect(data.disableBypassPermissionsMode).toBeUndefined();
+    }
+  });
+
+  it("aborts when user declines confirmation", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchBypassLockCommand(true, {
+      root, maxDepth: 2, includeGlobal: false, scope: "project",
+      _confirmFn: async () => false,
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/Aborted/i);
+    const data = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(data.disableBypassPermissionsMode).toBeUndefined();
+  });
+
+  it("shows 'Skipped N already on' when some projects already have it enabled", async () => {
+    // Pre-enable proj-a only
+    await writeFile(
+      join(root, "proj-a", ".claude", "settings.json"),
+      JSON.stringify({ permissions: { disableBypassPermissionsMode: "disable" } })
+    );
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchBypassLockCommand(true, { root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project" });
+    const out = lines.join("\n");
+    expect(out).toMatch(/Skipped 1 already on/i);
+    expect(out).toMatch(/enabled in 2 project/i);
+  });
+
+  it("shows 'all projects already have bypass-lock' when nothing to do", async () => {
+    // Pre-enable all
+    for (const name of ["proj-a", "proj-b", "proj-c"]) {
+      await writeFile(
+        join(root, name, ".claude", "settings.json"),
+        JSON.stringify({ permissions: { disableBypassPermissionsMode: "disable" } })
+      );
+    }
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchBypassLockCommand(true, { root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project" });
+    const out = lines.join("\n");
+    expect(out).toMatch(/already have bypass-lock on/i);
+  });
+
+  it("shows 'no projects found' when root has no projects", async () => {
+    const emptyRoot = mkdtempSync(join(tmpdir(), "cpm-empty-"));
+    try {
+      const lines: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+      vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      await batchBypassLockCommand(true, { root: emptyRoot, maxDepth: 2, includeGlobal: false, yes: true, scope: "project" });
+      const out = lines.join("\n");
+      expect(out).toMatch(/No Claude projects found/i);
+    } finally {
+      rmSync(emptyRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("warns and returns when --scope user is specified", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchBypassLockCommand(true, { root, maxDepth: 2, includeGlobal: false, scope: "user" });
+    const out = lines.join("\n");
+    expect(out).toMatch(/already applies to all projects globally/i);
+  });
+
+  it("exits 1 on invalid scope", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    await expect(
+      batchBypassLockCommand(true, { root, maxDepth: 2, includeGlobal: false, scope: "invalid" })
+    ).rejects.toThrow("exit:1");
+    exitSpy.mockRestore();
+  });
+
+  it("reports write errors and exits 1 when a target project is not writable", async () => {
+    const lockedDir = join(root, "proj-a", ".claude");
+    chmodSync(lockedDir, 0o555);
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    try {
+      await expect(
+        batchBypassLockCommand(true, { root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project" })
+      ).rejects.toThrow("exit:1");
+      const out = lines.join("\n");
+      expect(out).toMatch(/error/i);
+    } finally {
+      chmodSync(lockedDir, 0o755);
+      exitSpy.mockRestore();
+    }
+  });
+
+  it("no 'Skipped' message when no project already has bypass-lock set (alreadySet empty)", async () => {
+    // All projects start with no bypass-lock — alreadySet is empty → covers if (alreadySet.length > 0) false branch
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchBypassLockCommand(true, { root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project" });
+    const out = lines.join("\n");
+    expect(out).toMatch(/enabled in 3 project/i);
     expect(out).not.toMatch(/Skipped/);
   });
 });

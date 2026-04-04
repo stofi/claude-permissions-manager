@@ -206,7 +206,7 @@ _cpm_completions() {
       if [[ "\${cur}" != -* ]]; then
         COMPREPLY=( \$(compgen -W "on off" -- "\${cur}") )
       else
-        COMPREPLY=( \$(compgen -W "--scope --project --dry-run" -- "\${cur}") )
+        COMPREPLY=( \$(compgen -W "--scope --project --dry-run --all --yes" -- "\${cur}") )
       fi
       return 0
       ;;
@@ -418,6 +418,8 @@ ${commandDefs}
             '--scope[Settings scope]:scope:(${scopeList})' \\
             '--project[Project path]:project:_directories' \\
             '--dry-run[Preview without writing]' \\
+            '--all[Apply to all discovered projects]' \\
+            '--yes[Skip confirmation prompt]' \\
             '1:state:(on off)'
           ;;
         copy)

@@ -764,3 +764,96 @@ export async function batchReplaceCommand(
     process.exit(1);
   }
 }
+
+/** Enable or disable bypass-permissions lock across ALL discovered projects. */
+export async function batchBypassLockCommand(
+  enable: boolean,
+  opts: ScanOptions & {
+    scope?: string;
+    dryRun?: boolean;
+    yes?: boolean;
+    _confirmFn?: (q: string) => Promise<boolean>;
+  }
+): Promise<void> {
+  const scope = resolveScope(opts.scope);
+
+  if (scope === "user") {
+    console.log(chalk.yellow(`⚠ --scope user already applies to all projects globally.`));
+    console.log(chalk.yellow(`  Use: cpm bypass-lock ${enable ? "on" : "off"} --scope user`));
+    return;
+  }
+
+  process.stderr.write(chalk.gray("Scanning for Claude projects...\n"));
+  const result = await scan(opts);
+  const projects = result.projects;
+
+  if (projects.length === 0) {
+    console.log(chalk.yellow("No Claude projects found."));
+    return;
+  }
+
+  // Pre-check: which projects already have the target state?
+  const alreadySet: string[] = [];
+  const toUpdate: string[] = [];
+
+  for (const p of projects) {
+    const settingsPath = resolveSettingsPath(scope, p.rootPath);
+    const existing = await readSettingsOrEmpty(settingsPath);
+    const isLocked = existing.permissions?.disableBypassPermissionsMode === "disable";
+    if (isLocked === enable) {
+      alreadySet.push(p.rootPath);
+    } else {
+      toUpdate.push(p.rootPath);
+    }
+  }
+
+  const action = enable ? "enable" : "disable";
+  const label = enable ? "on" : "off";
+
+  if (toUpdate.length === 0) {
+    console.log(chalk.yellow(`\nAll ${alreadySet.length} project(s) already have bypass-lock ${label}.`));
+    return;
+  }
+
+  console.log(`\nWill set bypass-lock ${chalk.bold(label)} in ${toUpdate.length} project(s):`);
+  for (const p of toUpdate) {
+    console.log(`  ${collapseHome(p)}`);
+  }
+  if (alreadySet.length > 0) {
+    console.log(chalk.gray(`\nSkipped ${alreadySet.length} already ${label}.`));
+  }
+
+  if (opts.dryRun) {
+    console.log(chalk.cyan(`\n[dry-run] No files will be modified`));
+    return;
+  }
+
+  const confirmFn = opts._confirmFn ?? promptConfirm;
+  const proceed = opts.yes || await confirmFn(chalk.yellow("\nApply to all? [Y/n] "));
+  if (!proceed) {
+    console.log(chalk.gray("Aborted."));
+    return;
+  }
+
+  let updated = 0;
+  const errors: string[] = [];
+  for (const projectPath of toUpdate) {
+    const settingsPath = resolveSettingsPath(scope, projectPath);
+    try {
+      await setBypassLock(enable, settingsPath);
+      updated++;
+    } catch (e) {
+      errors.push(`${collapseHome(projectPath)}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  const msg = enable
+    ? `✓ Bypass-permissions lock enabled in ${updated} project(s)`
+    : `✓ Bypass-permissions lock disabled in ${updated} project(s)`;
+  console.log(chalk.green(`\n${msg}`));
+  if (errors.length > 0) {
+    console.log(chalk.red(`\n${errors.length} error(s):`));
+    for (const err of errors) console.log(chalk.red(`  ${err}`));
+    process.exit(1);
+  }
+}

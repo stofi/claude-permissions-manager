@@ -317,9 +317,24 @@ program
   .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
   .option("--dry-run", "Preview what would be written without modifying any files")
+  .option("--all", "Apply to all discovered projects")
+  .option("--yes", "Skip confirmation prompt (with --all)")
   .action(async (state, opts) => {
-    const { bypassLockCommand } = await import("./commands/manage.js");
-    await bypassLockCommand(state === "on", { ...opts, dryRun: opts.dryRun });
+    if (opts.all) {
+      const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
+      const { batchBypassLockCommand } = await import("./commands/manage.js");
+      await batchBypassLockCommand(state === "on", {
+        root,
+        maxDepth: parseDepth(depth),
+        includeGlobal: g !== false,
+        scope: opts.scope,
+        dryRun: opts.dryRun,
+        yes: opts.yes,
+      });
+    } else {
+      const { bypassLockCommand } = await import("./commands/manage.js");
+      await bypassLockCommand(state === "on", { ...opts, dryRun: opts.dryRun });
+    }
   });
 
 program

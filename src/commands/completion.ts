@@ -162,7 +162,7 @@ _cpm_completions() {
       return 0
       ;;
     search)
-      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --exact --type --scope" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--root --depth --json --no-global --exact --type --scope --exit-code" -- "\${cur}") )
       return 0
       ;;
     rules)
@@ -400,6 +400,7 @@ ${commandDefs}
             '--json[Output as JSON]' \\
             '--no-global[Skip user and managed global settings]' \\
             '--exact[Exact rule match]' \\
+            '--exit-code[Exit 1 if no matches found (useful in CI)]' \\
             '--type[Only search in this rule list]:type:(allow deny ask)' \\
             '--scope[Only match rules in this scope]:scope:(local project user managed)'
           ;;

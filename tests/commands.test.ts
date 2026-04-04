@@ -5893,6 +5893,44 @@ describe("searchCommand", () => {
     const lines = await captureSearch("bash", { scope: "local" });
     expect(lines.join("\n")).toMatch(/No rules matching/i);
   });
+
+  it("--exit-code exits 1 when no matches found", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      await expect(
+        searchCommand("nonexistent-xyz", { root, maxDepth: 2, includeGlobal: false, exitCode: true })
+      ).rejects.toThrow("exit:1");
+    } finally {
+      exitSpy.mockRestore();
+    }
+  });
+
+  it("--exit-code does NOT exit when matches are found", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      await searchCommand("bash", { root, maxDepth: 2, includeGlobal: false, exitCode: true });
+      // Should NOT have called process.exit
+    } finally {
+      exitSpy.mockRestore();
+    }
+  });
+
+  it("--exit-code --json exits 1 when no matches", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      await expect(
+        searchCommand("nonexistent-xyz", { root, maxDepth: 2, includeGlobal: false, json: true, exitCode: true })
+      ).rejects.toThrow("exit:1");
+    } finally {
+      exitSpy.mockRestore();
+    }
+  });
 });
 
 describe("rulesCommand", () => {

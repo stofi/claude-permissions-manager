@@ -30,6 +30,7 @@ cpm stats --json            # Machine-readable statistics
 cpm search bash             # Find all projects with rules matching "bash"
 cpm search "npm run" --type allow  # Only search allow rules
 cpm search "Bash(npm run *)" --exact  # Exact rule match
+cpm search "Read(**/.env)" --exact --type deny --exit-code  # CI: exit 1 if rule not present
 cpm rules                   # List all unique rules ranked by frequency across projects
 cpm rules --type allow      # Only allow rules
 cpm rules --top 10          # Show top 10 most common rules
@@ -49,6 +50,7 @@ cpm copy <source> <target>  # Copy project-level permissions to another project
 cpm preset safe             # Apply the "safe" security preset to current project
 cpm preset                  # List all available presets
 cpm dedup                   # Remove duplicate rules from current project's settings
+cpm dedup --fix-conflicts   # Also auto-resolve cross-list conflicts (deny > allow > ask)
 cpm dedup --all --yes       # Remove duplicates across all discovered projects
 cpm export                  # Dump all permissions as JSON (stdout)
 cpm export --format csv     # Dump as CSV
@@ -59,7 +61,13 @@ cpm export --format markdown --output report.md  # Markdown report to file
 
 ### List MCP servers
 
-
+```bash
+cpm mcp                          # List all MCP servers across projects ranked by frequency
+cpm mcp github                   # Show which projects use the "github" MCP server
+cpm mcp --type stdio             # Only stdio servers (vs http)
+cpm mcp --approval pending       # Only servers awaiting approval
+cpm mcp --json                   # Machine-readable output
+```
 
 `cpm mcp` reads MCP server definitions from `.mcp.json`, `.claude/settings.json` (`mcpServers` key), and `~/.claude.json` (global + per-project approval states). Approval states are: `approved`, `denied`, `pending` (no decision yet).
 
@@ -210,15 +218,32 @@ cpm dedup --scope project --project ~/my-project
 # Preview without writing
 cpm dedup --dry-run
 
+# Auto-resolve cross-list conflicts (deny > allow > ask precedence)
+cpm dedup --fix-conflicts
+cpm dedup --fix-conflicts --dry-run   # preview
+cpm dedup --fix-conflicts --yes       # skip confirmation
+
 # Remove duplicates across ALL discovered projects
-cpm dedup --all --dry-run   # preview
-cpm dedup --all --yes       # apply
+cpm dedup --all --dry-run                       # preview
+cpm dedup --all --yes                           # apply
+cpm dedup --all --fix-conflicts --yes           # dedup + fix conflicts across all projects
 
 # Machine-readable output
 cpm dedup --json
+cpm dedup --fix-conflicts --json
 ```
 
-`cpm dedup` removes rules that appear more than once in the same allow/deny/ask list (keeping the first occurrence). It also detects **cross-list conflicts** — when the same rule appears in both `allow` and `deny` — and reports them as warnings without auto-removing (since the resolution depends on intent; use `cpm reset` or `cpm allow`/`cpm deny` to resolve manually).
+`cpm dedup` removes rules that appear more than once in the same allow/deny/ask list (keeping the first occurrence). It also detects **cross-list conflicts** — when the same rule appears in both `allow` and `deny` (or both `allow` and `ask`, or both `ask` and `deny`) — and reports them as warnings.
+
+Use `--fix-conflicts` to auto-resolve conflicts using deny > allow > ask precedence:
+
+| Conflict | Winner | Removed from |
+|----------|--------|-------------|
+| allow + deny | deny | allow |
+| ask + deny | deny | ask |
+| allow + ask | allow | ask |
+
+`cpm audit --fix` can also auto-resolve conflict warnings when `fixOp` is available (cross-scope conflicts where the losing rule is in a separate settings file).
 
 ### Open settings in your editor
 
@@ -248,11 +273,12 @@ Creates the file (empty `{}`) if it doesn't already exist, then opens it in `$VI
 --no-global        Skip user/managed global settings (list, show, audit, diff, export, ui, search)
 --sort <field>     Sort projects by: name | warnings | mode (list only; warnings = most warnings first)
 --min-severity     Only show/report issues at or above severity: critical | high | medium | low (list and audit)
---exit-code        Exit 1 if issues found, 2 if critical issues (audit only — useful in CI)
+--exit-code        Exit 1 if no matches found (search only) or exit 1/2 if issues found (audit only — useful in CI)
 --fix              Auto-apply all available fix commands (audit only)
 --all              Apply to all discovered projects (allow, deny, ask, reset <rule>, mode, bypass-lock, preset, dedup, copy); or clear all rules across all projects (reset without rule + no --project)
 --yes / -y         Skip confirmation prompt (--fix for audit; --all for allow/deny/ask/reset/mode/preset/dedup/copy)
 --dry-run          Preview what would be written without modifying files (allow, deny, ask, reset, mode, init, copy, preset, dedup)
+--fix-conflicts    Auto-resolve cross-list conflicts using deny > allow > ask precedence (dedup only)
 --format <fmt>     Output format: json|csv|markdown (export only, default: json)
 --output <file>    Write output to file instead of stdout (export only)
 --exact            Exact rule match instead of substring (search only)

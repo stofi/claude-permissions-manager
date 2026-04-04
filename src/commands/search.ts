@@ -20,6 +20,7 @@ export async function searchCommand(
     type?: string;
     exact?: boolean;
     scope?: string;
+    exitCode?: boolean;
   }
 ): Promise<void> {
   process.stderr.write(chalk.gray("Scanning for Claude projects...\n"));
@@ -59,11 +60,13 @@ export async function searchCommand(
       projectCount: projectPaths.size,
       matches,
     }, null, 2));
+    if (options.exitCode && matches.length === 0) process.exit(1);
     return;
   }
 
   if (matches.length === 0) {
     console.log(chalk.yellow(`\nNo rules matching "${pattern}" found.`));
+    if (options.exitCode) process.exit(1);
     return;
   }
 

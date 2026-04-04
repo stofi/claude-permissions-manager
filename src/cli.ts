@@ -190,19 +190,23 @@ program
 
 program
   .command("reset [rule]")
-  .description("Remove a rule, or --all to clear all rules / remove rule from all projects")
+  .description("Remove a rule, or --all to remove rule / clear all rules across all projects")
   .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
   .option("--project <path>", "Project path for local/project scope (default: cwd)")
-  .option("--all", "With rule: remove from all projects. Without rule: clear all rules in project")
+  .option("--all", "With rule: remove from all projects. Without rule: clear all rules in all projects")
   .option("--yes", "Skip confirmation prompt (with --all)")
   .option("--dry-run", "Preview what would be removed without modifying any files")
   .action(async (rule, opts) => {
     const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
-    const { resetRuleCommand, resetAllCommand, batchRemoveCommand } = await import("./commands/manage.js");
+    const { resetRuleCommand, resetAllCommand, batchRemoveCommand, batchResetAllCommand } = await import("./commands/manage.js");
     if (opts.all && rule) {
       await batchRemoveCommand(rule, { root, maxDepth: parseDepth(depth), includeGlobal: g !== false, ...opts, dryRun: opts.dryRun });
-    } else if (opts.all) {
+    } else if (opts.all && opts.project) {
+      // --all + --project: clear all rules from a specific project
       await resetAllCommand({ ...opts, dryRun: opts.dryRun });
+    } else if (opts.all) {
+      // --all without --project: batch clear all rules from all discovered projects
+      await batchResetAllCommand({ root, maxDepth: parseDepth(depth), includeGlobal: g !== false, ...opts, dryRun: opts.dryRun });
     } else if (rule) {
       await resetRuleCommand(rule, { ...opts, dryRun: opts.dryRun });
     } else {

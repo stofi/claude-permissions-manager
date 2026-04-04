@@ -239,7 +239,7 @@ function zshScript(): string {
       allow: "Add allow rule",
       deny: "Add deny rule",
       ask: "Add ask rule",
-      reset: "Remove rule (--all = batch across projects)",
+      reset: "Remove rule/clear all (--all = batch across all projects)",
       replace: "Replace/rename a rule (--all = batch across projects)",
       mode: "Set default mode (--all = batch across projects)",
       "bypass-lock": "Enable/disable bypass-permissions lock",
@@ -320,7 +320,7 @@ ${commandDefs}
           _arguments \\
             '--scope[Settings scope]:scope:(${scopeList})' \\
             '--project[Project path]:project:_directories' \\
-            '--all[Clear all rules]' \\
+            '--all[Clear all rules in all projects / remove rule from all]' \\
             '--yes[Skip confirmation]' \\
             '--dry-run[Preview without writing]' \\
             '1:rule:(${toolList})'

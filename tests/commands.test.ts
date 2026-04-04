@@ -6166,6 +6166,18 @@ describe("batchAddCommand — allow --all", () => {
     expect(fileA.permissions?.allow).toBeUndefined();
   });
 
+  it("applies when user confirms via prompt (no --yes)", async () => {
+    // Covers confirmFn-returns-true path: opts.yes falsy, evaluate _confirmFn → true → proceed
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchAddCommand("Bash(npm run *)", "allow", {
+      root, maxDepth: 2, includeGlobal: false, scope: "project",
+      _confirmFn: async () => true,
+    });
+    expect(lines.join("\n")).toMatch(/Added to 2 project/);
+  });
+
   it("works with deny list", async () => {
     const lines: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
@@ -6382,6 +6394,18 @@ describe("batchRemoveCommand — reset --all", () => {
     // Files unchanged
     const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
     expect(fileA.permissions?.allow).toContain("Bash(npm run *)");
+  });
+
+  it("applies when user confirms via prompt (no --yes)", async () => {
+    // Covers confirmFn-returns-true path: opts.yes falsy, evaluate _confirmFn → true → proceed
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchRemoveCommand("Bash(npm run *)", {
+      root, maxDepth: 2, includeGlobal: false, scope: "project",
+      _confirmFn: async () => true,
+    });
+    expect(lines.join("\n")).toMatch(/Removed from 2 project/);
   });
 
   it("rejects empty rule", async () => {
@@ -6679,6 +6703,18 @@ describe("batchModeCommand — mode --all", () => {
     expect(out).not.toMatch(/Skipped/);
   });
 
+  it("applies when user confirms via prompt (no --yes)", async () => {
+    // Covers confirmFn-returns-true path: opts.yes falsy, evaluate _confirmFn → true → proceed
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchModeCommand("plan", {
+      root, maxDepth: 2, includeGlobal: false, scope: "project",
+      _confirmFn: async () => true,
+    });
+    expect(lines.join("\n")).toMatch(/Updated 3 project/);
+  });
+
   it("reports write errors and exits 1 when a project is not writable", async () => {
     const claudeDir = join(root, "proj-a", ".claude");
     chmodSync(claudeDir, 0o555);
@@ -6878,6 +6914,20 @@ describe("batchReplaceCommand — replace --all", () => {
     expect(lines.join("\n")).toMatch(/Aborted/i);
     const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
     expect(fileA.permissions?.allow).toContain("Bash(npm run dev)");
+  });
+
+  it("applies when user confirms via prompt (no --yes)", async () => {
+    // Covers the confirmFn-returns-true path (opts.yes falsy, evaluate confirmFn → true → proceed)
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchReplaceCommand("Bash(npm run dev)", "Bash(npm run start)", {
+      root, maxDepth: 2, includeGlobal: false, scope: "project",
+      _confirmFn: async () => true,
+    });
+    expect(lines.join("\n")).toMatch(/Replaced in 2 project/);
+    const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(fileA.permissions?.allow).toContain("Bash(npm run start)");
   });
 
   it("exits 1 on identical old/new rules", async () => {
@@ -7114,13 +7164,42 @@ describe("batchBypassLockCommand — bypass-lock --all", () => {
     }
   });
 
-  it("warns and returns when --scope user is specified", async () => {
+  it("warns and returns when --scope user is specified (enable=true)", async () => {
     const lines: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     await batchBypassLockCommand(true, { root, maxDepth: 2, includeGlobal: false, scope: "user" });
     const out = lines.join("\n");
     expect(out).toMatch(/already applies to all projects globally/i);
+    expect(out).toMatch(/bypass-lock on/i);
+  });
+
+  it("warns and returns when --scope user is specified (enable=false)", async () => {
+    // Covers the `enable ? "on" : "off"` false arm at line 782
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchBypassLockCommand(false, { root, maxDepth: 2, includeGlobal: false, scope: "user" });
+    const out = lines.join("\n");
+    expect(out).toMatch(/already applies to all projects globally/i);
+    expect(out).toMatch(/bypass-lock off/i);
+  });
+
+  it("applies when user confirms via prompt (no --yes)", async () => {
+    // Covers confirmFn-returns-true path: opts.yes falsy, evaluate _confirmFn → true → proceed
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchBypassLockCommand(true, {
+      root, maxDepth: 2, includeGlobal: false, scope: "project",
+      _confirmFn: async () => true,
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/enabled in 3 project/i);
+    for (const name of ["proj-a", "proj-b", "proj-c"]) {
+      const data = JSON.parse(await readFile(join(root, name, ".claude", "settings.json"), "utf-8"));
+      expect(data.permissions?.disableBypassPermissionsMode).toBe("disable");
+    }
   });
 
   it("exits 1 on invalid scope", async () => {

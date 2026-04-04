@@ -211,7 +211,7 @@ _cpm_completions() {
       return 0
       ;;
     copy)
-      COMPREPLY=( \$(compgen -W "--scope --yes --dry-run" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--scope --all --yes --dry-run --root --depth" -- "\${cur}") )
       return 0
       ;;
   esac
@@ -243,7 +243,7 @@ function zshScript(): string {
       replace: "Replace/rename a rule (--all = batch across projects)",
       mode: "Set default mode (--all = batch across projects)",
       "bypass-lock": "Enable/disable bypass-permissions lock",
-      copy: "Copy permissions to another project",
+      copy: "Copy permissions to another project (--all = batch)",
       export: "Export permissions data",
       init: "Create starter settings",
       edit: "Open settings file in $EDITOR",
@@ -425,8 +425,11 @@ ${commandDefs}
             '1:source:_directories' \\
             '2:target:_directories' \\
             '--scope[Target scope]:scope:(${scopeList})' \\
+            '--all[Copy to all discovered projects]' \\
             '--yes[Skip confirmation]' \\
-            '--dry-run[Preview without writing]'
+            '--dry-run[Preview without writing]' \\
+            '--root[Scan root]:dir:_directories' \\
+            '--depth[Max depth]:n:'
           ;;
         completion)
           _arguments '1:shell:(bash zsh)'

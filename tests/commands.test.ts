@@ -29,6 +29,7 @@ import { statsCommand } from "../src/commands/stats.js";
 import { searchCommand } from "../src/commands/search.js";
 import { rulesCommand } from "../src/commands/rules.js";
 import { batchAddCommand, batchRemoveCommand, batchModeCommand, replaceRuleCommand, batchReplaceCommand } from "../src/commands/manage.js";
+import { copyCommand, batchCopyCommand } from "../src/commands/copy.js";
 
 // ────────────────────────────────────────────────────────────
 // Helpers
@@ -4518,8 +4519,6 @@ describe("editCommand", () => {
 // copyCommand
 // ────────────────────────────────────────────────────────────
 
-import { copyCommand } from "../src/commands/copy.js";
-
 describe("copyCommand", () => {
   let srcDir: string;
   let dstDir: string;
@@ -4816,6 +4815,302 @@ describe("copyCommand", () => {
     const data = JSON.parse(content);
     // Local scope mode "plan" wins over project scope mode "acceptEdits"
     expect(data.permissions.defaultMode).toBe("plan");
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// batchCopyCommand — copy --all
+// ────────────────────────────────────────────────────────────
+
+describe("batchCopyCommand — copy --all", () => {
+  let root: string;
+  let srcDir: string;
+
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), "cpm-batch-copy-"));
+    srcDir = join(root, "src-proj");
+    const srcClaudeDir = join(srcDir, ".claude");
+    await mkdir(srcClaudeDir, { recursive: true });
+    await writeFile(
+      join(srcClaudeDir, "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(npm run *)", "Read(*)"], defaultMode: "acceptEdits" } })
+    );
+
+    // proj-a and proj-b: target projects with no rules
+    for (const name of ["proj-a", "proj-b"]) {
+      const dir = join(root, name, ".claude");
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "settings.json"), JSON.stringify({ permissions: {} }));
+    }
+  });
+
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it("--yes copies rules to all other projects", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchCopyCommand(srcDir, {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/Copied.*2 project/);
+    for (const name of ["proj-a", "proj-b"]) {
+      const file = JSON.parse(await readFile(join(root, name, ".claude", "settings.json"), "utf-8"));
+      expect(file.permissions?.allow).toContain("Bash(npm run *)");
+      expect(file.permissions?.allow).toContain("Read(*)");
+      expect(file.permissions?.defaultMode).toBe("acceptEdits");
+    }
+  });
+
+  it("--dry-run shows preview without modifying files", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchCopyCommand(srcDir, {
+      root, maxDepth: 2, includeGlobal: false, dryRun: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/\[dry-run\]/);
+    // Files unchanged
+    const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(fileA.permissions?.allow).toBeUndefined();
+  });
+
+  it("aborts when user declines confirmation", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchCopyCommand(srcDir, {
+      root, maxDepth: 2, includeGlobal: false, scope: "project",
+      _confirmFn: async () => false,
+    });
+    expect(lines.join("\n")).toMatch(/Aborted/i);
+    // Files unchanged
+    const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(fileA.permissions?.allow).toBeUndefined();
+  });
+
+  it("excludes source project from targets", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchCopyCommand(srcDir, {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    // Source project settings.json should be unchanged (just has allow+mode)
+    const srcFile = JSON.parse(await readFile(join(srcDir, ".claude", "settings.json"), "utf-8"));
+    // Source still has same content — not overwritten
+    expect(srcFile.permissions.allow).toHaveLength(2);
+  });
+
+  it("merges with existing target rules (dedup)", async () => {
+    // proj-a already has one of the source rules
+    await writeFile(
+      join(root, "proj-a", ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(npm run *)", "Glob(*)"] } })
+    );
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchCopyCommand(srcDir, {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    // No duplicates: Bash(npm run *) appears only once, Glob(*) preserved, Read(*) added
+    expect(fileA.permissions.allow.filter((r: string) => r === "Bash(npm run *)")).toHaveLength(1);
+    expect(fileA.permissions.allow).toContain("Glob(*)");
+    expect(fileA.permissions.allow).toContain("Read(*)");
+  });
+
+  it("exits 1 when source has no .claude directory", async () => {
+    const noClaudeDir = mkdtempSync(join(tmpdir(), "cpm-batch-copy-no-claude-"));
+    try {
+      const exitSpy = vi.spyOn(process, "exit").mockImplementation((c) => { throw new Error(`exit:${c}`); });
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      await expect(
+        batchCopyCommand(noClaudeDir, { root, maxDepth: 2, includeGlobal: false })
+      ).rejects.toThrow("exit:1");
+      exitSpy.mockRestore(); errSpy.mockRestore();
+    } finally {
+      rmSync(noClaudeDir, { recursive: true, force: true });
+    }
+  });
+
+  it("shows 'nothing to copy' when source has no project-level rules or mode", async () => {
+    // Override source to have empty settings
+    await writeFile(join(srcDir, ".claude", "settings.json"), JSON.stringify({ permissions: {} }));
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchCopyCommand(srcDir, {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    expect(lines.join("\n")).toMatch(/Nothing to copy/i);
+  });
+
+  it("shows 'no other projects found' when root has only the source project", async () => {
+    const emptyRoot = mkdtempSync(join(tmpdir(), "cpm-batch-copy-solo-"));
+    const soloSrc = join(emptyRoot, "only-proj");
+    try {
+      const dir = join(soloSrc, ".claude");
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "settings.json"), JSON.stringify({ permissions: { allow: ["Read(*)"] } }));
+      const lines: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+      vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      await batchCopyCommand(soloSrc, {
+        root: emptyRoot, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+      });
+      expect(lines.join("\n")).toMatch(/No other Claude projects found/i);
+    } finally {
+      rmSync(emptyRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("warns and returns when --scope user is specified", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchCopyCommand(srcDir, {
+      root, maxDepth: 2, includeGlobal: false, scope: "user",
+    });
+    expect(lines.join("\n")).toMatch(/user.*already applies/i);
+  });
+
+  it("exits 1 on invalid scope", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((c) => { throw new Error(`exit:${c}`); });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(
+      batchCopyCommand(srcDir, { root, maxDepth: 2, includeGlobal: false, scope: "managed" })
+    ).rejects.toThrow("exit:1");
+    exitSpy.mockRestore(); errSpy.mockRestore();
+  });
+
+  it("reports write errors and exits 1 when a target project is not writable", async () => {
+    const claudeDir = join(root, "proj-a", ".claude");
+    chmodSync(claudeDir, 0o555);
+
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+
+    try {
+      await expect(
+        batchCopyCommand(srcDir, {
+          root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+        })
+      ).rejects.toThrow("exit:1");
+    } finally {
+      chmodSync(claudeDir, 0o755);
+      exitSpy.mockRestore();
+    }
+    expect(lines.join("\n")).toMatch(/1 error/i);
+  });
+
+  it("copies deny and ask rules from source (lines 186-187)", async () => {
+    // Source has deny+ask rules in addition to allow
+    await writeFile(
+      join(srcDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Read(*)"], deny: ["Write(*)"], ask: ["Bash(git *)"] } })
+    );
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchCopyCommand(srcDir, {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(fileA.permissions?.deny).toContain("Write(*)");
+    expect(fileA.permissions?.ask).toContain("Bash(git *)");
+  });
+
+  it("success message shows only rule count when source has no mode (line 233 false)", async () => {
+    // Source has rules but no mode → srcMode undefined → 'mode "..."' not in output
+    await writeFile(
+      join(srcDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Read(*)"] } })
+    );
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchCopyCommand(srcDir, {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    const out = lines.join("\n");
+    expect(out).toMatch(/Copied.*1 rule/);
+    expect(out).not.toMatch(/mode/);
+  });
+
+  it("local-scope mode wins over project-scope mode (line 163 sort)", async () => {
+    // Source has BOTH project-scope (settings.json, "auto") and local-scope (settings.local.json, "plan") modes
+    // sort puts local first so "plan" wins
+    await writeFile(
+      join(srcDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { defaultMode: "auto" } })
+    );
+    await writeFile(
+      join(srcDir, ".claude", "settings.local.json"),
+      JSON.stringify({ permissions: { defaultMode: "plan" } })
+    );
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchCopyCommand(srcDir, {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(fileA.permissions?.defaultMode).toBe("plan");
+  });
+
+  it("handles non-array existing target permissions gracefully (lines 215-216 false)", async () => {
+    // Target has malformed allow/deny/ask as strings, not arrays — should treat as empty
+    await writeFile(
+      join(root, "proj-a", ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: "not-an-array", deny: 42 } })
+    );
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchCopyCommand(srcDir, {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(Array.isArray(fileA.permissions.allow)).toBe(true);
+    expect(fileA.permissions.allow).toContain("Bash(npm run *)");
+  });
+
+  it("creates new settings.local.json when target has none (line 213 ?? {} branch)", async () => {
+    // Targets have settings.json but NOT settings.local.json. scope=local → writes to local.
+    // readSettingsOrEmpty returns {} → existing.permissions is undefined → ?? {} triggers.
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchCopyCommand(srcDir, {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "local",
+    });
+    // settings.local.json should be created with source rules
+    const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.local.json"), "utf-8"));
+    expect(fileA.permissions?.allow).toContain("Bash(npm run *)");
+  });
+
+  it("preserves existing target deny and ask arrays (lines 215-216 TRUE branch)", async () => {
+    // Target proj-a has existing deny and ask arrays — should be merged with source rules
+    await writeFile(
+      join(root, "proj-a", ".claude", "settings.json"),
+      JSON.stringify({ permissions: { deny: ["Read(**/.env)"], ask: ["Grep(*)"] } })
+    );
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join("")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await batchCopyCommand(srcDir, {
+      root, maxDepth: 2, includeGlobal: false, yes: true, scope: "project",
+    });
+    const fileA = JSON.parse(await readFile(join(root, "proj-a", ".claude", "settings.json"), "utf-8"));
+    expect(fileA.permissions.deny).toContain("Read(**/.env)"); // existing preserved
+    expect(fileA.permissions.ask).toContain("Grep(*)");       // existing preserved
+    expect(fileA.permissions.allow).toContain("Bash(npm run *)"); // source added
   });
 });
 

@@ -43,6 +43,7 @@ const COMMANDS = [
   "mode",
   "bypass-lock",
   "copy",
+  "preset",
   "export",
   "init",
   "edit",
@@ -51,7 +52,7 @@ const COMMANDS = [
 
 const SCOPES = WRITABLE_SCOPES;
 const MODES = PermissionModeSchema.options;
-const PRESETS = ["safe", "node", "strict"];
+const PRESETS = ["safe", "readonly", "locked", "open", "cautious"];
 const FORMATS = ["json", "csv", "markdown"];
 
 // Bash completion script
@@ -117,6 +118,14 @@ _cpm_completions() {
     mode)
       if [[ "\${cur}" != -* ]]; then
         COMPREPLY=( \$(compgen -W "${modeList}" -- "\${cur}") )
+      else
+        COMPREPLY=( \$(compgen -W "--scope --project --all --yes --dry-run --root --depth" -- "\${cur}") )
+      fi
+      return 0
+      ;;
+    preset)
+      if [[ "\${cur}" != -* ]]; then
+        COMPREPLY=( \$(compgen -W "${presetList}" -- "\${cur}") )
       else
         COMPREPLY=( \$(compgen -W "--scope --project --all --yes --dry-run --root --depth" -- "\${cur}") )
       fi
@@ -244,6 +253,7 @@ function zshScript(): string {
       mode: "Set default mode (--all = batch across projects)",
       "bypass-lock": "Enable/disable bypass-permissions lock",
       copy: "Copy permissions to another project (--all = batch)",
+      preset: "Apply a named security preset (safe/readonly/locked/open/cautious)",
       export: "Export permissions data",
       init: "Create starter settings",
       edit: "Open settings file in $EDITOR",
@@ -291,6 +301,17 @@ ${commandDefs}
             '--root[Scan root path]:root:_directories' \\
             '--depth[Max scan depth]:depth:' \\
             '1:mode:(${modeList})'
+          ;;
+        preset)
+          _arguments \\
+            '--scope[Settings scope]:scope:(${scopeList})' \\
+            '--project[Project path]:project:_directories' \\
+            '--all[Apply to all discovered projects]' \\
+            '--yes[Skip confirmation]' \\
+            '--dry-run[Preview without writing]' \\
+            '--root[Scan root path]:root:_directories' \\
+            '--depth[Max scan depth]:depth:' \\
+            '1:preset:(${presetList})'
           ;;
         show)
           _arguments \\

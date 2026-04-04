@@ -2,7 +2,7 @@
  * Integration tests for CLI commands: initCommand, exportCommand, listCommand, manage commands
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, symlinkSync, chmodSync } from "fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, symlinkSync, chmodSync } from "fs";
 import { readFile, mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -30,6 +30,7 @@ import { searchCommand } from "../src/commands/search.js";
 import { rulesCommand } from "../src/commands/rules.js";
 import { batchAddCommand, batchRemoveCommand, batchModeCommand, replaceRuleCommand, batchReplaceCommand, batchBypassLockCommand, batchResetAllCommand } from "../src/commands/manage.js";
 import { copyCommand, batchCopyCommand } from "../src/commands/copy.js";
+import { dedupCommand, batchDedupCommand } from "../src/commands/dedup.js";
 
 // ────────────────────────────────────────────────────────────
 // Helpers
@@ -7404,6 +7405,332 @@ describe("batchResetAllCommand — reset --all", () => {
       expect(lines.join("\n")).toMatch(/error/i);
     } finally {
       chmodSync(lockedDir, 0o755);
+      exitSpy.mockRestore();
+    }
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// dedupCommand
+// ────────────────────────────────────────────────────────────
+
+describe("dedupCommand", () => {
+  let tmpDir: string;
+  const lines: string[] = [];
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "cpm-dedup-"));
+    mkdirSync(join(tmpDir, ".claude"), { recursive: true });
+    lines.length = 0;
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join(" ")); });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("reports no duplicates when file is clean", async () => {
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { deny: ["Bash(*)", "Write(**)"] } })
+    );
+    await dedupCommand({ project: tmpDir, scope: "project", yes: true });
+    expect(lines.join("\n")).toMatch(/no duplicates/i);
+  });
+
+  it("removes duplicate rules from allow list", async () => {
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Read(*)", "Read(*)", "Glob(*)"] } })
+    );
+    await dedupCommand({ project: tmpDir, scope: "project", yes: true });
+    const data = JSON.parse(await readFile(join(tmpDir, ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions.allow).toEqual(["Read(*)", "Glob(*)"]);
+    expect(lines.join("\n")).toMatch(/removed 1 duplicate/i);
+  });
+
+  it("removes duplicate rules from deny and ask lists", async () => {
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({
+        permissions: {
+          deny: ["Bash(*)", "Bash(*)", "Write(**)"],
+          ask: ["WebFetch(*)", "WebFetch(*)"],
+        },
+      })
+    );
+    await dedupCommand({ project: tmpDir, scope: "project", yes: true });
+    const data = JSON.parse(await readFile(join(tmpDir, ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions.deny).toEqual(["Bash(*)", "Write(**)"]);
+    expect(data.permissions.ask).toEqual(["WebFetch(*)"]);
+    expect(lines.join("\n")).toMatch(/removed 2 duplicate/i);
+  });
+
+  it("--dry-run shows what would be removed without modifying file", async () => {
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Read(*)", "Read(*)"] } })
+    );
+    await dedupCommand({ project: tmpDir, scope: "project", dryRun: true });
+    const data = JSON.parse(await readFile(join(tmpDir, ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions.allow).toEqual(["Read(*)", "Read(*)"]);  // unchanged
+    expect(lines.join("\n")).toMatch(/dry-run/i);
+  });
+
+  it("aborts when confirmation is declined", async () => {
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Read(*)", "Read(*)"] } })
+    );
+    await dedupCommand({ project: tmpDir, scope: "project", _confirmFn: async () => false });
+    const data = JSON.parse(await readFile(join(tmpDir, ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions.allow).toEqual(["Read(*)", "Read(*)"]); // unchanged
+    expect(lines.join("\n")).toMatch(/aborted/i);
+  });
+
+  it("proceeds when confirmation is given via _confirmFn=true (covers confirm path)", async () => {
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { deny: ["Bash(*)", "Bash(*)"] } })
+    );
+    await dedupCommand({ project: tmpDir, scope: "project", _confirmFn: async () => true });
+    const data = JSON.parse(await readFile(join(tmpDir, ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions.deny).toEqual(["Bash(*)"]);
+  });
+
+  it("detects cross-list conflicts and reports them", async () => {
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(*)"], deny: ["Bash(*)"] } })
+    );
+    await dedupCommand({ project: tmpDir, scope: "project", yes: true });
+    expect(lines.join("\n")).toMatch(/conflict/i);
+    // File should NOT be rewritten for conflicts-only (no duplicates within lists)
+  });
+
+  it("--json outputs structured result", async () => {
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Read(*)", "Read(*)", "Glob(*)"] } })
+    );
+    await dedupCommand({ project: tmpDir, scope: "project", json: true });
+    const output = JSON.parse(lines.join(""));
+    expect(output.removedCount).toBe(1);
+    expect(output.removed[0]).toMatchObject({ list: "allow", rule: "Read(*)" });
+  });
+
+  it("--json reports clean file with 0 removed", async () => {
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { deny: ["Bash(*)"] } })
+    );
+    await dedupCommand({ project: tmpDir, scope: "project", json: true });
+    const output = JSON.parse(lines.join(""));
+    expect(output.removedCount).toBe(0);
+    expect(output.conflictCount).toBe(0);
+  });
+
+  it("handles missing settings file (no permissions key)", async () => {
+    // File doesn't exist yet — no duplicates
+    await dedupCommand({ project: tmpDir, scope: "project", yes: true });
+    expect(lines.join("\n")).toMatch(/no duplicates/i);
+  });
+
+  it("removes empty rule arrays after dedup", async () => {
+    // allow has only one entry but duplicated — after dedup, list shrinks to 1 (not empty)
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Read(*)", "Read(*)"] } })
+    );
+    await dedupCommand({ project: tmpDir, scope: "project", yes: true });
+    const data = JSON.parse(await readFile(join(tmpDir, ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions.allow).toEqual(["Read(*)"]);
+  });
+
+  it("uses scope 'local' by default when no scope provided", async () => {
+    // No scope → defaults to "local" scope → settings.local.json
+    await writeFile(
+      join(tmpDir, ".claude", "settings.local.json"),
+      JSON.stringify({ permissions: { allow: ["Glob(*)", "Glob(*)"] } })
+    );
+    await dedupCommand({ project: tmpDir, yes: true });
+    const data = JSON.parse(await readFile(join(tmpDir, ".claude", "settings.local.json"), "utf-8"));
+    expect(data.permissions.allow).toEqual(["Glob(*)"]);
+  });
+
+  it("uses cwd when no project provided (resolveProject cwd path)", async () => {
+    // covers resolveProject(undefined) → process.cwd() path
+    const origCwd = process.cwd();
+    process.chdir(tmpDir);
+    try {
+      await writeFile(
+        join(tmpDir, ".claude", "settings.json"),
+        JSON.stringify({ permissions: { deny: ["Bash(*)", "Bash(*)"] } })
+      );
+      await dedupCommand({ scope: "project", yes: true });
+      const data = JSON.parse(await readFile(join(tmpDir, ".claude", "settings.json"), "utf-8"));
+      expect(data.permissions.deny).toEqual(["Bash(*)"]);
+    } finally {
+      process.chdir(origCwd);
+    }
+  });
+
+  it("detects conflict where rule only in deny and ask (covers findConflicts deny.find path)", async () => {
+    // Rule only in deny+ask, NOT in allow → conflict.original resolved via deny.find
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { deny: ["Bash(*)"], ask: ["Bash(*)"] } })
+    );
+    await dedupCommand({ project: tmpDir, scope: "project", yes: true });
+    expect(lines.join("\n")).toMatch(/conflict/i);
+  });
+
+  it("reports remaining conflicts after removing duplicates (dedup.ts:209)", async () => {
+    // Same file has both a duplicate AND a cross-list conflict
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Read(*)", "Read(*)", "Bash(*)"], deny: ["Bash(*)"] } })
+    );
+    await dedupCommand({ project: tmpDir, scope: "project", yes: true });
+    const output = lines.join("\n");
+    expect(output).toMatch(/conflict/i); // conflict warning shown after applying
+    const data = JSON.parse(await readFile(join(tmpDir, ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions.allow).toEqual(["Read(*)", "Bash(*)"]); // duplicate removed
+  });
+
+  it("exits 1 for invalid scope", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(dedupCommand({ project: tmpDir, scope: "managed" })).rejects.toThrow("exit:1");
+    } finally {
+      exitSpy.mockRestore();
+    }
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// batchDedupCommand
+// ────────────────────────────────────────────────────────────
+
+describe("batchDedupCommand", () => {
+  let root: string;
+  const lines: string[] = [];
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), "cpm-bdedup-"));
+    lines.length = 0;
+    vi.spyOn(console, "log").mockImplementation((...args) => { lines.push(args.join(" ")); });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  async function makeProject(name: string, settings: object): Promise<string> {
+    const dir = join(root, name);
+    mkdirSync(join(dir, ".claude"), { recursive: true });
+    await writeFile(join(dir, ".claude", "settings.json"), JSON.stringify(settings));
+    return dir;
+  }
+
+  it("--yes deduplicates all projects with duplicates", async () => {
+    await makeProject("proj-a", { permissions: { deny: ["Bash(*)", "Bash(*)", "Write(**)"] } });
+    await makeProject("proj-b", { permissions: { allow: ["Read(*)", "Read(*)"] } });
+    await batchDedupCommand({ root, maxDepth: 2, includeGlobal: false, scope: "project", yes: true });
+    expect(lines.join("\n")).toMatch(/removed duplicates from 2 project/i);
+  });
+
+  it("skips projects with no duplicates", async () => {
+    await makeProject("proj-clean", { permissions: { deny: ["Bash(*)", "Write(**)"] } });
+    await batchDedupCommand({ root, maxDepth: 2, includeGlobal: false, scope: "project", yes: true });
+    expect(lines.join("\n")).toMatch(/no duplicates found/i);
+  });
+
+  it("--dry-run shows changes without modifying files", async () => {
+    const dir = await makeProject("proj-a", { permissions: { allow: ["Read(*)", "Read(*)"] } });
+    await batchDedupCommand({ root, maxDepth: 2, includeGlobal: false, scope: "project", dryRun: true });
+    const data = JSON.parse(await readFile(join(dir, ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions.allow).toEqual(["Read(*)", "Read(*)"]); // unchanged
+    expect(lines.join("\n")).toMatch(/dry-run/i);
+  });
+
+  it("aborts when confirmation is declined", async () => {
+    const dir = await makeProject("proj-a", { permissions: { deny: ["Bash(*)", "Bash(*)"] } });
+    await batchDedupCommand({ root, maxDepth: 2, includeGlobal: false, scope: "project", _confirmFn: async () => false });
+    const data = JSON.parse(await readFile(join(dir, ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions.deny).toEqual(["Bash(*)", "Bash(*)"]); // unchanged
+    expect(lines.join("\n")).toMatch(/aborted/i);
+  });
+
+  it("proceeds when _confirmFn returns true (covers confirm path)", async () => {
+    const dir = await makeProject("proj-a", { permissions: { allow: ["Glob(*)", "Glob(*)"] } });
+    await batchDedupCommand({ root, maxDepth: 2, includeGlobal: false, scope: "project", _confirmFn: async () => true });
+    const data = JSON.parse(await readFile(join(dir, ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions.allow).toEqual(["Glob(*)"]);
+  });
+
+  it("--json outputs structured result", async () => {
+    await makeProject("proj-a", { permissions: { allow: ["Read(*)", "Read(*)", "Glob(*)"] } });
+    await batchDedupCommand({ root, maxDepth: 2, includeGlobal: false, scope: "project", json: true });
+    const output = JSON.parse(lines.join(""));
+    expect(output.projectCount).toBe(1);
+    expect(output.projectsWithDuplicates).toBe(1);
+    expect(output.totalDuplicatesRemoved).toBe(1);
+  });
+
+  it("no projects found", async () => {
+    await batchDedupCommand({ root, maxDepth: 2, includeGlobal: false, scope: "project", yes: true });
+    expect(lines.join("\n")).toMatch(/no claude projects found/i);
+  });
+
+  it("shows conflict-only message when projects have conflicts but no duplicates (dedup.ts:278)", async () => {
+    // Create a project with a cross-list conflict but no duplicates within lists
+    await makeProject("proj-conflict", { permissions: { allow: ["Bash(*)"], deny: ["Bash(*)"] } });
+    await batchDedupCommand({ root, maxDepth: 2, includeGlobal: false, scope: "project", yes: true });
+    expect(lines.join("\n")).toMatch(/conflict/i);
+  });
+
+  it("reports remaining conflicts after applying batch dedup (dedup.ts:314)", async () => {
+    // Project has BOTH a duplicate AND a conflict → after dedup, conflicts remain
+    await makeProject("proj-both", {
+      permissions: { allow: ["Read(*)", "Read(*)", "Bash(*)"], deny: ["Bash(*)"] },
+    });
+    await batchDedupCommand({ root, maxDepth: 2, includeGlobal: false, scope: "project", yes: true });
+    expect(lines.join("\n")).toMatch(/conflict/i);
+    expect(lines.join("\n")).toMatch(/removed duplicates from 1 project/i);
+  });
+
+  it("warns and returns when --scope user is specified (no --all needed)", async () => {
+    await batchDedupCommand({ root, maxDepth: 2, includeGlobal: false, scope: "user", yes: true });
+    expect(lines.join("\n")).toMatch(/scope user applies globally/i);
+  });
+
+  it("exits 1 for invalid scope", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(
+        batchDedupCommand({ root, maxDepth: 2, includeGlobal: false, scope: "managed" })
+      ).rejects.toThrow("exit:1");
+    } finally {
+      exitSpy.mockRestore();
+    }
+  });
+
+  it("reports write errors gracefully", async () => {
+    const lockedDir = await makeProject("proj-locked", { permissions: { allow: ["Read(*)", "Read(*)"] } });
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => { throw new Error(`exit:${code}`); });
+    chmodSync(join(lockedDir, ".claude"), 0o555); // read+execute but no write (can read files, can't create temp file)
+    try {
+      await batchDedupCommand({ root, maxDepth: 2, includeGlobal: false, scope: "project", yes: true });
+      // Should not throw, but report error
+      expect(lines.join("\n")).toMatch(/error/i);
+    } finally {
+      chmodSync(join(lockedDir, ".claude"), 0o755);
       exitSpy.mockRestore();
     }
   });

@@ -8,6 +8,7 @@ import { auditCommand } from "./commands/audit.js";
 import { statsCommand } from "./commands/stats.js";
 import { searchCommand } from "./commands/search.js";
 import { homeDir } from "./utils/paths.js";
+import { dedupCommand, batchDedupCommand } from "./commands/dedup.js";
 import { PermissionModeSchema } from "./core/schemas.js";
 import { WRITABLE_SCOPES } from "./core/types.js";
 
@@ -379,6 +380,24 @@ program
       await batchPresetCommand(name, { root, maxDepth: parseDepth(depth), includeGlobal: g !== false, ...opts, dryRun: opts.dryRun });
     } else {
       await presetCommand(name, { ...opts, dryRun: opts.dryRun });
+    }
+  });
+
+program
+  .command("dedup")
+  .description("Remove duplicate rules from settings files (optionally across all projects)")
+  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
+  .option("--project <path>", "Project path for local/project scope (default: cwd)")
+  .option("--all", "Apply to all discovered projects")
+  .option("--yes", "Skip confirmation prompt")
+  .option("--dry-run", "Preview what would be removed without modifying any files")
+  .option("--json", "Output as JSON")
+  .action(async (opts) => {
+    const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
+    if (opts.all) {
+      await batchDedupCommand({ root, maxDepth: parseDepth(depth), includeGlobal: g !== false, scope: opts.scope, dryRun: opts.dryRun, yes: opts.yes, json: opts.json });
+    } else {
+      await dedupCommand({ project: opts.project, scope: opts.scope, dryRun: opts.dryRun, yes: opts.yes, json: opts.json });
     }
   });
 

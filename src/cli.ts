@@ -85,13 +85,14 @@ program
   .description("Search for projects that have rules matching a pattern")
   .option("--json", "Output as JSON")
   .option("--exact", "Exact rule match (default: substring)")
+  .option("--exit-code", "Exit 1 if no matches found (useful in CI)")
   .addOption(new Option("--type <type>", "Only search in this rule list").choices(["allow", "deny", "ask"]))
   .addOption(new Option("--scope <scope>", "Only match rules in this scope").choices(["local", "project", "user", "managed"]))
   .action(async (pattern, opts) => {
     const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
     await searchCommand(pattern, {
       root, maxDepth: parseDepth(depth), json: opts.json, includeGlobal: g !== false,
-      exact: opts.exact, type: opts.type, scope: opts.scope,
+      exact: opts.exact, type: opts.type, scope: opts.scope, exitCode: opts.exitCode,
     });
   });
 

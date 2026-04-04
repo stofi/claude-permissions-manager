@@ -43,6 +43,10 @@ cpm audit --fix --yes       # Auto-apply all available fixes without prompting, 
 cpm audit --fix --yes --exit-code  # Fix, re-scan, exit non-zero if issues remain
 cpm diff <path1> <path2>    # Compare two projects side by side
 cpm copy <source> <target>  # Copy project-level permissions to another project
+cpm preset safe             # Apply the "safe" security preset to current project
+cpm preset                  # List all available presets
+cpm dedup                   # Remove duplicate rules from current project's settings
+cpm dedup --all --yes       # Remove duplicates across all discovered projects
 cpm export                  # Dump all permissions as JSON (stdout)
 cpm export --format csv     # Dump as CSV
 cpm export --format markdown  # Generate a Markdown report
@@ -86,6 +90,10 @@ cpm reset "Bash(npm run *)" --all --scope project --yes      # apply
 # Clear all rules from one project (with confirmation)
 cpm reset --all --yes --project ~/my-project --scope project
 
+# Clear all rules across ALL discovered projects (batch)
+cpm reset --all --dry-run   # preview
+cpm reset --all --yes       # apply
+
 # Set permission mode for one project
 cpm mode acceptEdits --project ~/my-project --scope project
 
@@ -118,6 +126,10 @@ cpm copy ~/template-project ~/new-project --dry-run
 
 # Copy into a project-scope (shared) settings file instead of local
 cpm copy ~/template-project ~/new-project --scope project --yes
+
+# Copy from a template to ALL discovered projects at once
+cpm copy ~/template-project --all --dry-run   # preview
+cpm copy ~/template-project --all --yes       # apply
 ```
 
 `cpm copy` reads allow/deny/ask rules and `defaultMode` from the **source project's `project` and `local` scope settings files only** (global user/managed rules are excluded — they already apply everywhere). It then merges those rules into the target's settings file, deduplicating any rules already present.
@@ -133,9 +145,71 @@ cpm bypass-lock off --project ~/my-project --scope project
 
 # Preview without writing
 cpm bypass-lock on --scope project --dry-run
+
+# Apply to ALL discovered projects at once
+cpm bypass-lock on --all --dry-run   # preview
+cpm bypass-lock on --all --yes       # apply
 ```
 
 Setting `disableBypassPermissionsMode` to `"disable"` in a settings file prevents the `bypassPermissions` mode from being activated in that project. This is also auto-applied by `cpm audit --fix` when the corresponding LOW-severity warning is present.
+
+### Apply security presets
+
+```bash
+# List all available presets with descriptions
+cpm preset
+
+# Apply a preset to the current project (local scope by default)
+cpm preset safe             # Block shell + writes; keep read access
+cpm preset readonly         # Block shell, writes, and network fetch
+cpm preset locked           # Block shell + writes + enable bypass-lock
+cpm preset open             # Allow all tools (removes restrictive deny rules)
+cpm preset cautious         # Deny shell + writes; set dontAsk mode
+
+# Target a specific scope or project
+cpm preset safe --scope project --project ~/my-project
+
+# Apply to ALL discovered projects at once
+cpm preset safe --all --dry-run   # preview
+cpm preset safe --all --yes       # apply
+
+# Preview without writing
+cpm preset locked --dry-run
+```
+
+**Preset reference:**
+
+| Preset | Effect |
+|--------|--------|
+| `safe` | Deny `Bash(*)`, `Write(**)`, `Edit(**)`, `MultiEdit(**)` — blocks shell and writes |
+| `readonly` | `safe` + deny `WebFetch(*)`, `WebSearch(*)` — fully read-only |
+| `locked` | `safe` + enable `bypass-lock` (`disableBypassPermissionsMode`) |
+| `open` | Allow all major tools (removes existing restrictive deny rules) |
+| `cautious` | Deny shell + writes; set `dontAsk` mode (Claude must ask before all actions) |
+
+Presets **merge** with existing rules — they never remove rules you've already added. Rules are deduplicated if already present. Use `cpm reset` or `cpm dedup` to clean up after applying a preset.
+
+### Remove duplicate rules
+
+```bash
+# Remove duplicate rules from the current project (local scope)
+cpm dedup
+
+# Target a specific scope or project
+cpm dedup --scope project --project ~/my-project
+
+# Preview without writing
+cpm dedup --dry-run
+
+# Remove duplicates across ALL discovered projects
+cpm dedup --all --dry-run   # preview
+cpm dedup --all --yes       # apply
+
+# Machine-readable output
+cpm dedup --json
+```
+
+`cpm dedup` removes rules that appear more than once in the same allow/deny/ask list (keeping the first occurrence). It also detects **cross-list conflicts** — when the same rule appears in both `allow` and `deny` — and reports them as warnings without auto-removing (since the resolution depends on intent; use `cpm reset` or `cpm allow`/`cpm deny` to resolve manually).
 
 ### Open settings in your editor
 
@@ -167,9 +241,9 @@ Creates the file (empty `{}`) if it doesn't already exist, then opens it in `$VI
 --min-severity     Only show/report issues at or above severity: critical | high | medium | low (list and audit)
 --exit-code        Exit 1 if issues found, 2 if critical issues (audit only — useful in CI)
 --fix              Auto-apply all available fix commands (audit only)
---all              Apply to all discovered projects (allow, deny, ask, reset <rule>, mode); or clear all rules in one project (reset without rule)
---yes / -y         Skip confirmation prompt (--fix for audit; --all for allow/deny/ask/reset/mode)
---dry-run          Preview what would be written without modifying files (allow, deny, ask, reset, mode, init, copy)
+--all              Apply to all discovered projects (allow, deny, ask, reset <rule>, mode, bypass-lock, preset, dedup, copy); or clear all rules across all projects (reset without rule + no --project)
+--yes / -y         Skip confirmation prompt (--fix for audit; --all for allow/deny/ask/reset/mode/preset/dedup/copy)
+--dry-run          Preview what would be written without modifying files (allow, deny, ask, reset, mode, init, copy, preset, dedup)
 --format <fmt>     Output format: json|csv|markdown (export only, default: json)
 --output <file>    Write output to file instead of stdout (export only)
 --exact            Exact rule match instead of substring (search only)

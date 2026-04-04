@@ -244,10 +244,20 @@ function detectWarnings(
   const denySet = new Set(permissions.deny.map((r) => r.raw));
   for (const rule of permissions.allow) {
     if (denySet.has(rule.raw)) {
+      const denyRule = permissions.deny.find((d) => d.raw === rule.raw);
+      const sameScope = denyRule?.scope === rule.scope;
+      const fixCmd = sameScope
+        ? `cpm dedup --fix-conflicts --scope ${rule.scope}`
+        : `cpm reset "${rule.raw}" --scope ${rule.scope}`;
+      const fixOp: FixOp | undefined = sameScope
+        ? undefined
+        : { kind: "reset" as const, rule: rule.raw, scope: rule.scope };
       warnings.push({
         severity: "low",
         message: `Rule "${rule.raw}" is in both allow and deny — deny wins, allow has no effect`,
         rule: rule.raw,
+        fixCmd,
+        ...(fixOp ? { fixOp } : {}),
       });
     }
   }
@@ -255,10 +265,20 @@ function detectWarnings(
   // Warn about rules that appear in both ask and deny (deny wins, ask prompt never shown)
   for (const rule of permissions.ask) {
     if (denySet.has(rule.raw)) {
+      const denyRule = permissions.deny.find((d) => d.raw === rule.raw);
+      const sameScope = denyRule?.scope === rule.scope;
+      const fixCmd = sameScope
+        ? `cpm dedup --fix-conflicts --scope ${rule.scope}`
+        : `cpm reset "${rule.raw}" --scope ${rule.scope}`;
+      const fixOp: FixOp | undefined = sameScope
+        ? undefined
+        : { kind: "reset" as const, rule: rule.raw, scope: rule.scope };
       warnings.push({
         severity: "low",
         message: `Rule "${rule.raw}" is in both ask and deny — deny wins, ask prompt never shown`,
         rule: rule.raw,
+        fixCmd,
+        ...(fixOp ? { fixOp } : {}),
       });
     }
   }
@@ -267,10 +287,20 @@ function detectWarnings(
   const allowSet = new Set(permissions.allow.map((r) => r.raw));
   for (const rule of permissions.ask) {
     if (allowSet.has(rule.raw)) {
+      const allowRule = permissions.allow.find((a) => a.raw === rule.raw);
+      const sameScope = allowRule?.scope === rule.scope;
+      const fixCmd = sameScope
+        ? `cpm dedup --fix-conflicts --scope ${rule.scope}`
+        : `cpm reset "${rule.raw}" --scope ${rule.scope}`;
+      const fixOp: FixOp | undefined = sameScope
+        ? undefined
+        : { kind: "reset" as const, rule: rule.raw, scope: rule.scope };
       warnings.push({
         severity: "low",
         message: `Rule "${rule.raw}" is in both allow and ask — allow wins, ask prompt never shown`,
         rule: rule.raw,
+        fixCmd,
+        ...(fixOp ? { fixOp } : {}),
       });
     }
   }

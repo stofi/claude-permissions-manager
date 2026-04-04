@@ -7608,6 +7608,62 @@ describe("dedupCommand", () => {
       exitSpy.mockRestore();
     }
   });
+
+  it("--fix-conflicts resolves allow+deny conflict (deny wins, removes from allow)", async () => {
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(*)", "Read(*)"], deny: ["Bash(*)"] } })
+    );
+    await dedupCommand({ project: tmpDir, scope: "project", yes: true, fixConflicts: true });
+    const data = JSON.parse(await readFile(join(tmpDir, ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions.allow).toEqual(["Read(*)"]);  // Bash(*) removed from allow
+    expect(data.permissions.deny).toEqual(["Bash(*)"]);   // deny kept
+    expect(lines.join("\n")).toMatch(/fix conflict/i);
+  });
+
+  it("--fix-conflicts resolves ask+deny conflict (deny wins, removes from ask)", async () => {
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { ask: ["WebFetch(*)", "Read(*)"], deny: ["WebFetch(*)"] } })
+    );
+    await dedupCommand({ project: tmpDir, scope: "project", yes: true, fixConflicts: true });
+    const data = JSON.parse(await readFile(join(tmpDir, ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions.ask).toEqual(["Read(*)"]);      // WebFetch(*) removed from ask
+    expect(data.permissions.deny).toEqual(["WebFetch(*)"]); // deny kept
+  });
+
+  it("--fix-conflicts resolves allow+ask conflict (allow wins, removes from ask)", async () => {
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Glob(*)", "Read(*)"], ask: ["Glob(*)", "Write(*)"] } })
+    );
+    await dedupCommand({ project: tmpDir, scope: "project", yes: true, fixConflicts: true });
+    const data = JSON.parse(await readFile(join(tmpDir, ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions.allow).toEqual(["Glob(*)", "Read(*)"]); // allow unchanged
+    expect(data.permissions.ask).toEqual(["Write(*)"]);              // Glob(*) removed from ask
+  });
+
+  it("--fix-conflicts --dry-run shows what would be resolved without writing", async () => {
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(*)"], deny: ["Bash(*)"] } })
+    );
+    await dedupCommand({ project: tmpDir, scope: "project", dryRun: true, fixConflicts: true });
+    const data = JSON.parse(await readFile(join(tmpDir, ".claude", "settings.json"), "utf-8"));
+    expect(data.permissions.allow).toEqual(["Bash(*)"]); // unchanged
+    expect(lines.join("\n")).toMatch(/dry-run/i);
+  });
+
+  it("--fix-conflicts --json includes resolvedConflicts in output", async () => {
+    await writeFile(
+      join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ permissions: { allow: ["Bash(*)"], deny: ["Bash(*)"] } })
+    );
+    await dedupCommand({ project: tmpDir, scope: "project", json: true, fixConflicts: true });
+    const output = JSON.parse(lines.join(""));
+    expect(output.resolvedConflictCount).toBe(1);
+    expect(output.resolvedConflicts[0]).toMatchObject({ rule: "Bash(*)", removedFrom: "allow", keptIn: "deny" });
+  });
 });
 
 // ────────────────────────────────────────────────────────────
@@ -7641,7 +7697,7 @@ describe("batchDedupCommand", () => {
     await makeProject("proj-a", { permissions: { deny: ["Bash(*)", "Bash(*)", "Write(**)"] } });
     await makeProject("proj-b", { permissions: { allow: ["Read(*)", "Read(*)"] } });
     await batchDedupCommand({ root, maxDepth: 2, includeGlobal: false, scope: "project", yes: true });
-    expect(lines.join("\n")).toMatch(/removed duplicates from 2 project/i);
+    expect(lines.join("\n")).toMatch(/updated 2 project/i);
   });
 
   it("skips projects with no duplicates", async () => {
@@ -7678,8 +7734,8 @@ describe("batchDedupCommand", () => {
     await batchDedupCommand({ root, maxDepth: 2, includeGlobal: false, scope: "project", json: true });
     const output = JSON.parse(lines.join(""));
     expect(output.projectCount).toBe(1);
-    expect(output.projectsWithDuplicates).toBe(1);
-    expect(output.totalDuplicatesRemoved).toBe(1);
+    expect(output.projectsWithChanges).toBe(1);
+    expect(output.totalChanges).toBe(1);
   });
 
   it("no projects found", async () => {
@@ -7701,7 +7757,7 @@ describe("batchDedupCommand", () => {
     });
     await batchDedupCommand({ root, maxDepth: 2, includeGlobal: false, scope: "project", yes: true });
     expect(lines.join("\n")).toMatch(/conflict/i);
-    expect(lines.join("\n")).toMatch(/removed duplicates from 1 project/i);
+    expect(lines.join("\n")).toMatch(/updated 1 project/i);
   });
 
   it("warns and returns when --scope user is specified (no --all needed)", async () => {
@@ -7733,6 +7789,21 @@ describe("batchDedupCommand", () => {
       chmodSync(join(lockedDir, ".claude"), 0o755);
       exitSpy.mockRestore();
     }
+  });
+
+  it("--fix-conflicts resolves conflicts across all projects", async () => {
+    await makeProject("proj-a", { permissions: { allow: ["Bash(*)"], deny: ["Bash(*)"] } });
+    await makeProject("proj-b", { permissions: { allow: ["Read(*)", "Read(*)"] } });
+    await batchDedupCommand({ root, maxDepth: 2, includeGlobal: false, scope: "project", yes: true, fixConflicts: true });
+    expect(lines.join("\n")).toMatch(/updated 2 project/i);
+  });
+
+  it("--fix-conflicts --json includes resolvedConflictCount", async () => {
+    await makeProject("proj-a", { permissions: { allow: ["Bash(*)"], deny: ["Bash(*)"] } });
+    await batchDedupCommand({ root, maxDepth: 2, includeGlobal: false, scope: "project", json: true, fixConflicts: true });
+    const output = JSON.parse(lines.join(""));
+    expect(output.results[0].resolvedConflictCount).toBe(1);
+    expect(output.totalChanges).toBe(1);
   });
 });
 

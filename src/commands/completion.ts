@@ -226,7 +226,7 @@ _cpm_completions() {
       return 0
       ;;
     dedup)
-      COMPREPLY=( \$(compgen -W "--scope --project --all --yes --dry-run --json --root --depth" -- "\${cur}") )
+      COMPREPLY=( \$(compgen -W "--scope --project --all --yes --dry-run --json --fix-conflicts --root --depth" -- "\${cur}") )
       return 0
       ;;
   esac
@@ -479,6 +479,7 @@ ${commandDefs}
             '--yes[Skip confirmation]' \\
             '--dry-run[Preview without writing]' \\
             '--json[Output as JSON]' \\
+            '--fix-conflicts[Auto-resolve cross-list conflicts (deny > allow > ask)]' \\
             '--root[Scan root]:dir:_directories' \\
             '--depth[Max depth]:n:'
           ;;

@@ -361,6 +361,28 @@ program
   });
 
 program
+  .command("preset [name]")
+  .description("Apply a named security preset (safe, readonly, locked, open, cautious). No name = list presets.")
+  .addOption(new Option("--scope <scope>", "Settings scope (default: local)").choices(WRITABLE_SCOPES).default("local"))
+  .option("--project <path>", "Project path for local/project scope (default: cwd)")
+  .option("--all", "Apply to all discovered projects")
+  .option("--yes", "Skip confirmation prompt")
+  .option("--dry-run", "Preview what would be applied without modifying any files")
+  .action(async (name, opts) => {
+    const { root, depth, global: g } = program.opts() as { root: string; depth: string; global: boolean };
+    const { listPresetsCommand, presetCommand, batchPresetCommand } = await import("./commands/preset.js");
+    if (!name) {
+      listPresetsCommand();
+      return;
+    }
+    if (opts.all) {
+      await batchPresetCommand(name, { root, maxDepth: parseDepth(depth), includeGlobal: g !== false, ...opts, dryRun: opts.dryRun });
+    } else {
+      await presetCommand(name, { ...opts, dryRun: opts.dryRun });
+    }
+  });
+
+program
   .command("completion <shell>")
   .description("Print shell completion script (bash or zsh). Add to shell profile:")
   .addHelpText("after", "\n  eval \"$(cpm completion bash)\"  # ~/.bashrc\n  eval \"$(cpm completion zsh)\"   # ~/.zshrc")

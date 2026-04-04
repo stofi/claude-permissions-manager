@@ -44,6 +44,7 @@ const COMMANDS = [
   "bypass-lock",
   "copy",
   "preset",
+  "dedup",
   "export",
   "init",
   "edit",
@@ -223,6 +224,10 @@ _cpm_completions() {
       COMPREPLY=( \$(compgen -W "--scope --all --yes --dry-run --root --depth" -- "\${cur}") )
       return 0
       ;;
+    dedup)
+      COMPREPLY=( \$(compgen -W "--scope --project --all --yes --dry-run --json --root --depth" -- "\${cur}") )
+      return 0
+      ;;
   esac
 
   # Default: complete flags
@@ -254,6 +259,7 @@ function zshScript(): string {
       "bypass-lock": "Enable/disable bypass-permissions lock",
       copy: "Copy permissions to another project (--all = batch)",
       preset: "Apply a named security preset (safe/readonly/locked/open/cautious)",
+      dedup: "Remove duplicate rules from settings files",
       export: "Export permissions data",
       init: "Create starter settings",
       edit: "Open settings file in $EDITOR",
@@ -451,6 +457,17 @@ ${commandDefs}
             '--all[Copy to all discovered projects]' \\
             '--yes[Skip confirmation]' \\
             '--dry-run[Preview without writing]' \\
+            '--root[Scan root]:dir:_directories' \\
+            '--depth[Max depth]:n:'
+          ;;
+        dedup)
+          _arguments \\
+            '--scope[Settings scope]:scope:(${scopeList})' \\
+            '--project[Project path]:project:_directories' \\
+            '--all[Apply to all discovered projects]' \\
+            '--yes[Skip confirmation]' \\
+            '--dry-run[Preview without writing]' \\
+            '--json[Output as JSON]' \\
             '--root[Scan root]:dir:_directories' \\
             '--depth[Max depth]:n:'
           ;;
